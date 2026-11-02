@@ -1,6 +1,6 @@
 {
 	"name": "@certalis/agent-smith",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "PROOF OF CONCEPT for ideation only: an experimental local proxy and provider pool for Claude Code and Codex",
 	"license": "MIT",
 	"author": "Certalis",
@@ -14,6 +14,10 @@
 	},
 	"bin": {
 		"agent-smith": "dist/bin.js"
+	},
+	"exports": {
+		"./server": "./dist/server.js",
+		"./package.json": "./package.json"
 	},
 	"type": "module",
 	"engines": {

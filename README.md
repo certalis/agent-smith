@@ -47,6 +47,19 @@ agent-smith
 Or run it once without installing: `bunx @certalis/agent-smith`. To work from
 source, clone this repository, then run `bun install && bun run ccflare`.
 
+A host that supervises agent-smith itself can start the server in its own Bun
+process, without the dashboard and with a private Unix socket beside the TCP port:
+
+```js
+import startServer from "@certalis/agent-smith/server";
+
+startServer({
+  port: 8081,
+  withDashboard: false,
+  additionalUnixSocket: "/absolute/path/control.sock",
+});
+```
+
 ## Quick start: Claude Code with an Anthropic API key
 
 1. Create the config file (see [Configuration](#configuration)) with a pool for

@@ -30,6 +30,7 @@ if (web.exitCode !== 0) {
 const result = await Bun.build({
 	entrypoints: [
 		join(tuiDir, "src/bin.ts"),
+		join(tuiDir, "src/server.ts"),
 		join(tuiDir, "../../packages/proxy/src/post-processor.worker.ts"),
 	],
 	outdir: distDir,
