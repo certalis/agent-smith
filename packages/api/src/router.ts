@@ -91,11 +91,16 @@ export class APIRouter {
 	}
 
 	private registerHandlers(): void {
-		if (this.enrollment)
+		if (this.enrollment) {
 			this.staticHandlers.set(
 				"POST:/api/enrollment-invitations",
 				this.enrollment.issue,
 			);
+			this.staticHandlers.set(
+				"POST:/api/enrollment-emails",
+				this.enrollment.emails,
+			);
+		}
 		const { config, dbOps, getProviders, getRuntimeHealth, providerRegistry } =
 			this.context;
 

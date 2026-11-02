@@ -12,7 +12,9 @@ import {
 	DEFAULT_STRATEGY,
 	isValidStrategy,
 	NETWORK,
+	patterns,
 	TIME_CONSTANTS,
+	ValidationError,
 } from "@ccflare/core";
 import { Logger } from "@ccflare/logger";
 import {
@@ -129,10 +131,12 @@ export interface ConfigData {
 	team_routing?: TeamRoutingFileConfig;
 	providers?: Record<string, ProviderFileConfig>;
 	provider_pools?: ProviderPoolsFileConfig;
+	enrollment_emails?: string[];
 	[key: string]:
 		| string
 		| number
 		| boolean
+		| string[]
 		| TeamRoutingFileConfig
 		| Record<string, ProviderFileConfig>
 		| ProviderPoolsFileConfig
@@ -148,6 +152,22 @@ function parseNumber(value: string | undefined): number | undefined {
 	return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+const MAX_ENROLLMENT_EMAILS = 200;
+
+function normalizeEnrollmentEmail(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const email = value.trim().toLowerCase();
+	return email.length <= 254 && patterns.email.test(email) ? email : undefined;
+}
+
+function sanitizeEnrollmentEmails(value: unknown): string[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const emails = value
+		.map(normalizeEnrollmentEmail)
+		.filter((email): email is string => email !== undefined);
+	return [...new Set(emails)].slice(0, MAX_ENROLLMENT_EMAILS);
+}
+
 function sanitizeConfigData(value: unknown): ConfigData {
 	if (!isRecord(value)) {
 		return {};
@@ -156,6 +176,11 @@ function sanitizeConfigData(value: unknown): ConfigData {
 	const sanitized: ConfigData = {};
 
 	for (const [key, entry] of Object.entries(value)) {
+		if (key === "enrollment_emails") {
+			const emails = sanitizeEnrollmentEmails(entry);
+			if (emails) sanitized.enrollment_emails = emails;
+			continue;
+		}
 		if (key === "team_routing") {
 			const teamRouting = sanitizeTeamRouting(entry);
 			if (teamRouting) sanitized.team_routing = teamRouting;
@@ -635,11 +660,42 @@ export class Config extends EventEmitter {
 	}
 
 	private persistAccountAllowlist(accountUuids: string[]): void {
-		const teamRouting = {
+		this.persistStrictly("team_routing", {
 			...this.data.team_routing,
 			allowlisted_account_uuids: accountUuids,
-		};
-		const next = { ...this.data, team_routing: teamRouting };
+		});
+	}
+
+	getEnrollmentEmails(): string[] {
+		return [...(this.data.enrollment_emails ?? [])];
+	}
+
+	/** Replaces the stable-link email list live; one invalid entry refuses the whole list. */
+	setEnrollmentEmails(emails: readonly string[]): string[] {
+		const normalized = emails.map(normalizeEnrollmentEmail);
+		if (normalized.some((email) => email === undefined)) {
+			throw new ValidationError(
+				"Invalid enrollment email",
+				"enrollment_emails",
+			);
+		}
+		const unique = [...new Set(normalized as string[])];
+		if (unique.length > MAX_ENROLLMENT_EMAILS) {
+			throw new ValidationError(
+				`At most ${MAX_ENROLLMENT_EMAILS} enrollment emails`,
+				"enrollment_emails",
+			);
+		}
+		this.persistStrictly("enrollment_emails", unique);
+		return [...unique];
+	}
+
+	/** Atomic write that throws, unlike saveConfig, so a caller can roll back. */
+	private persistStrictly<K extends "team_routing" | "enrollment_emails">(
+		key: K,
+		value: NonNullable<ConfigData[K]>,
+	): void {
+		const next: ConfigData = { ...this.data, [key]: value };
 		const temporary = `${this.configPath}.${crypto.randomUUID()}.tmp`;
 		try {
 			writeFileSync(temporary, JSON.stringify(next, null, 2), {
@@ -650,13 +706,9 @@ export class Config extends EventEmitter {
 		} finally {
 			rmSync(temporary, { force: true });
 		}
-		const oldValue = this.data.team_routing;
+		const oldValue = this.data[key];
 		this.data = next;
-		this.emit("change", {
-			key: "team_routing",
-			oldValue,
-			newValue: teamRouting,
-		});
+		this.emit("change", { key, oldValue, newValue: value });
 	}
 
 	getRuntime(): RuntimeConfig {

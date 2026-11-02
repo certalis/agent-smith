@@ -1,4 +1,7 @@
-import { enrollmentEnvironment } from "./harness/enrollment-fixture";
+import {
+	enrollmentEnvironment,
+	publicHeaders,
+} from "./harness/enrollment-fixture";
 import { defineScenario } from "./harness/scenario";
 
 export default defineScenario({
@@ -13,6 +16,12 @@ export default defineScenario({
 			path: "/api/enrollment-invitations",
 			headers: { "x-api-key": "scenario-admin-key" },
 			body: "{}",
+		},
+		{
+			type: "request",
+			path: "/pool-enroll/request",
+			headers: publicHeaders,
+			body: '{"email":"owner@example.test"}',
 		},
 	],
 	assertions: [

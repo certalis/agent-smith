@@ -159,6 +159,45 @@ const cases: { id: string; request: RequestStep; status: number }[] = [
 		status: 400,
 	},
 	{
+		id: "email-request-requires-origin",
+		request: publicRequest("/pool-enroll/request", {
+			body: '{"email":"someone@example.test"}',
+			headers: { host: "pool.example.test" },
+		}),
+		status: 403,
+	},
+	{
+		id: "email-request-rejects-get",
+		request: publicRequest("/pool-enroll/request", { method: "GET" }),
+		status: 405,
+	},
+	{
+		id: "empty-list-admits-no-email",
+		request: publicRequest("/pool-enroll/request", {
+			body: '{"email":"someone@example.test"}',
+		}),
+		status: 403,
+	},
+	{
+		id: "email-request-accepts-only-an-email",
+		request: publicRequest("/pool-enroll/request", {
+			body: JSON.stringify({
+				email: "someone@example.test",
+				token: missingToken,
+			}),
+		}),
+		status: 400,
+	},
+	{
+		id: "email-list-requires-authentication",
+		request: {
+			type: "request",
+			path: "/api/enrollment-emails",
+			body: "{}",
+		},
+		status: 401,
+	},
+	{
 		id: "admin-can-issue-without-personal-metadata",
 		request: {
 			type: "request",

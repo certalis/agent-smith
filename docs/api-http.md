@@ -59,11 +59,22 @@ disabled, issuing one returns 400.
 | Method / path | Authorization | Body / result |
 |---|---|---|
 | `POST /api/enrollment-invitations` | Existing admin key | Optional `name`, `email` (expected Claude email), `contactEmail`, `slackUserId`; returns `url`, `expiresAt` |
-| `GET /pool-enroll` | Configured Host | Static page; does not consume an invite |
+| `POST /api/enrollment-emails` | Existing admin key | Optional `add`, `remove` email lists; returns the whole `emails` list. `{}` only reads it |
+| `GET /pool-enroll` | Configured Host | Static page: the stable link; does not consume an invite |
+| `POST /pool-enroll/request` | Exact Host/Origin + listed email | `{email}` → invitation `token`, normalized `email`, `expiresAt`; 403 when the email is not listed |
 | `POST /pool-enroll/start` | Exact Host/Origin + invitation | `{token}` → `token`, `authUrl`, `expiresAt` |
 | `POST /pool-enroll/verify` | Exact Host/Origin + login capability | `{token, code}` → new `token`, authenticated `email`, `expiresAt`; no account saved |
 | `POST /pool-enroll/confirm` | Exact Host/Origin + verified capability | `{token, consent: true}` → `connected: true`, seat-specific removal `token`, `expiresAt` |
 | `POST /pool-enroll/disconnect` | Exact Host/Origin + removal capability | `{token}` → `disconnected: true`, fresh invitation `token`, `expiresAt` |
+
+**Stable link.** `/pool-enroll` without a fragment asks for an email. When that
+email is on `enrollment_emails`, it returns a 10-minute invitation bound to it: the
+seat is named after the email's local part, the email becomes its reminder contact,
+and verify refuses any Claude account whose email differs. The typed email only
+selects the invitation; the Claude sign-in proves it. An email whose seat already
+exists returns 409. The list is edited live and persisted; removing an email stops
+new requests at once, without touching seats already connected. It is POST-only
+because the proxy key may read every `GET /api/*` route.
 
 JSON POST bodies are streaming-capped at 8 KiB. Issuing `{}` is supported: the
 operator delegates seat choice to the private link's holder. The page always shows

@@ -2,7 +2,7 @@
 
 This guide covers all configuration options for ccflare, including file-based configuration, environment variables, and runtime API updates.
 
-`CF_ENROLLMENT_ORIGIN` optionally enables the [private invitation flow](api-http.md#private-claude-seat-enrollment-opt-in).
+`CF_ENROLLMENT_ORIGIN` optionally enables the [stable link and private invitation flow](api-http.md#private-claude-seat-enrollment-opt-in).
 It must be an exact HTTPS origin, with no path/trailing slash; HTTP is accepted
 only for loopback tests. Invalid values fail startup. Unset disables enrollment.
 This setting does not enable team routing or change account-pool limits.
@@ -101,6 +101,7 @@ The configuration file is stored at:
 | `host` | string | `"127.0.0.1"` | Interface to bind; use `CF_HOST` for deployment overrides |
 | `trust_loopback` | boolean | `true` | Allow direct loopback requests without a key; set `false` behind a same-host reverse proxy that does not forward client-address headers |
 | `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
+| `enrollment_emails` | string[] | `[]` | Emails the stable `/pool-enroll` link admits (lowercased, at most 200). Edit it through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
 | `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
 

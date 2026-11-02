@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { ValidationError } from "@ccflare/core";
 import {
 	type OAuthAuthorization,
 	OAuthFlow,
@@ -10,6 +11,7 @@ import { enrollmentPage } from "./enrollment-page";
 
 const paths = new Set([
 	"/pool-enroll",
+	"/pool-enroll/request",
 	"/pool-enroll/start",
 	"/pool-enroll/verify",
 	"/pool-enroll/confirm",
@@ -108,21 +110,106 @@ export class EnrollmentHandlers {
 				: json(
 						{
 							error:
-								"Enrollment could not be saved. Ask the operator to check the seat and issue a new link.",
+								"Enrollment could not be saved. Ask the operator to check the seat.",
 						},
 						500,
 					);
 		}
 	}
 
+	private requireClaudeCode(): void {
+		if (!this.context.providerRegistry.getOAuthProvider("claude-code"))
+			throw new EnrollmentError(
+				400,
+				"Provider 'claude-code' is disabled. Set providers.claude-code.enabled to true in your config.",
+			);
+	}
+	/** Frees the seat name for one new sign-in: older pending entries for it are dropped. */
+	private reserve(name: string): void {
+		if (this.context.dbOps.getAccountByName(name))
+			throw new EnrollmentError(409, "This seat is already in the pool.");
+		for (const entry of this.entries.values())
+			if (entry.details.name === name && entry.state.kind === "busy")
+				throw new EnrollmentError(409, "Sign-in is already in progress");
+		for (const [key, entry] of this.entries)
+			if (entry.details.name === name) this.entries.delete(key);
+		if (this.entries.size >= 100)
+			throw new EnrollmentError(429, "Too many pending invitations");
+	}
+
+	/**
+	 * Stable-link entry: a listed email selects an invitation; it proves nothing.
+	 * verify still requires the Claude sign-in to return this same email.
+	 */
+	private request(body: Record<string, unknown>): Response {
+		this.requireClaudeCode();
+		if (Object.keys(body).some((key) => key !== "email"))
+			throw new EnrollmentError(400, "Unknown request field");
+		const email =
+			typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+		if (!this.context.config.getEnrollmentEmails().includes(email))
+			throw new EnrollmentError(
+				403,
+				"This email is not on the list. Ask the operator to add it.",
+			);
+		const name = email
+			.slice(0, email.indexOf("@"))
+			.replace(/[^a-z0-9._+-]/g, "-")
+			.slice(0, 64);
+		this.reserve(name);
+		const issued = this.mint(
+			{ name, email, contactEmail: email },
+			{ kind: "invited" },
+			tenMinutes,
+		);
+		return json({ ...issued, email });
+	}
+
+	/**
+	 * Admin-only list edit; an empty body reads the list. POST even to read:
+	 * GET /api/* is open to the proxy key, which must never see these emails.
+	 */
+	emails = (req: Request): Promise<Response> =>
+		this.guarded(async () => {
+			const body = await readBody(req);
+			const lists = Object.entries(body);
+			if (
+				lists.some(
+					([key, value]) =>
+						(key !== "add" && key !== "remove") ||
+						!Array.isArray(value) ||
+						value.some((email) => typeof email !== "string"),
+				)
+			)
+				throw new EnrollmentError(
+					400,
+					"Expected { add?: string[], remove?: string[] }",
+				);
+			const { config } = this.context;
+			const add = (body.add ?? []) as string[];
+			const remove = new Set(
+				((body.remove ?? []) as string[]).map((email) =>
+					email.trim().toLowerCase(),
+				),
+			);
+			if (add.length === 0 && remove.size === 0)
+				return json({ emails: config.getEnrollmentEmails() });
+			const next = [...config.getEnrollmentEmails(), ...add].filter(
+				(email) => !remove.has(email.trim().toLowerCase()),
+			);
+			try {
+				return json({ emails: config.setEnrollmentEmails(next) });
+			} catch (error) {
+				if (error instanceof ValidationError)
+					throw new EnrollmentError(400, error.message);
+				throw error;
+			}
+		});
+
 	/** Called only behind the existing management/admin-key boundary. */
 	issue = (req: Request): Promise<Response> =>
 		this.guarded(async () => {
-			if (!this.context.providerRegistry.getOAuthProvider("claude-code"))
-				throw new EnrollmentError(
-					400,
-					"Provider 'claude-code' is disabled. Set providers.claude-code.enabled to true in your config.",
-				);
+			this.requireClaudeCode();
 			const input = await readBody(req);
 			const allowed = new Set(["name", "email", "contactEmail", "slackUserId"]);
 			if (Object.keys(input).some((key) => !allowed.has(key)))
@@ -158,15 +245,7 @@ export class EnrollmentHandlers {
 				)
 			)
 				throw new EnrollmentError(400, "Invalid invitation details");
-			if (this.context.dbOps.getAccountByName(details.name))
-				throw new EnrollmentError(409, "Seat already exists");
-			for (const entry of this.entries.values())
-				if (entry.details.name === details.name && entry.state.kind === "busy")
-					throw new EnrollmentError(409, "Sign-in is already in progress");
-			for (const [key, entry] of this.entries)
-				if (entry.details.name === details.name) this.entries.delete(key);
-			if (this.entries.size >= 100)
-				throw new EnrollmentError(429, "Too many pending invitations");
+			this.reserve(details.name);
 			const issued = this.mint(details, { kind: "invited" }, oneDay);
 			return json(
 				{
@@ -193,6 +272,7 @@ export class EnrollmentHandlers {
 			if (req.headers.get("origin") !== this.origin.origin)
 				throw new EnrollmentError(403, "Untrusted enrollment origin");
 			const body = await readBody(req);
+			if (url.pathname === "/pool-enroll/request") return this.request(body);
 			const token =
 				typeof body.token === "string" && /^[A-Za-z0-9_-]{43}$/.test(body.token)
 					? body.token
@@ -214,7 +294,7 @@ export class EnrollmentHandlers {
 			)
 				throw new EnrollmentError(
 					410,
-					"This link has expired or was already used. Ask the operator for a new link.",
+					"This sign-in has expired or was already used. Start again.",
 				);
 			const state = entry.state;
 			entry.state = { kind: "busy" }; // Claim before any await: duplicate clicks cannot exchange twice.
@@ -239,7 +319,7 @@ export class EnrollmentHandlers {
 					} catch {
 						throw new EnrollmentError(
 							400,
-							"Claude sign-in could not be verified. Ask for a new link and try again.",
+							"Claude sign-in could not be verified. Start again.",
 						);
 					}
 					this.assertCurrent(key, entry);
@@ -251,7 +331,7 @@ export class EnrollmentHandlers {
 					)
 						throw new EnrollmentError(
 							400,
-							"This Claude account does not match the invitation. Ask for a new link.",
+							"This Claude account does not match your email. Start again and sign in with the matching account.",
 						);
 					this.assertNewSeat(entry.details.name, seat);
 					return json({
@@ -305,7 +385,7 @@ export class EnrollmentHandlers {
 
 	private assertCurrent(key: string, entry: Entry): void {
 		if (this.entries.get(key) !== entry || entry.expiresAt <= this.now())
-			throw new EnrollmentError(410, "Sign-in expired. Ask for a new link.");
+			throw new EnrollmentError(410, "Sign-in expired. Start again.");
 	}
 	private assertNewSeat(name: string, seat: VerifiedClaudeSeat): void {
 		if (
