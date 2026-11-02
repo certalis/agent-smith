@@ -1,0 +1,89 @@
+import { describe, expect, test } from "bun:test";
+import {
+	type ExposureConfig,
+	exposureFailure,
+	isForwardedRequest,
+	isLocalHostHeader,
+} from "./exposure";
+
+const config: ExposureConfig = {
+	adminKey: "admin-key",
+	bindHost: "127.0.0.1",
+	proxyKey: "proxy-key",
+	trustLoopback: true,
+};
+
+const loopbackServer = {
+	requestIP: () => ({ address: "127.0.0.1" }),
+} as unknown as Pick<Bun.Server<unknown>, "requestIP">;
+
+function request(path: string, init: RequestInit = {}): [Request, URL] {
+	const url = new URL(`http://127.0.0.1:8080${path}`);
+	return [new Request(url, init), url];
+}
+
+describe("exposure gate", () => {
+	test("treats forwarded loopback requests as non-local", () => {
+		const [req, url] = request("/v1/claude-code/v1/messages", {
+			headers: { "x-forwarded-for": "203.0.113.7" },
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)?.status).toBe(401);
+	});
+
+	test("allows a forwarded request with the configured proxy key", () => {
+		const [req, url] = request("/v1/claude-code/v1/messages", {
+			headers: {
+				"x-api-key": "proxy-key",
+				"x-forwarded-for": "203.0.113.7",
+			},
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)).toBeNull();
+	});
+
+	test("rejects a cross-origin management write before it can mutate", () => {
+		const [req, url] = request("/api/accounts", {
+			headers: {
+				"x-api-key": "admin-key",
+				origin: "https://attacker.example",
+			},
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)?.status).toBe(403);
+	});
+
+	test("requires the admin key for a management write", () => {
+		const [req, url] = request("/api/accounts", {
+			headers: { "x-api-key": "proxy-key" },
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)?.status).toBe(401);
+	});
+
+	test("does not allow loopback management writes without an admin key", () => {
+		const [req, url] = request("/api/accounts", { method: "POST" });
+		expect(
+			exposureFailure(req, url, loopbackServer, {
+				bindHost: "127.0.0.1",
+				trustLoopback: true,
+			})?.status,
+		).toBe(401);
+	});
+});
+
+test("forwarding marks and acceptable loopback hosts are precise", () => {
+	expect(isForwardedRequest(new Headers({ "x-forwarded-for": "" }))).toBe(
+		false,
+	);
+	expect(
+		isForwardedRequest(new Headers({ forwarded: "for=203.0.113.7" })),
+	).toBe(true);
+	expect(isLocalHostHeader("localhost:8080", "127.0.0.1")).toBe(true);
+	expect(isLocalHostHeader("[::1]:8080", "127.0.0.1")).toBe(true);
+	expect(isLocalHostHeader("attacker.example", "127.0.0.1")).toBe(false);
+});

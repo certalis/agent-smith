@@ -1,0 +1,90 @@
+import {
+	confirm,
+	disconnect,
+	enrollmentEnvironment,
+	issue,
+	profileReply,
+	readAccounts,
+	start,
+	tokenReply,
+	verify,
+} from "./harness/enrollment-fixture";
+import { defineScenario } from "./harness/scenario";
+
+export default defineScenario({
+	name: "private enrollment disconnect expires after restart or 24 hours without deleting a seat",
+	environment: enrollmentEnvironment,
+	claudeOAuth: true,
+	fleet: [],
+	upstream: [
+		tokenReply,
+		{
+			...profileReply({ uuid: "restart-seat", email: "owner@example.test" }),
+			times: 1,
+		},
+		{
+			...profileReply({ uuid: "expired-seat", email: "owner@example.test" }),
+			times: 1,
+		},
+		profileReply({ uuid: "near-expiry-seat", email: "owner@example.test" }),
+	],
+	steps: [
+		issue("restarted"),
+		start("restarted"),
+		verify("restarted"),
+		confirm("restarted", true),
+		{ type: "restart" },
+		disconnect("restarted", "unused", false),
+		readAccounts("afterRestart"),
+		issue("expired"),
+		start("expired"),
+		verify("expired"),
+		confirm("expired", true),
+		issue("nearly"),
+		start("nearly"),
+		verify("nearly"),
+		confirm("nearly", true),
+		{ type: "advance", by: "1439m" },
+		disconnect("nearly"),
+		{ type: "advance", by: "1m" },
+		disconnect("expired", "unused", false),
+		readAccounts("afterExpiry"),
+	],
+	assertions: [
+		{
+			id: "restart-revokes-removal-token",
+			type: "client",
+			request: "restarted-disconnect",
+			status: 410,
+		},
+		{
+			id: "restart-does-not-delete-seat",
+			type: "client",
+			request: "afterRestart",
+			jsonPath: { path: "length", value: 1 },
+		},
+		{
+			id: "removal-works-until-24-hour-boundary",
+			type: "client",
+			request: "nearly-disconnect",
+			status: 200,
+		},
+		{
+			id: "expired-token-cannot-remove",
+			type: "client",
+			request: "expired-disconnect",
+			status: 410,
+		},
+		{
+			id: "expiry-does-not-delete-seat",
+			type: "client",
+			request: "afterExpiry",
+			jsonPath: { path: "length", value: 2 },
+		},
+		{
+			id: "invalid-removal-does-not-call-provider",
+			type: "upstream",
+			count: 6,
+		},
+	],
+});

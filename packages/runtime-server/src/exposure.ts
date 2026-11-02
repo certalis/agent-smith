@@ -1,0 +1,189 @@
+import { timingSafeEqual } from "node:crypto";
+
+const FORWARDED_HEADERS = [
+	"forwarded",
+	"x-forwarded-for",
+	"x-real-ip",
+] as const;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+const MUTATING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
+
+export type ExposureConfig = {
+	adminKey?: string;
+	bindHost: string;
+	proxyKey?: string;
+	trustLoopback: boolean;
+};
+
+type RequestServer = Pick<Bun.Server<unknown>, "requestIP">;
+
+function requestAddress(
+	server: RequestServer | undefined,
+	req: Request,
+): {
+	address: string | undefined;
+	hasRequestIp: boolean;
+} {
+	if (!server || typeof server.requestIP !== "function") {
+		return { address: undefined, hasRequestIp: false };
+	}
+
+	return {
+		address: server.requestIP(req)?.address,
+		hasRequestIp: true,
+	};
+}
+
+function configuredKey(
+	value: string | number | boolean | undefined,
+): string | undefined {
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function createExposureConfig(config: {
+	get(key: string): string | number | boolean | undefined;
+}): ExposureConfig {
+	const configuredHost =
+		configuredKey(process.env.CF_HOST) ?? configuredKey(config.get("host"));
+	const configuredTrustLoopback = process.env.CF_TRUST_LOOPBACK;
+	return {
+		adminKey: configuredKey(process.env.CF_ADMIN_KEY),
+		bindHost: configuredHost ?? "127.0.0.1",
+		proxyKey: configuredKey(process.env.CF_PROXY_KEY),
+		trustLoopback:
+			configuredTrustLoopback === undefined
+				? config.get("trust_loopback") !== false
+				: configuredTrustLoopback !== "false",
+	};
+}
+
+export function isForwardedRequest(headers: Headers): boolean {
+	return FORWARDED_HEADERS.some((header) => {
+		const value = headers.get(header);
+		return value !== null && value.trim().length > 0;
+	});
+}
+
+export function isLoopbackAddress(address: string | undefined): boolean {
+	return (
+		address === "127.0.0.1" ||
+		address === "::1" ||
+		address === "::ffff:127.0.0.1"
+	);
+}
+
+function safeKeyEqual(
+	candidate: string | null,
+	expected: string | undefined,
+): boolean {
+	if (!candidate || !expected || candidate.length !== expected.length) {
+		return false;
+	}
+
+	return timingSafeEqual(Buffer.from(candidate), Buffer.from(expected));
+}
+
+function keyRole(
+	req: Request,
+	config: ExposureConfig,
+): "admin" | "proxy" | null {
+	const key = req.headers.get("x-api-key");
+	if (safeKeyEqual(key, config.adminKey)) {
+		return "admin";
+	}
+	if (safeKeyEqual(key, config.proxyKey)) {
+		return "proxy";
+	}
+	return null;
+}
+
+function hostnameFromHostHeader(host: string): string | undefined {
+	try {
+		const hostname = new URL(`http://${host}`).hostname.toLowerCase();
+		return hostname.startsWith("[") && hostname.endsWith("]")
+			? hostname.slice(1, -1)
+			: hostname;
+	} catch {
+		return undefined;
+	}
+}
+
+function isWildcardHost(host: string): boolean {
+	return host === "0.0.0.0" || host === "::";
+}
+
+export function isLocalHostHeader(
+	hostHeader: string | null,
+	bindHost: string,
+): boolean {
+	if (hostHeader === null) {
+		return true;
+	}
+
+	const hostname = hostnameFromHostHeader(hostHeader);
+	if (!hostname) {
+		return false;
+	}
+
+	return (
+		LOOPBACK_HOSTS.has(hostname) ||
+		(!isWildcardHost(bindHost) && hostname === bindHost.toLowerCase())
+	);
+}
+
+function isSameOriginManagementRequest(req: Request, url: URL): boolean {
+	const fetchSite = req.headers.get("sec-fetch-site");
+	if (fetchSite) {
+		return fetchSite === "same-origin" || fetchSite === "none";
+	}
+
+	const origin = req.headers.get("origin");
+	return origin === null || origin === url.origin;
+}
+
+function jsonError(status: number, message: string): Response {
+	return Response.json({ error: { message } }, { status });
+}
+
+/**
+ * Enforces the server's external exposure boundary before API or proxy routing.
+ * A same-host reverse proxy is treated as remote when it supplies forwarding
+ * headers, preventing it from inheriting the direct-loopback exemption.
+ */
+export function exposureFailure(
+	req: Request,
+	url: URL,
+	server: RequestServer | undefined,
+	config: ExposureConfig,
+): Response | null {
+	const remote = requestAddress(server, req);
+	const loopbackExempt =
+		config.trustLoopback &&
+		(remote.hasRequestIp
+			? isLoopbackAddress(remote.address)
+			: isLocalHostHeader(url.host, config.bindHost)) &&
+		!isForwardedRequest(req.headers);
+	const role = keyRole(req, config);
+
+	if (!role && !loopbackExempt) {
+		return jsonError(401, "A proxy key is required for this request");
+	}
+
+	if (!role && !isLocalHostHeader(req.headers.get("host"), config.bindHost)) {
+		return jsonError(403, "Host header is not allowed for a loopback request");
+	}
+
+	if (url.pathname.startsWith("/api/")) {
+		if (!isSameOriginManagementRequest(req, url)) {
+			return jsonError(403, "Cross-origin management requests are not allowed");
+		}
+
+		if (MUTATING_METHODS.has(req.method)) {
+			if (role !== "admin") {
+				return jsonError(401, "An admin key is required for management writes");
+			}
+		}
+	}
+
+	return null;
+}

@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"module": "esnext",
+		"target": "esnext",
+		"moduleResolution": "bundler",
+		"moduleDetection": "force",
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowJs": true,
+		"types": ["bun-types"],
+		"jsx": "react-jsx",
+		"baseUrl": ".",
+		"paths": {
+			"@ccflare/web": ["apps/web/src/index.ts"],
+			"@ccflare/web/manifest.json": ["apps/web/dist/manifest.json"],
+			"@ccflare/*": ["packages/*/src", "apps/*/src"]
+		}
+	}
+}

@@ -1,0 +1,16 @@
+{
+	"name": "@ccflare/logger",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "bunx tsc --noEmit"
+	},
+	"dependencies": {
+		"@ccflare/core": "workspace:*",
+		"@ccflare/types": "workspace:*"
+	}
+}

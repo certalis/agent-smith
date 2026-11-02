@@ -1,0 +1,166 @@
+import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Config } from "./index";
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+	for (const directory of tempDirs.splice(0)) {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
+
+function configFrom(data: unknown): Config {
+	const directory = mkdtempSync(join(tmpdir(), "agent-smith-config-"));
+	tempDirs.push(directory);
+	const path = join(directory, "config.json");
+	writeFileSync(path, JSON.stringify(data));
+	return new Config(path);
+}
+
+const EXAMPLES_DIR = join(import.meta.dir, "../../../examples/config");
+const API_KEY_EXAMPLES = [
+	"anthropic-api-key.json",
+	"openai-api-key.json",
+	"compatible-endpoint-fallback.json",
+];
+
+function exampleConfig(name: string): Config {
+	return configFrom(JSON.parse(readFileSync(join(EXAMPLES_DIR, name), "utf8")));
+}
+
+describe("provider configuration", () => {
+	it("enables API-key providers but leaves subscription sign-ins off by default", () => {
+		const config = configFrom({});
+
+		expect(config.getProviderConfig("anthropic")).toMatchObject({
+			enabled: true,
+			strategy: "anthropic-api",
+		});
+		expect(config.getProviderConfig("openai")).toMatchObject({
+			enabled: true,
+			strategy: "openai-api",
+		});
+		expect(config.getProviderConfig("claude-code")).toMatchObject({
+			enabled: false,
+			strategy: "claude-code",
+		});
+		expect(config.getProviderConfig("codex")).toMatchObject({
+			enabled: false,
+			strategy: "codex",
+		});
+	});
+
+	it("adds a named Anthropic-compatible provider and explicitly enables Claude Code", () => {
+		const config = configFrom({
+			providers: {
+				acme: {
+					strategy: "anthropic-api",
+					base_url: "https://api.acme.test/",
+				},
+				"claude-code": { enabled: true },
+			},
+		});
+
+		expect(config.getProviderConfig("acme")).toEqual({
+			name: "acme",
+			enabled: true,
+			strategy: "anthropic-api",
+			baseUrl: "https://api.acme.test",
+		});
+		expect(config.getProviderConfig("claude-code")).toMatchObject({
+			enabled: true,
+			strategy: "claude-code",
+		});
+	});
+
+	it("keeps only enabled, same-wire provider-pool entries and provider model maps", () => {
+		const config = configFrom({
+			providers: {
+				acme: {
+					strategy: "anthropic-api",
+					models: {
+						"claude-opus-4": "acme-opus",
+						"claude-sonnet-*": "acme-sonnet",
+					},
+				},
+				"claude-code": { enabled: true },
+				codex: { enabled: true },
+			},
+			provider_pools: {
+				"anthropic-messages": [
+					"claude-code",
+					"acme",
+					"acme",
+					"codex",
+					"missing",
+				],
+			},
+		});
+
+		expect(config.getProviderConfig("acme")).toMatchObject({
+			models: {
+				"claude-opus-4": "acme-opus",
+				"claude-sonnet-*": "acme-sonnet",
+			},
+		});
+		expect(config.getProviderPool("anthropic-messages")).toEqual([
+			"claude-code",
+			"acme",
+		]);
+	});
+
+	it("reserves pool as the protocol route name", () => {
+		const config = configFrom({
+			providers: { pool: { strategy: "anthropic-api" } },
+		});
+
+		expect(config.getProviderConfig("pool")).toBeUndefined();
+	});
+});
+
+describe("README example configurations", () => {
+	it("route each API-key protocol pool through the providers it names", () => {
+		expect(
+			exampleConfig("anthropic-api-key.json").getProviderPool(
+				"anthropic-messages",
+			),
+		).toEqual(["anthropic"]);
+		expect(
+			exampleConfig("openai-api-key.json").getProviderPool("openai-responses"),
+		).toEqual(["openai"]);
+
+		const fallback = exampleConfig("compatible-endpoint-fallback.json");
+		expect(fallback.getProviderPool("anthropic-messages")).toEqual([
+			"anthropic",
+			"acme",
+		]);
+		expect(fallback.getProviderConfig("acme")).toMatchObject({
+			enabled: true,
+			strategy: "anthropic-api",
+			baseUrl: "https://api.acme.example",
+			models: { "claude-sonnet-*": "acme-large" },
+		});
+	});
+
+	it("leave subscription sign-ins off outside the example-only files", () => {
+		for (const name of API_KEY_EXAMPLES) {
+			const config = exampleConfig(name);
+			expect(config.getProviderConfig("claude-code")?.enabled).toBe(false);
+			expect(config.getProviderConfig("codex")?.enabled).toBe(false);
+		}
+
+		expect(
+			exampleConfig(
+				"example-only-claude-code-subscription.json",
+			).getProviderConfig("claude-code")?.enabled,
+		).toBe(true);
+		expect(
+			exampleConfig("example-only-codex-subscription.json").getProviderConfig(
+				"codex",
+			)?.enabled,
+		).toBe(true);
+	});
+});

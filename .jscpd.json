@@ -1,0 +1,19 @@
+{
+	"reporters": ["console", "json"],
+	"output": "./artifacts/jscpd",
+	"absolute": true,
+	"gitignore": true,
+	"minLines": 5,
+	"minTokens": 50,
+	"threshold": 0,
+	"ignore": [
+		"**/node_modules/**",
+		"**/dist/**",
+		"**/build/**",
+		"**/artifacts/**",
+		"**/tmp/**",
+		"**/*.test.*",
+		"**/*.spec.*",
+		"**/test-helpers/**"
+	]
+}

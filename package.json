@@ -1,0 +1,43 @@
+{
+	"private": true,
+	"name": "ccflare",
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"ccflare": "bun run build:clients && bun run tui",
+		"tui": "bun run apps/tui/src/main.ts",
+		"dev": "bun run tui",
+		"start": "bun run apps/server/src/server.ts",
+		"server": "bun run apps/server/src/server.ts",
+		"dev:server": "bun run --hot apps/server/src/server.ts",
+		"dev:dashboard": "bun run --cwd apps/web dev",
+		"typecheck": "for d in packages/*/tsconfig.json apps/*/tsconfig.json; do echo \"typechecking $(dirname $d)...\" && bunx tsc -p $(dirname $d) --noEmit || exit 1; done",
+		"test": "for d in packages/* apps/*; do if [ -f \"$d/package.json\" ] && [ -d \"$d/src\" ]; then echo \"testing $d...\" && (cd \"$d\" && bun test ./src --pass-with-no-tests) || exit 1; fi; done",
+		"lint:check": "bunx --bun biome check apps/server apps/tui apps/web packages",
+		"verify": "bun run test && bun run typecheck && bun run lint:check",
+		"build": "bun run build:clients",
+		"build:clients": "bun run build:dashboard && bun run build:tui",
+		"build:dashboard": "bun run --cwd apps/web build",
+		"build:tui": "bun run --cwd apps/tui build",
+		"build:server": "bun run --cwd apps/server build",
+		"dupes": "jscpd apps packages --config .jscpd.json",
+		"format": "bunx biome format --write .",
+		"lint": "bunx --bun biome check --write --unsafe ."
+	},
+	"engines": {
+		"bun": ">=1.2.8"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.10",
+		"@types/bun": "latest",
+		"bun-types": "latest",
+		"jscpd": "^4.0.9",
+		"typescript": "^5.9.3"
+	},
+	"overrides": {
+		"react": "^19.0.0",
+		"@types/react": "^19.0.0"
+	}
+}

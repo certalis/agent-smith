@@ -1,0 +1,64 @@
+{
+	"name": "@certalis/agent-smith",
+	"version": "0.1.0",
+	"description": "PROOF OF CONCEPT for ideation only: an experimental local proxy and provider pool for Claude Code and Codex",
+	"license": "MIT",
+	"author": "Certalis",
+	"homepage": "https://github.com/certalis/agent-smith#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/certalis/agent-smith.git"
+	},
+	"bugs": {
+		"url": "https://github.com/certalis/agent-smith/issues"
+	},
+	"bin": {
+		"agent-smith": "dist/bin.js"
+	},
+	"type": "module",
+	"engines": {
+		"bun": ">=1.2.8"
+	},
+	"scripts": {
+		"dev": "bun run src/main.ts",
+		"build": "bun run build.ts",
+		"prepack": "bun run build.ts"
+	},
+	"dependencies": {
+		"@dqbd/tiktoken": "^1.0.21",
+		"@opentui/core": "^0.1.98",
+		"@opentui/react": "^0.1.98",
+		"open": "^10.0.0",
+		"react": "^19.0.0"
+	},
+	"devDependencies": {
+		"@ccflare/config": "workspace:*",
+		"@ccflare/core": "workspace:*",
+		"@ccflare/database": "workspace:*",
+		"@ccflare/logger": "workspace:*",
+		"@ccflare/oauth-flow": "workspace:*",
+		"@ccflare/providers": "workspace:*",
+		"@ccflare/runtime-server": "workspace:*",
+		"@ccflare/types": "workspace:*",
+		"@ccflare/ui": "workspace:*",
+		"@types/react": "^19.0.0",
+		"@types/node": "^20.0.0"
+	},
+	"files": [
+		"dist"
+	],
+	"keywords": [
+		"proof-of-concept",
+		"experimental",
+		"agent-smith",
+		"claude-code",
+		"codex",
+		"proxy",
+		"provider-pool",
+		"tui",
+		"cli"
+	],
+	"publishConfig": {
+		"access": "public"
+	}
+}

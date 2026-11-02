@@ -1,0 +1,83 @@
+import {
+	confirm,
+	disconnect,
+	enrollmentConfig,
+	enrollmentEnvironment,
+	issue,
+	oauthReplies,
+	readAccounts,
+	start,
+	verify,
+} from "./harness/enrollment-fixture";
+import { defineScenario } from "./harness/scenario";
+
+export default defineScenario({
+	name: "private enrollment disconnect binds the created account not a replacement with the same provider identity",
+	environment: enrollmentEnvironment,
+	config: enrollmentConfig,
+	claudeOAuth: true,
+	fleet: [],
+	upstream: oauthReplies,
+	steps: [
+		issue("old", { name: "old-label" }),
+		start("old"),
+		verify("old"),
+		confirm("old", true),
+		{ ...readAccounts("oldAccount"), capture: { oldId: { field: "0.id" } } },
+		{
+			type: "request",
+			id: "operatorRemove",
+			method: "DELETE",
+			path: "/api/accounts/{{oldId}}",
+			headers: { "x-api-key": "scenario-admin-key" },
+			body: "",
+		},
+		issue("replacement", { name: "replacement-label" }),
+		start("replacement"),
+		verify("replacement"),
+		confirm("replacement", true),
+		disconnect("old", "unused", false),
+		readAccounts("replacementStillPresent"),
+		disconnect("replacement"),
+		readAccounts("removed"),
+	],
+	assertions: [
+		{
+			id: "operator-removed-original-account",
+			type: "client",
+			request: "operatorRemove",
+			status: 200,
+		},
+		{
+			id: "replacement-enrolled",
+			type: "client",
+			request: "replacement-confirm",
+			status: 200,
+		},
+		{
+			id: "unused-old-token-cannot-remove-replacement",
+			type: "client",
+			request: "old-disconnect",
+			status: 410,
+		},
+		{
+			id: "replacement-keeps-its-credentials",
+			type: "client",
+			request: "replacementStillPresent",
+			jsonPath: { path: "0.name", value: "replacement-label" },
+		},
+		{
+			id: "replacement-owner-can-remove",
+			type: "client",
+			request: "replacement-disconnect",
+			status: 200,
+		},
+		{
+			id: "replacement-credentials-removed",
+			type: "client",
+			request: "removed",
+			body: "[]",
+		},
+		{ id: "removal-only-touches-local-state", type: "upstream", count: 4 },
+	],
+});

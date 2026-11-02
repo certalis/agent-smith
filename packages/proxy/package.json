@@ -1,0 +1,23 @@
+{
+	"name": "@ccflare/proxy",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "bunx tsc --noEmit",
+		"test": "bun test ./src"
+	},
+	"dependencies": {
+		"@ccflare/config": "workspace:*",
+		"@ccflare/core": "workspace:*",
+		"@ccflare/database": "workspace:*",
+		"@ccflare/http": "workspace:*",
+		"@ccflare/logger": "workspace:*",
+		"@ccflare/providers": "workspace:*",
+		"@ccflare/types": "workspace:*",
+		"@dqbd/tiktoken": "^1.0.21"
+	}
+}

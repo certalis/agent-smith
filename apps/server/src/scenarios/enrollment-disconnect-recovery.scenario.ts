@@ -1,0 +1,85 @@
+import {
+	confirm,
+	disconnect,
+	enrollmentConfig,
+	enrollmentEnvironment,
+	issue,
+	oauthReplies,
+	readAccounts,
+	readRouting,
+	start,
+	verify,
+} from "./harness/enrollment-fixture";
+import { defineScenario } from "./harness/scenario";
+
+export default defineScenario({
+	name: "private enrollment disconnect preserves account and retry capability when config write fails",
+	environment: enrollmentEnvironment,
+	config: enrollmentConfig,
+	claudeOAuth: true,
+	fleet: [{ name: "untouched", accountUuid: "existing-seat" }],
+	upstream: oauthReplies,
+	steps: [
+		issue("owner"),
+		start("owner"),
+		verify("owner"),
+		confirm("owner", true),
+		{ type: "block-config-write" },
+		{ ...disconnect("owner", "unused", false), id: "failedRemoval" },
+		readAccounts("afterFailure"),
+		readRouting("failureRouting"),
+		{ type: "restore-config-write" },
+		disconnect("owner", "again"),
+		{ type: "restart" },
+		readAccounts("afterRestart"),
+		readRouting("afterRouting"),
+	],
+	assertions: [
+		{
+			id: "failure-not-reported-as-removed",
+			type: "client",
+			request: "failedRemoval",
+			status: 500,
+		},
+		{
+			id: "failed-removal-keeps-credentials",
+			type: "client",
+			request: "afterFailure",
+			jsonPath: { path: "length", value: 2 },
+		},
+		{
+			id: "failed-removal-keeps-membership",
+			type: "client",
+			request: "failureRouting",
+			jsonPath: {
+				path: "allowlistedAccountUuids",
+				value: ["existing-seat", "verified-seat"],
+			},
+		},
+		{
+			id: "same-removal-token-can-retry",
+			type: "client",
+			request: "owner-disconnect",
+			status: 200,
+		},
+		{
+			id: "successful-retry-deletes-credentials-durably",
+			type: "client",
+			request: "afterRestart",
+			jsonPath: { path: "length", value: 1 },
+		},
+		{
+			id: "successful-retry-preserves-other-seat",
+			type: "client",
+			request: "afterRestart",
+			jsonPath: { path: "0.name", value: "untouched" },
+		},
+		{
+			id: "successful-retry-removes-only-target-membership",
+			type: "client",
+			request: "afterRouting",
+			jsonPath: { path: "allowlistedAccountUuids", value: ["existing-seat"] },
+		},
+		{ id: "removal-does-not-contact-provider", type: "upstream", count: 2 },
+	],
+});
