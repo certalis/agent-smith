@@ -37,6 +37,9 @@ function createTestProvider(name: string): Provider {
 		isWeeklyBucket() {
 			return false;
 		},
+		isFiveHourBucket() {
+			return false;
+		},
 		supportsQuotaProbe() {
 			return false;
 		},

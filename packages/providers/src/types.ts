@@ -60,6 +60,9 @@ export interface Provider {
 	/** Whether a quota bucket represents this provider's weekly allowance. */
 	isWeeklyBucket(bucket: string): boolean;
 
+	/** Whether a quota bucket represents this provider's five-hour session window. */
+	isFiveHourBucket(bucket: string): boolean;
+
 	/** Whether this account can be refreshed through the provider's quota probe. */
 	supportsQuotaProbe(account: Account): boolean;
 

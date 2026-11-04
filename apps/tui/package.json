@@ -1,6 +1,6 @@
 {
 	"name": "@certalis/agent-smith",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "PROOF OF CONCEPT for ideation only: an experimental local proxy and provider pool for Claude Code and Codex",
 	"license": "MIT",
 	"author": "Certalis",

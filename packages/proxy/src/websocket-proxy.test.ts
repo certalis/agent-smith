@@ -36,6 +36,9 @@ function createTestProvider(): Provider {
 		isWeeklyBucket(bucket: string) {
 			return bucket === "unified7d";
 		},
+		isFiveHourBucket(bucket: string) {
+			return bucket === "unified5h";
+		},
 		supportsQuotaProbe() {
 			return false;
 		},

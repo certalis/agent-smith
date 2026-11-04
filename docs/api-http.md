@@ -91,15 +91,15 @@ Invitation PKCE state is also process-local: it never enters the ordinary
 `auth_sessions` table and cannot be completed through a legacy OAuth callback,
 before or after a restart.
 
-After confirmation, the success page offers **Disconnect and try again**. Its
+After confirmation, the success page offers **Disconnect**. Its
 24-hour removal capability is bound to the created account ID and provider UUID;
 an old capability cannot remove a subsequently re-enrolled seat. Disconnect
 deletes the account credentials, private contacts, conversation pins and that
 allowlist membership, preserving other seats and routing settings. A failed
 membership-file write rolls back deletion and leaves removal retryable. Success
 returns a fresh one-use invitation with the original restrictions for another
-sign-in. Keep this page open until test cleanup is done: reload, expiry or server
-restart requires operator cleanup. Removal does not cancel a subscription, log
+sign-in. Disconnect needs this page still open: after a reload, expiry or server
+restart, removal is operator cleanup. Removal does not cancel a subscription, log
 the browser out of Claude, remotely revoke provider tokens, or stop an in-flight
 request. An interruption between config rename and SQLite deletion commit can
 leave a stored account without membership; the operator must inspect it before

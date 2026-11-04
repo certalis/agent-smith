@@ -7,6 +7,7 @@ import {
 	quotaThresholdFor,
 	type RequestMeta,
 } from "@ccflare/types";
+import { soonestWeeklyReset } from "../seat-usage";
 import { isAllowlisted, type TeamRoutingRequest } from "../team-router";
 import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 
@@ -172,24 +173,6 @@ export function getSoonestQuotaReset(
 		)
 		.map(({ window }) => window.resetAt as number);
 	return resets.length > 0 ? Math.min(...resets) : null;
-}
-
-function soonestWeeklyReset(
-	provider: Provider,
-	account: Account,
-	now: number,
-): number {
-	const windows = account.quota_state?.windows ?? {};
-	const resets = Object.entries(windows)
-		.filter(([name, window]) => {
-			return (
-				provider.isWeeklyBucket(name) &&
-				window.resetAt !== null &&
-				window.resetAt > now
-			);
-		})
-		.map(([, window]) => window.resetAt as number);
-	return Math.min(...resets, Number.POSITIVE_INFINITY);
 }
 
 function selectRevalidationProbe(

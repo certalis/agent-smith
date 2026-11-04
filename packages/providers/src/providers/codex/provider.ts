@@ -193,6 +193,10 @@ export class CodexProvider extends OpenAIProvider {
 		return bucket === "unified7d";
 	}
 
+	isFiveHourBucket(bucket: string): boolean {
+		return bucket === "unified5h";
+	}
+
 	supportsWebSocket(upstreamPath: string): boolean {
 		return upstreamPath === "/responses";
 	}

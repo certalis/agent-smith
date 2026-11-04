@@ -33,6 +33,7 @@ function probeProvider(quota: AccountQuotaState): Provider {
 		quotaBucketsFor: () => undefined,
 		weeklyBucketFor: () => "providerWeekly",
 		isWeeklyBucket: () => true,
+		isFiveHourBucket: () => false,
 		supportsQuotaProbe: () => true,
 		probeQuota: async () => quota,
 		processResponse: async (response) => response,

@@ -122,7 +122,7 @@ export function enrollmentPage(): Response {
 <div class="avatar ok">${icon("check")}</div>
 <h1 tabindex="-1">Subscription connected</h1>
 <p class="lead"><strong id="connected-account"></strong> is now part of the shared agents pool. You can close this page.</p>
-<div class="aside"><strong>Only testing?</strong> Disconnect removes this account's saved authorization and pool membership, then lets you sign in again. It stays available for 24 hours while this page is open; it does not sign you out of Claude or cancel your subscription.<button class="button secondary" id="disconnect" type="button">Disconnect and try again</button></div>
+<div class="aside"><strong>Changed your mind?</strong> Disconnect removes this account's saved authorization and pool membership. It stays available for 24 hours while this page is open; it does not sign you out of Claude or cancel your subscription.<button class="button secondary" id="disconnect" type="button">Disconnect</button></div>
 </section>
 <section class="card" id="step-error" hidden>
 <div class="avatar err">${icon("alert")}</div>

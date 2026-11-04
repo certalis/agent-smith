@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { TeamRoutingConfig } from "@ccflare/config";
 import type { Provider } from "@ccflare/providers";
 import type { Account, AccountProvider } from "@ccflare/types";
+import { compareSeatUsage } from "./seat-usage";
 
 const MAX_OPENING_BYTES = 64 * 1024;
 const PIN_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -135,8 +136,9 @@ export class TeamRouter {
 
 		if (!config.distributionEnabled || !key) return eligible;
 
-		const selected = this.leastLoadedPriorityAccount(
+		const selected = this.leastUsedPriorityAccount(
 			eligible,
+			compareSeatUsage(provider, request.model, now),
 			store?.countConversationPinsByAccount(now - PIN_TTL_MS),
 		);
 		this.touchPin(key, selected.id, now, store);
@@ -216,8 +218,9 @@ export class TeamRouter {
 			.length;
 	}
 
-	private leastLoadedPriorityAccount(
+	private leastUsedPriorityAccount(
 		accounts: Account[],
+		byUsage: (left: Account, right: Account) => number,
 		persistedCounts: ReadonlyMap<string, number> | undefined,
 	): Account {
 		const priority = Math.min(
@@ -226,16 +229,15 @@ export class TeamRouter {
 		const tier = accounts.filter(
 			(account) => (account.priority ?? 0) === priority,
 		);
-		return [...tier].sort((left, right) => {
-			const activeDifference =
+		return [...tier].sort(
+			(left, right) =>
+				byUsage(left, right) ||
 				this.activePins(left.id, persistedCounts) -
-				this.activePins(right.id, persistedCounts);
-			if (activeDifference !== 0) return activeDifference;
-			const inFlightDifference =
-				(this.inFlight.get(left.id) ?? 0) - (this.inFlight.get(right.id) ?? 0);
-			if (inFlightDifference !== 0) return inFlightDifference;
-			return left.name.localeCompare(right.name);
-		})[0] as Account;
+					this.activePins(right.id, persistedCounts) ||
+				(this.inFlight.get(left.id) ?? 0) -
+					(this.inFlight.get(right.id) ?? 0) ||
+				left.name.localeCompare(right.name),
+		)[0] as Account;
 	}
 
 	private removeExpiredPins(now: number, store?: ConversationPinStore): void {

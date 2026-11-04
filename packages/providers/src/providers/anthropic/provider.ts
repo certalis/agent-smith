@@ -249,6 +249,10 @@ export class AnthropicProvider extends BaseProvider {
 		return bucket.startsWith("unified7d");
 	}
 
+	isFiveHourBucket(bucket: string): boolean {
+		return bucket === "unified5h";
+	}
+
 	prepareHeaders(headers: Headers, account: Account | null): Headers {
 		const newHeaders = new Headers(headers);
 		deleteClientCredentialHeaders(newHeaders);

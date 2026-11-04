@@ -86,6 +86,10 @@ export abstract class BaseProvider implements Provider {
 		return false;
 	}
 
+	isFiveHourBucket(_bucket: string): boolean {
+		return false;
+	}
+
 	getClientSessionId(headers: Headers): string | null {
 		return headers.get("x-claude-code-session-id");
 	}

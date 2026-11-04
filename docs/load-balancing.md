@@ -16,7 +16,8 @@ For a request, the proxy:
 2. if every account is quota-blocked, permits one real revalidation probe per
    provider per minute, choosing the nearest weekly reset;
 3. orders the remaining accounts by configured `priority`, then by the nearest
-   applicable weekly reset; and
+   applicable weekly reset — an order that does not move with usage, so
+   unpinned traffic stays on its account; and
 4. hands that ordered list to the compatibility-named `SessionStrategy`, which
    currently only filters unavailable accounts.
 
@@ -34,8 +35,14 @@ For Claude Code traffic, a conversation pin is the session ID plus a hashed
 digest of its opening, scoped to the model's weekly family. Pins are durable,
 so a restart does not move a conversation. The account remains pinned until it
 is ineligible; a per-minute 429 does not rotate it. New pinned conversations
-choose the least-loaded account in the best priority tier, then the fewest
-in-flight requests. Turning `distribution_enabled` off drains pins: existing
+choose, in the best priority tier, a seat on its weekly pace (weekly use no
+further along than its week) before one ahead of it, then the lowest 5-hour
+usage, the lowest weekly usage and the nearest weekly reset — spreading load
+across the seats' 5-hour windows without burning one seat's week early. A
+5-hour window whose reset has passed counts as unused. Fewer active pins, then
+fewer in-flight requests, only break an exact tie.
+Moving a running conversation early would discard its prompt cache, so usage
+never moves a pin. Turning `distribution_enabled` off drains pins: existing
 conversations stay put while new ones use normal ordering.
 
 Pooled seats have a hard `max_usage` ceiling (never above `0.9`) across their

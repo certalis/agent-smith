@@ -17,3 +17,17 @@ tmp/
 skills-lock.json
 
 git-crypt-key
+
+# autopilot harness
+.claude/tmp/
+.claude/settings.local.json
+.claude/autopilot-state/
+.claude/autopilot-history/
+.claude/worktrees/
+.wt-setup.status
+.wt-setup.log
+.archex/
+.wt-review-receipt
+.wt-push-result
+.wt-ship-*
+.wt-dev.*
