@@ -12,9 +12,13 @@ operator priority decisions.
 For a request, the proxy:
 
 1. filters accounts by provider, pause state, temporary cooldown, and fresh
-   quota windows relevant to the requested model;
-2. if every account is quota-blocked, permits one real revalidation probe per
-   provider per minute, choosing the nearest weekly reset;
+   quota windows relevant to the requested model (with a pooled hard cap kept
+   through a still-unreset stale window);
+2. if every account is quota-blocked, refuses the request with a 429 naming the
+   soonest reset and alerts once (see `alerts`); only with
+   `block_when_all_full: false` does it instead permit one real revalidation
+   probe per provider per minute, choosing the nearest weekly reset, which may
+   spend extra usage;
 3. orders the remaining accounts by configured `priority`, then by the nearest
    applicable weekly reset — an order that does not move with usage, so
    unpinned traffic stays on its account; and
@@ -22,7 +26,10 @@ For a request, the proxy:
    currently only filters unavailable accounts.
 
 An account-specific `switch_threshold` overrides the fleet threshold for its
-own quota bucket. Stale or reset quota observations do not block a request.
+own quota bucket. Reset quota observations do not block a request. A stale
+observation ordinarily does not block, except that a pooled seat with a quota
+rejection or at or above its hard `max_usage` remains blocked until that window
+resets.
 A rejected family-specific weekly bucket excludes only that model family.
 
 ## Team routing (opt-in)
@@ -35,10 +42,9 @@ For Claude Code traffic, a conversation pin is the session ID plus a hashed
 digest of its opening, scoped to the model's weekly family. Pins are durable,
 so a restart does not move a conversation. The account remains pinned until it
 is ineligible; a per-minute 429 does not rotate it. New pinned conversations
-choose, in the best priority tier, a seat on its weekly pace (weekly use no
-further along than its week) before one ahead of it, then the lowest 5-hour
-usage, the lowest weekly usage and the nearest weekly reset — spreading load
-across the seats' 5-hour windows without burning one seat's week early. A
+choose, in the best priority tier, the lowest 5-hour usage, then the lowest
+weekly usage and the nearest weekly reset. The hard quota cap is checked before
+that ordering, so no seat at its limit is selected. A
 5-hour window whose reset has passed counts as unused. Fewer active pins, then
 fewer in-flight requests, only break an exact tie.
 Moving a running conversation early would discard its prompt cache, so usage

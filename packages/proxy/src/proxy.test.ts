@@ -73,6 +73,9 @@ function createProxyContext(
 			getAllAccounts() {
 				return accounts;
 			},
+			getAccountsByProvider() {
+				return accounts;
+			},
 			getAvailableAccountsByProvider() {
 				return accounts;
 			},

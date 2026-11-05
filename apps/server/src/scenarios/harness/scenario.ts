@@ -114,6 +114,8 @@ export type UpstreamRule = {
 export type UpstreamAssertion = {
 	id: string;
 	type: "upstream";
+	/** Grade only the requests recorded at this path, such as one alert channel. */
+	onPath?: string;
 	count?: number;
 	atMostPerHeader?: { name: string; count: number };
 	eachHeaderIncludesAccount?: { name: string; account: string; count?: number };
@@ -125,6 +127,7 @@ export type UpstreamAssertion = {
 	header?: { name: string; value: string };
 	headerAbsent?: string;
 	bodyIdentical?: string | string[];
+	bodyIncludes?: string[];
 };
 
 export type ClientAssertion = {

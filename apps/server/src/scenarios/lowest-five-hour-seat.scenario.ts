@@ -41,7 +41,7 @@ const continuation = JSON.stringify({
 });
 
 export default defineScenario({
-	name: "a new conversation takes the on-pace seat with the lowest 5h usage; a pinned one stays",
+	name: "a new conversation takes the lowest five-hour seat below the cap; a pinned one stays",
 	config: {
 		team_routing: {
 			enabled: true,
@@ -53,12 +53,12 @@ export default defineScenario({
 	fleet: [
 		seat("busy", 0.6, 0.05),
 		seat("quiet", 0.2, 0.05),
-		// One day into its week (1/7 elapsed) with half the week spent: ahead of pace.
+		// Its higher weekly use stays below the hard cap, so lower 5h use wins.
 		seat("ahead", 0.05, 0.5),
 	],
 	upstream: [
 		{
-			account: "quiet",
+			account: "ahead",
 			path: "/v1/messages",
 			times: 1,
 			status: 200,
@@ -72,9 +72,8 @@ export default defineScenario({
 			},
 			json: { ok: true },
 		},
-		{ account: "quiet", path: "/v1/messages", status: 200, json: { ok: true } },
-		{ account: "busy", path: "/v1/messages", status: 200, json: { ok: true } },
 		{ account: "ahead", path: "/v1/messages", status: 200, json: { ok: true } },
+		{ account: "quiet", path: "/v1/messages", status: 200, json: { ok: true } },
 	],
 	steps: [
 		{ type: "request", body: opening("map the red fox"), sessionId: "fox" },
@@ -87,9 +86,9 @@ export default defineScenario({
 	],
 	assertions: [
 		{
-			id: "lowest-on-pace-5h-wins-then-pin-holds-then-next-lowest",
+			id: "lowest-5h-wins-then-pin-holds-then-next-lowest",
 			type: "upstream",
-			accounts: ["quiet", "quiet", "busy"],
+			accounts: ["ahead", "ahead", "quiet"],
 		},
 		{ id: "each-request-succeeds", type: "client", status: 200 },
 	],

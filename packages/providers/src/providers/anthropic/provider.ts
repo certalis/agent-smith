@@ -234,6 +234,21 @@ export class AnthropicProvider extends BaseProvider {
 		);
 	}
 
+	/** The rule Claude Code itself applies: a served "rejected" with overage allowed is extra usage. */
+	spendsExtraUsage(response: Response): boolean {
+		if (!response.ok) return false;
+		const overageStatus = response.headers.get(
+			"anthropic-ratelimit-unified-overage-status",
+		);
+		return (
+			response.headers.get("anthropic-ratelimit-unified-overage-in-use") ===
+				"true" ||
+			(response.headers.get("anthropic-ratelimit-unified-status") ===
+				"rejected" &&
+				(overageStatus === "allowed" || overageStatus === "allowed_warning"))
+		);
+	}
+
 	quotaBucketsFor(model: string | undefined): readonly string[] {
 		const familyBucket = familyQuotaBucket(model);
 		return familyBucket

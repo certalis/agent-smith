@@ -215,9 +215,10 @@ The response uses `Cache-Control: no-store` and has no account identities or cre
 Only available, allowlisted OAuth seats count. Quota thresholds and owner reserve
 reuse routing's eligibility rules. Disabled routing reports zero. Optional `model`
 includes that family's weekly quota; omission considers shared windows only.
-`retryAtMs` is the next known blocking quota reset when no seat is eligible, in
-epoch milliseconds, or null when unknown. It is a recheck hint, not guaranteed
-capacity. Cooldowns/paused seats may need another poll. Reads perform no admission,
+`retryAtMs` is, when no seat is eligible, the soonest a seat may serve again, in
+epoch milliseconds: once its last blocking quota window resets and its cooldown
+ends. It is null when no seat is quota-blocked or no reset is known. It is a
+recheck hint, not guaranteed capacity; paused seats never count. Reads perform no admission,
 conversation pin, token refresh or quota probe. Invalid/missing provider or an
 empty/overlong model returns 400.
 

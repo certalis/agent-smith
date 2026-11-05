@@ -266,7 +266,7 @@ async function classifyUpstreamResponse(
 			retryAfterMs: perMinuteRetryAfterMs,
 		};
 	}
-	if (isRateLimited) {
+	if (isRateLimited && !response.ok) {
 		return response.status === 429
 			? {
 					discard: discardUpstreamResponse(state),

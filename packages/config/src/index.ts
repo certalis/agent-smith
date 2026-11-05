@@ -31,6 +31,7 @@ import { resolveConfigPath } from "./paths";
 const log = new Logger("Config");
 
 export interface RuntimeConfig {
+	blockWhenAllFull: boolean;
 	clientId: string;
 	maxBodyBytes: number;
 	quotaThreshold: number;
@@ -63,6 +64,25 @@ export type TeamRoutingFileConfig = {
 	admission_wait_ms?: number;
 	hold_seconds?: number;
 	quota_probe_seconds?: number;
+};
+
+/** Where seat alerts go; a channel with an empty value stays off. */
+export interface AlertsConfig {
+	slackWebhookUrl: string | null;
+	slackBotToken: string | null;
+	slackChannel: string | null;
+	email: string | null;
+	emailFrom: string | null;
+	resendApiKey: string | null;
+}
+
+export type AlertsFileConfig = {
+	slack_webhook_url?: string;
+	slack_bot_token?: string;
+	slack_channel?: string;
+	email?: string;
+	email_from?: string;
+	resend_api_key?: string;
 };
 
 export const PROVIDER_STRATEGIES = [
@@ -132,6 +152,8 @@ export interface ConfigData {
 	providers?: Record<string, ProviderFileConfig>;
 	provider_pools?: ProviderPoolsFileConfig;
 	enrollment_emails?: string[];
+	alerts?: AlertsFileConfig;
+	block_when_all_full?: boolean;
 	[key: string]:
 		| string
 		| number
@@ -140,6 +162,7 @@ export interface ConfigData {
 		| TeamRoutingFileConfig
 		| Record<string, ProviderFileConfig>
 		| ProviderPoolsFileConfig
+		| AlertsFileConfig
 		| undefined;
 }
 
@@ -196,6 +219,11 @@ function sanitizeConfigData(value: unknown): ConfigData {
 			if (providerPools) sanitized.provider_pools = providerPools;
 			continue;
 		}
+		if (key === "alerts") {
+			const alerts = sanitizeAlerts(entry);
+			if (alerts) sanitized.alerts = alerts;
+			continue;
+		}
 		if (
 			typeof entry === "string" ||
 			typeof entry === "boolean" ||
@@ -237,6 +265,44 @@ function sanitizeConfigData(value: unknown): ConfigData {
 	}
 
 	return sanitized;
+}
+
+const MAX_ALERT_VALUE_LENGTH = 512;
+
+function filledText(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const text = value.trim();
+	return text.length > 0 && text.length <= MAX_ALERT_VALUE_LENGTH
+		? text
+		: undefined;
+}
+
+function sanitizeHttpsUrl(value: unknown): string | undefined {
+	const text = filledText(value);
+	if (!text) return undefined;
+	try {
+		return new URL(text).protocol === "https:" ? text : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function sanitizeAlerts(value: unknown): AlertsFileConfig | undefined {
+	if (!isRecord(value)) return undefined;
+	const alerts: AlertsFileConfig = {};
+	const slackWebhookUrl = sanitizeHttpsUrl(value.slack_webhook_url);
+	if (slackWebhookUrl) alerts.slack_webhook_url = slackWebhookUrl;
+	const slackBotToken = filledText(value.slack_bot_token);
+	if (slackBotToken) alerts.slack_bot_token = slackBotToken;
+	const slackChannel = filledText(value.slack_channel);
+	if (slackChannel) alerts.slack_channel = slackChannel;
+	const email = normalizeEnrollmentEmail(value.email);
+	if (email) alerts.email = email;
+	const emailFrom = filledText(value.email_from);
+	if (emailFrom) alerts.email_from = emailFrom;
+	const resendApiKey = filledText(value.resend_api_key);
+	if (resendApiKey) alerts.resend_api_key = resendApiKey;
+	return alerts;
 }
 
 function isProviderStrategy(value: unknown): value is ProviderStrategy {
@@ -422,10 +488,23 @@ export class Config extends EventEmitter {
 
 	private saveConfig(): void {
 		try {
-			const content = JSON.stringify(this.data, null, 2);
-			writeFileSync(this.configPath, content, "utf8");
+			this.writePrivately(this.data);
 		} catch (error) {
 			log.error(`Failed to save config file: ${error}`);
+		}
+	}
+
+	/** The file holds alert credentials, so every write lands it `0600`, replacing a looser file. */
+	private writePrivately(data: ConfigData): void {
+		const temporary = `${this.configPath}.${crypto.randomUUID()}.tmp`;
+		try {
+			writeFileSync(temporary, JSON.stringify(data, null, 2), {
+				mode: 0o600,
+				flag: "wx",
+			});
+			renameSync(temporary, this.configPath);
+		} finally {
+			rmSync(temporary, { force: true });
 		}
 	}
 
@@ -557,6 +636,23 @@ export class Config extends EventEmitter {
 			quotaProbeSeconds:
 				file?.quota_probe_seconds ?? TEAM_ROUTING_DEFAULTS.quotaProbeSeconds,
 		};
+	}
+
+	getAlerts(): AlertsConfig {
+		const file = this.data.alerts;
+		return {
+			slackWebhookUrl: file?.slack_webhook_url ?? null,
+			slackBotToken: file?.slack_bot_token ?? null,
+			slackChannel: file?.slack_channel ?? null,
+			email: file?.email ?? null,
+			emailFrom: file?.email_from ?? null,
+			resendApiKey: file?.resend_api_key ?? null,
+		};
+	}
+
+	/** On unless the file says `false`: a full fleet refuses requests rather than spend extra usage. */
+	getBlockWhenAllFull(): boolean {
+		return this.data.block_when_all_full !== false;
 	}
 
 	getProviderConfig(name: string): ProviderConfig | undefined {
@@ -696,16 +792,7 @@ export class Config extends EventEmitter {
 		value: NonNullable<ConfigData[K]>,
 	): void {
 		const next: ConfigData = { ...this.data, [key]: value };
-		const temporary = `${this.configPath}.${crypto.randomUUID()}.tmp`;
-		try {
-			writeFileSync(temporary, JSON.stringify(next, null, 2), {
-				mode: 0o600,
-				flag: "wx",
-			});
-			renameSync(temporary, this.configPath);
-		} finally {
-			rmSync(temporary, { force: true });
-		}
+		this.writePrivately(next);
 		const oldValue = this.data[key];
 		this.data = next;
 		this.emit("change", { key, oldValue, newValue: value });
@@ -714,6 +801,7 @@ export class Config extends EventEmitter {
 	getRuntime(): RuntimeConfig {
 		// Default values
 		const defaults: RuntimeConfig = {
+			blockWhenAllFull: this.getBlockWhenAllFull(),
 			clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
 			maxBodyBytes: 64 * 1024 * 1024,
 			quotaThreshold: 0.98,

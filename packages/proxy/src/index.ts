@@ -16,6 +16,7 @@ export {
 	forwardToClient,
 	type ResponseHandlerOptions,
 } from "./response-handler";
+export { SeatAlerts } from "./seat-alerts";
 export { SessionStrategy } from "./strategies";
 export {
 	type AdmissionPermit,

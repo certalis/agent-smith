@@ -23,6 +23,7 @@ import {
 	type ProxyContext,
 	QuotaHold,
 	QuotaProbe,
+	SeatAlerts,
 	SessionStrategy,
 	TeamAdmission,
 	TeamRouter,
@@ -43,6 +44,7 @@ export type BootstrappedRuntime = {
 
 function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 	return {
+		blockWhenAllFull: config.getBlockWhenAllFull(),
 		clientId: config.get(
 			"client_id",
 			"9d1c250a-e61b-44d9-88ed-5944d1962f5e",
@@ -166,6 +168,7 @@ export function bootstrapRuntime(
 		teamAdmission,
 		quotaHold,
 		outsideSpendTracker,
+		seatAlerts: new SeatAlerts(config.getAlerts()),
 		asyncWriter,
 		usageWorker: getUsageWorker(),
 	};

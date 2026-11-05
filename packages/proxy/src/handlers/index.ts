@@ -1,5 +1,6 @@
 export {
 	getSoonestQuotaReset,
+	isEveryAccountQuotaBlocked,
 	selectAccountsForRequest,
 } from "./account-selector";
 export {
@@ -12,7 +13,12 @@ export {
 	quotaExhaustionResponse,
 } from "./proxy-attempts";
 export { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
-export { type ProxyRequest, prepareProxyRequest } from "./proxy-request";
+export {
+	getRequestRetryAt,
+	type ProxyRequest,
+	prepareProxyRequest,
+	selectRequestAccounts,
+} from "./proxy-request";
 export {
 	createResolvedProxyContext,
 	ERROR_MESSAGES,

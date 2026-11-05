@@ -4,7 +4,7 @@ import { isRequestPayload, isRequestSummary } from "@ccflare/types";
 import {
 	createRequestMetadata,
 	ERROR_MESSAGES,
-	getSoonestQuotaReset,
+	getRequestRetryAt,
 	type ProxyContext,
 	prepareProxyRequest,
 	prepareRequestBody,
@@ -12,10 +12,11 @@ import {
 	quotaExhaustionResponse,
 	readRequestModel,
 	resolveProxyContext,
-	selectAccountsForRequest,
+	selectRequestAccounts,
 	TIMING,
 } from "./handlers";
 import { proxyProviderPool } from "./provider-pool";
+import { alertWhenFleetFull } from "./seat-alerts";
 import {
 	UsageWorkerController,
 	type UsageWorkerHealthSnapshot,
@@ -184,26 +185,26 @@ export async function handleProxy(
 	);
 	let accounts = initiallySelectedAccounts;
 	if (accounts.length === 0) {
-		const resetAt = getSoonestQuotaReset(requestMeta, requestContext);
-		if (resetAt !== null) {
-			const holdMs = requestContext.runtime.teamRouting.holdSeconds * 1_000;
+		const holdSeconds =
+			requestContext.runtime.teamRouting.enabled && requestContext.quotaHold
+				? requestContext.runtime.teamRouting.holdSeconds
+				: 0;
+		alertWhenFleetFull(requestMeta, requestContext, holdSeconds);
+		const retryAt = getRequestRetryAt(request);
+		if (retryAt !== null) {
+			const holdMs = holdSeconds * 1_000;
 			if (
-				requestContext.runtime.teamRouting.enabled &&
 				holdMs > 0 &&
-				resetAt - Date.now() <= holdMs &&
+				retryAt - Date.now() <= holdMs &&
 				requestContext.quotaHold
 			) {
-				await requestContext.quotaHold.waitUntil(resetAt, req.signal);
-				const resumedAccounts = selectAccountsForRequest(
-					request.meta,
-					requestContext,
-					request.teamRequest,
-				);
+				await requestContext.quotaHold.waitUntil(retryAt, req.signal);
+				const resumedAccounts = selectRequestAccounts(request);
 				if (resumedAccounts.length > 0) {
 					accounts = resumedAccounts;
 				}
 			}
-			if (accounts.length === 0) return quotaExhaustionResponse(resetAt);
+			if (accounts.length === 0) return quotaExhaustionResponse(retryAt);
 		}
 		if (accounts.length === 0) {
 			log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);

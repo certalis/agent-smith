@@ -4,6 +4,7 @@ import type { Provider, ProviderRegistry } from "@ccflare/providers";
 import type { AccountProvider, LoadBalancingStrategy } from "@ccflare/types";
 import type { OutsideSpendTracker } from "../outside-spend";
 import type { QuotaHold } from "../quota-hold";
+import type { SeatAlerts } from "../seat-alerts";
 import type { TeamAdmission } from "../team-admission";
 import type { TeamRouter } from "../team-router";
 import type { UsageWorkerTransport } from "../usage-worker";
@@ -21,6 +22,7 @@ export interface ProxyContext {
 	teamAdmission?: TeamAdmission;
 	quotaHold?: QuotaHold;
 	outsideSpendTracker?: OutsideSpendTracker;
+	seatAlerts?: SeatAlerts;
 	asyncWriter: AsyncDbWriter;
 	usageWorker: UsageWorkerTransport;
 }

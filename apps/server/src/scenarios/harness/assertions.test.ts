@@ -39,6 +39,28 @@ test("limits upstream attempts for each concurrent scenario client", () => {
 	).toBeUndefined();
 });
 
+test("grades only the requests on the named path, each body against every text", () => {
+	const alert = {
+		...upstreamRequest("0-0"),
+		body: new TextEncoder().encode('{"text":"seat-a spent extra usage"}'),
+		path: "/services/T/B/x",
+	};
+	const assertion = {
+		id: "one-alert",
+		type: "upstream" as const,
+		onPath: "/services/T/B/x",
+		count: 1,
+		bodyIncludes: ["seat-a", "extra usage"],
+	};
+
+	expect(
+		upstreamFailure(assertion, [upstreamRequest("0-0"), alert]),
+	).toBeUndefined();
+	expect(
+		upstreamFailure({ ...assertion, bodyIncludes: ["seat-b"] }, [alert]),
+	).toContain('include "seat-b"');
+});
+
 test("fails an absent quota-window assertion when its account is missing", () => {
 	expect(
 		accountFailure(

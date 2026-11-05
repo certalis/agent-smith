@@ -3,6 +3,7 @@ import {
 	type Account,
 	type AccountProvider,
 	isCurrentQuotaWindow,
+	isOpenQuotaWindow,
 	type PoolStatus,
 	quotaThresholdFor,
 	type RequestMeta,
@@ -40,7 +41,9 @@ function isQuotaBlocking(
 	);
 	return (
 		(provider.quotaBucketsFor(model)?.includes(bucket) ?? true) &&
-		isCurrentQuotaWindow(window, now) &&
+		(maxUsage === undefined
+			? isCurrentQuotaWindow(window, now)
+			: isOpenQuotaWindow(window, now)) &&
 		(window.status === "rejected" ||
 			(window.utilization !== null && window.utilization >= threshold))
 	);
@@ -87,6 +90,113 @@ function isQuotaEligible(
 	return true;
 }
 
+/**
+ * The seats a full-fleet answer is about: a seat cooling after a per-minute
+ * 429 is one of them, a paused or team-routing-excluded seat never serves.
+ */
+function fleetAccounts(
+	provider: AccountProvider,
+	ctx: EligibilityContext,
+): Account[] {
+	const teamRouting = ctx.runtime.teamRouting;
+	return ctx.dbOps
+		.getAccountsByProvider(provider)
+		.filter(
+			(account) =>
+				!account.paused &&
+				(teamRouting?.enabled !== true || isAllowlisted(account, teamRouting)),
+		);
+}
+
+/**
+ * The first millisecond routing serves a cooling seat again:
+ * `findAvailableForProvider` keeps it only once `rate_limited_until < now`.
+ */
+function cooldownEnd(account: Account, now: number): number | null {
+	return account.rate_limited_until !== null &&
+		account.rate_limited_until >= now
+		? account.rate_limited_until + 1
+		: null;
+}
+
+function blockingResets(
+	provider: Provider,
+	account: Account,
+	model: string | undefined,
+	ctx: EligibilityContext,
+	now: number,
+): number[] {
+	return Object.entries(account.quota_state?.windows ?? {})
+		.filter(
+			([bucket, window]) =>
+				window.resetAt !== null &&
+				window.resetAt > now &&
+				isQuotaBlocking(
+					provider,
+					account,
+					bucket,
+					window,
+					ctx.runtime.quotaThreshold,
+					now,
+					model,
+					pooledMaxUsage(account, ctx),
+				),
+		)
+		.map(([, window]) => window.resetAt as number);
+}
+
+/** When this seat serves again: every blocking window reset and its cooldown over. */
+function servableAt(
+	provider: Provider,
+	account: Account,
+	model: string | undefined,
+	ctx: EligibilityContext,
+	now: number,
+): number | null {
+	const cooldown = cooldownEnd(account, now);
+	if (
+		isQuotaEligible(
+			provider,
+			account,
+			ctx.runtime.quotaThreshold,
+			now,
+			model,
+			ctx,
+		)
+	) {
+		return cooldown;
+	}
+	const resets = blockingResets(provider, account, model, ctx, now);
+	return resets.length > 0 ? Math.max(...resets, cooldown ?? 0) : null;
+}
+
+/**
+ * The soonest any of `seats` serves again. Null when no fleet seat is
+ * quota-blocked, so a fleet that is only cooling is not called out of quota.
+ */
+function soonestServableAt(
+	provider: Provider,
+	fleet: Account[],
+	seats: Account[],
+	model: string | undefined,
+	ctx: EligibilityContext,
+	now: number,
+): number | null {
+	if (
+		!fleet.some(
+			(account) =>
+				blockingResets(provider, account, model, ctx, now).length > 0,
+		)
+	) {
+		return null;
+	}
+	const times = seats.flatMap((account) => {
+		const at = servableAt(provider, account, model, ctx, now);
+		return at === null ? [] : [at];
+	});
+	return times.length > 0 ? Math.min(...times) : null;
+}
+
 /** Snapshot only: no admission, conversation pin or revalidation probe is consumed. */
 export function getPoolStatus(
 	provider: AccountProvider,
@@ -97,82 +207,80 @@ export function getPoolStatus(
 	if (!providerStrategy) throw new Error(`Unknown provider '${provider}'`);
 	const config = ctx.runtime.teamRouting;
 	const now = Date.now();
-	const accounts = config?.enabled
-		? ctx.dbOps
-				.getAvailableAccountsByProvider(provider)
-				.filter((account) => isAllowlisted(account, config))
-		: [];
-	const eligibleAccounts = accounts.filter((account) =>
-		isQuotaEligible(
-			providerStrategy,
-			account,
-			ctx.runtime.quotaThreshold,
-			now,
-			model,
-			ctx,
-		),
+	const accounts = config?.enabled ? fleetAccounts(provider, ctx) : [];
+	const eligibleAccounts = accounts.filter(
+		(account) =>
+			cooldownEnd(account, now) === null &&
+			isQuotaEligible(
+				providerStrategy,
+				account,
+				ctx.runtime.quotaThreshold,
+				now,
+				model,
+				ctx,
+			),
 	).length;
-	const resets = accounts.flatMap((account) =>
-		Object.entries(account.quota_state?.windows ?? {})
-			.filter(
-				([bucket, window]) =>
-					window.resetAt !== null &&
-					window.resetAt > now &&
-					isQuotaBlocking(
-						providerStrategy,
-						account,
-						bucket,
-						window,
-						ctx.runtime.quotaThreshold,
-						now,
-						model,
-						pooledMaxUsage(account, ctx),
-					),
-			)
-			.map(([, window]) => window.resetAt as number),
-	);
 	return {
 		version: 1,
 		provider,
 		routingEnabled: config?.enabled === true,
 		eligibleAccounts,
 		retryAtMs:
-			eligibleAccounts === 0 && resets.length > 0 ? Math.min(...resets) : null,
+			eligibleAccounts === 0
+				? soonestServableAt(
+						providerStrategy,
+						accounts,
+						accounts,
+						model,
+						ctx,
+						now,
+					)
+				: null,
 		holdSeconds: config?.holdSeconds ?? 0,
 		admissionWaitMs: config?.admissionWaitMs ?? 0,
 	};
 }
 
-/** Returns the next known reset among quota windows relevant to this request. */
+/**
+ * When a request refused for quota may retry. `seatsFor` narrows the fleet to
+ * the seats the request may use, such as the one a pin or a thread binds it to.
+ */
 export function getSoonestQuotaReset(
 	meta: RequestMeta,
 	ctx: ResolvedProxyContext,
-	now: number = Date.now(),
+	seatsFor: (fleet: Account[]) => Account[] = (fleet) => fleet,
 ): number | null {
-	const resets = ctx.dbOps
-		.getAvailableAccountsByProvider(ctx.providerName)
-		.flatMap((account) =>
-			Object.entries(account.quota_state?.windows ?? {}).map(
-				([bucket, window]) => ({ account, bucket, window }),
-			),
-		)
-		.filter(
-			({ account, bucket, window }) =>
-				window.resetAt !== null &&
-				window.resetAt > now &&
-				isQuotaBlocking(
-					ctx.provider,
-					account,
-					bucket,
-					window,
-					ctx.runtime.quotaThreshold,
-					now,
-					meta.model,
-					pooledMaxUsage(account, ctx),
-				),
-		)
-		.map(({ window }) => window.resetAt as number);
-	return resets.length > 0 ? Math.min(...resets) : null;
+	const fleet = fleetAccounts(ctx.providerName, ctx);
+	return soonestServableAt(
+		ctx.provider,
+		fleet,
+		seatsFor(fleet),
+		meta.model,
+		ctx,
+		Date.now(),
+	);
+}
+
+/**
+ * True when no seat of the fleet has quota left. A seat cooling after a
+ * per-minute 429 still has quota, and a list a thread or pin emptied is not
+ * the fleet.
+ */
+export function isEveryAccountQuotaBlocked(
+	meta: RequestMeta,
+	ctx: ResolvedProxyContext,
+	now: number = Date.now(),
+): boolean {
+	return !fleetAccounts(ctx.providerName, ctx).some((account) =>
+		isQuotaEligible(
+			ctx.provider,
+			account,
+			ctx.runtime.quotaThreshold,
+			now,
+			meta.model,
+			ctx,
+		),
+	);
 }
 
 function selectRevalidationProbe(
@@ -246,7 +354,7 @@ export function getOrderedAccounts(
 	const candidates =
 		eligible.length > 0
 			? eligible
-			: options.allowRevalidationProbe === false
+			: options.allowRevalidationProbe === false || ctx.runtime.blockWhenAllFull
 				? []
 				: selectRevalidationProbe(providerAccounts, ctx, now);
 	const prioritized = [...candidates].sort((left, right) => {

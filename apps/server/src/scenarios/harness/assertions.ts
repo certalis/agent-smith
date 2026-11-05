@@ -31,8 +31,11 @@ const ACCOUNT_ASSERTION_TIMEOUT_MS = 2_000;
 
 export function upstreamFailure(
 	assertion: UpstreamAssertion,
-	requests: RecordedUpstreamRequest[],
+	recorded: RecordedUpstreamRequest[],
 ): string | undefined {
+	const requests = assertion.onPath
+		? recorded.filter((request) => request.path === assertion.onPath)
+		: recorded;
 	if (assertion.count !== undefined && requests.length !== assertion.count) {
 		return `expected ${assertion.count} upstream requests, received ${requests.length}`;
 	}
@@ -142,6 +145,15 @@ export function upstreamFailure(
 		);
 		if (JSON.stringify(actual) !== JSON.stringify(expected)) {
 			return `expected byte-identical upstream bodies ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`;
+		}
+	}
+
+	for (const text of assertion.bodyIncludes ?? []) {
+		const missing = requests.find(
+			(request) => !new TextDecoder().decode(request.body).includes(text),
+		);
+		if (missing) {
+			return `expected every upstream body to include ${JSON.stringify(text)}, received ${JSON.stringify(new TextDecoder().decode(missing.body))}`;
 		}
 	}
 

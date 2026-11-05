@@ -186,4 +186,35 @@ describe("AnthropicProvider", () => {
 			},
 		});
 	});
+
+	it.each([
+		{ status: 200, unified: "rejected", overage: "allowed", spends: true },
+		{
+			status: 200,
+			unified: "rejected",
+			overage: "allowed_warning",
+			spends: true,
+		},
+		{ status: 200, inUse: "true", unified: "allowed", spends: true },
+		{ status: 200, unified: "allowed", overage: "allowed", spends: false },
+		{ status: 200, unified: "rejected", overage: "rejected", spends: false },
+		{ status: 429, unified: "rejected", overage: "allowed", spends: false },
+	])("a $status reading $unified with overage $overage (in use: $inUse) spends extra usage: $spends", ({
+		status,
+		unified,
+		overage,
+		inUse,
+		spends,
+	}) => {
+		const headers = new Headers({
+			"anthropic-ratelimit-unified-status": unified,
+		});
+		if (overage)
+			headers.set("anthropic-ratelimit-unified-overage-status", overage);
+		if (inUse) headers.set("anthropic-ratelimit-unified-overage-in-use", inUse);
+
+		expect(
+			provider.spendsExtraUsage(new Response("{}", { status, headers })),
+		).toBe(spends);
+	});
 });

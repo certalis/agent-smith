@@ -65,7 +65,7 @@ describe("compareSeatUsage", () => {
 		).toEqual(["quiet", "busy"]);
 	});
 
-	it("puts a seat on its weekly pace before one ahead of it, whatever their five-hour usage", () => {
+	it("puts lower five-hour usage first when both seats remain below the weekly cap", () => {
 		expect(
 			order([
 				seat("ahead", {
@@ -77,7 +77,7 @@ describe("compareSeatUsage", () => {
 					unified7d: onPaceWeek,
 				}),
 			]),
-		).toEqual(["on-pace", "ahead"]);
+		).toEqual(["ahead", "on-pace"]);
 	});
 
 	it("counts a five-hour window whose reset has passed as unused", () => {
@@ -95,16 +95,16 @@ describe("compareSeatUsage", () => {
 		).toEqual(["reset", "live"]);
 	});
 
-	it("applies a family weekly bucket's pace only to that family's model", () => {
+	it("uses a family weekly bucket only for that family's model after a five-hour tie", () => {
 		const seats = [
 			seat("opus-heavy", {
-				unified5h: window(now + hour, 0.1),
-				unified7d: onPaceWeek,
+				unified5h: window(now + hour, 0.4),
+				unified7d: window(now + 6 * 24 * hour, 0.2),
 				unified7dOpus: aheadOfPaceWeek,
 			}),
 			seat("even", {
 				unified5h: window(now + hour, 0.4),
-				unified7d: onPaceWeek,
+				unified7d: window(now + 6 * 24 * hour, 0.3),
 			}),
 		];
 		expect(order(seats, "claude-opus-4-5")).toEqual(["even", "opus-heavy"]);

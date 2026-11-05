@@ -112,6 +112,9 @@ export interface Provider {
 	/** Identifies headers that make a 429 account-scoped rather than request-scoped. */
 	hasRateLimitSignal?(headerName: string): boolean;
 
+	/** Whether the upstream served this response past the plan's limit, billed to extra usage. */
+	spendsExtraUsage?(response: Response): boolean;
+
 	/** Optional local redirect listener required by an OAuth client. */
 	getOAuthCallbackForwarder?(): {
 		port: number;

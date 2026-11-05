@@ -112,9 +112,19 @@ export async function attemptAccount(
 			request.ctx,
 		);
 		if (attempt.kind === "response") {
+			const spentExtraUsage =
+				request.ctx.provider.spendsExtraUsage?.(attempt.response) ?? false;
 			return {
 				...attempt,
-				response: releaseAfterResponse(attempt.response, release),
+				response: releaseAfterResponse(attempt.response, () => {
+					release();
+					if (spentExtraUsage) {
+						request.ctx.seatAlerts?.extraUsageSpent(
+							account,
+							request.ctx.providerName,
+						);
+					}
+				}),
 			};
 		}
 		release();

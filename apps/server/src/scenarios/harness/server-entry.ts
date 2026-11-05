@@ -29,13 +29,24 @@ const oauthUrls = new Set([
 	"https://platform.claude.com/v1/oauth/token",
 	"https://api.anthropic.com/api/oauth/profile",
 ]);
+const alertsUpstream = process.env.CCFLARE_SCENARIO_ALERTS_URL;
+const alertHosts = new Set(["hooks.slack.com", "slack.com", "api.resend.com"]);
+
+function fixtureUpstream(url: URL): string | undefined {
+	if (oauthUrls.has(url.href)) return oauthUpstream;
+	if (url.protocol === "https:" && alertHosts.has(url.hostname))
+		return alertsUpstream;
+	return undefined;
+}
+
 const guardedFetch: typeof fetch = Object.assign(
 	(input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
 		const url = new URL(input instanceof Request ? input.url : String(input));
-		if (oauthUpstream && oauthUrls.has(url.href)) {
-			const target = new URL(url.pathname, oauthUpstream);
+		const upstream = fixtureUpstream(url);
+		if (upstream) {
+			const target = new URL(url.pathname, upstream);
 			if (!isLoopback(target))
-				throw new Error("OAuth fixture must use a loopback upstream");
+				throw new Error("A fixture must use a loopback upstream");
 			return originalFetch(
 				input instanceof Request ? new Request(target, input) : target,
 				init,

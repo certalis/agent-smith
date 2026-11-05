@@ -253,6 +253,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 			privateSocket: scenario.privateSocket,
 			environment: {
 				...scenario.environment,
+				CCFLARE_SCENARIO_ALERTS_URL: upstream.url,
 				...(scenario.claudeOAuth
 					? { CCFLARE_SCENARIO_CLAUDE_OAUTH_URL: upstream.url }
 					: {}),

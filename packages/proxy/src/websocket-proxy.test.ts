@@ -78,6 +78,9 @@ function createProxyContext(accounts: Account[]): ProxyContext {
 			getAllAccounts() {
 				return accounts;
 			},
+			getAccountsByProvider() {
+				return accounts;
+			},
 			getAvailableAccountsByProvider() {
 				return accounts;
 			},

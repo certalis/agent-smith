@@ -15,6 +15,7 @@ const quota = {
 export default defineScenario({
 	name: "the pooled ninety-percent cap also blocks all-spent revalidation",
 	config: {
+		block_when_all_full: false,
 		team_routing: {
 			enabled: true,
 			allowlisted_account_uuids: ["acct-a", "acct-b"],

@@ -79,6 +79,15 @@ The configuration file is stored at:
     "admission_wait_ms": 30000,
     "hold_seconds": 0,
     "quota_probe_seconds": 0
+  },
+  "block_when_all_full": true,
+  "alerts": {
+    "slack_webhook_url": "",
+    "slack_bot_token": "",
+    "slack_channel": "",
+    "email": "",
+    "email_from": "",
+    "resend_api_key": ""
   }
 }
 ```
@@ -101,6 +110,8 @@ The configuration file is stored at:
 | `host` | string | `"127.0.0.1"` | Interface to bind; use `CF_HOST` for deployment overrides |
 | `trust_loopback` | boolean | `true` | Allow direct loopback requests without a key; set `false` behind a same-host reverse proxy that does not forward client-address headers |
 | `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
+| `block_when_all_full` | boolean | `true` | When every account is full, refuse every request with a 429 until the soonest reset. `false` lets one request a minute through to revalidate, and that request may spend extra usage. |
+| `alerts` | object | every channel off | Where seat alerts go; see [Alerts](#alerts). |
 | `enrollment_emails` | string[] | `[]` | Emails the stable `/pool-enroll` link admits (lowercased, at most 200). Edit it through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
 | `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
@@ -189,6 +200,29 @@ zero and no more than `0.9`.
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
 | `hold_seconds` | `0` | Wait only this long for a known quota reset; `0` returns 429 immediately. |
 | `quota_probe_seconds` | `0` | Opt-in interval for a zero-spend OAuth quota refresh; `0` disables it. |
+
+### Alerts
+
+`alerts` sends a warning when a seat is past its plan limit and a response it
+served was billed to extra usage (one alert per such response, when it ends),
+and when every account of a provider or pool is full (one alert until the
+soonest reset passes). Each channel is on once its values are filled; an empty
+or missing value keeps it off. Alerts name the seat and its provider, never a
+token, an account id or prompt content.
+
+| Field | Description |
+|-------|-------------|
+| `slack_webhook_url` | A Slack incoming-webhook URL (`https://` only) for the channel to post in. |
+| `slack_bot_token` | A Slack bot token with `chat:write`, for a bot already in the channel: posts through `chat.postMessage`. Needs `slack_channel`. |
+| `slack_channel` | The channel id the bot posts in. Slack bot alerts stay off without it. |
+| `email` | The address that receives alert emails. |
+| `email_from` | The sender, on a domain verified in Resend. Email stays off without it. |
+| `resend_api_key` | The Resend API key used to send the email. Email stays off without it. |
+
+The webhook URL, the bot token and the Resend key are credentials: keep the config file
+private. Every write agent-smith makes lands it `0600`, and a file you create
+yourself should be `chmod 600`. A failed send is logged with its channel only,
+and never retried.
 
 ### Exposure security
 

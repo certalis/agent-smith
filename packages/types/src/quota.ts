@@ -22,3 +22,13 @@ export function isCurrentQuotaWindow(
 		now - window.seenAt <= QUOTA_STALE_MS
 	);
 }
+
+/**
+ * Usage can only grow before a known window reset, so an older reading is still
+ * a lower bound until that reset. Without a reset time, it must be fresh.
+ */
+export function isOpenQuotaWindow(window: QuotaWindow, now: number): boolean {
+	return window.resetAt === null
+		? isCurrentQuotaWindow(window, now)
+		: window.resetAt > now;
+}

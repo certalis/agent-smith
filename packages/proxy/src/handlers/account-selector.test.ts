@@ -111,6 +111,7 @@ describe("selectAccountsForRequest", () => {
 
 	it("reports the reset of a fresh quota window that actually blocks the request", () => {
 		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
 		const account = Object.assign(
 			createAccount("a", "partly-spent", "claude-code"),
 			{
@@ -136,7 +137,7 @@ describe("selectAccountsForRequest", () => {
 			providerName: "claude-code",
 			provider: quotaProvider,
 			runtime: { quotaThreshold: 0.98 },
-			dbOps: { getAvailableAccountsByProvider: () => [account] },
+			dbOps: { getAccountsByProvider: () => [account] },
 		} as unknown as ResolvedProxyContext;
 
 		expect(
@@ -149,7 +150,43 @@ describe("selectAccountsForRequest", () => {
 					model: "claude-retired",
 				},
 				ctx,
-				now,
+			),
+		).toBe(now + 120_000);
+	});
+
+	it("waits for the last of a seat's blocking windows, not the first", () => {
+		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
+		const rejectedUntil = (resetAt: number) => ({
+			resetAt,
+			seenAt: now,
+			status: "rejected" as const,
+			utilization: null,
+		});
+		const account = Object.assign(createAccount("a", "spent", "claude-code"), {
+			quota_state: {
+				windows: {
+					unified5h: rejectedUntil(now + 60_000),
+					unified7d: rejectedUntil(now + 120_000),
+				},
+			},
+		});
+		const ctx = {
+			providerName: "claude-code",
+			provider: quotaProvider,
+			runtime: { quotaThreshold: 0.98 },
+			dbOps: { getAccountsByProvider: () => [account] },
+		} as unknown as ResolvedProxyContext;
+
+		expect(
+			getSoonestQuotaReset(
+				{
+					id: "request-two-windows",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
 			),
 		).toBe(now + 120_000);
 	});
@@ -197,6 +234,108 @@ describe("selectAccountsForRequest", () => {
 				ctx,
 			),
 		).toEqual([account]);
+	});
+
+	it("keeps a stale pooled quota rejection blocked until its reset", () => {
+		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
+		const capped = Object.assign(
+			createAccount("capped", "stale-rejection", "claude-code"),
+			{
+				auth_method: "oauth" as const,
+				account_uuid: "capped-seat",
+				quota_state: {
+					windows: {
+						unified5h: {
+							resetAt: now + 60_000,
+							seenAt: now - 30 * 60_000 - 1,
+							status: "rejected" as const,
+							utilization: null,
+						},
+					},
+				},
+			},
+		);
+		const available = Object.assign(
+			createAccount("available", "fresh-seat", "claude-code"),
+			{ auth_method: "oauth" as const, account_uuid: "available-seat" },
+		);
+		const ctx = {
+			providerName: "claude-code",
+			provider: quotaProvider,
+			runtime: {
+				quotaThreshold: 0.98,
+				teamRouting: {
+					enabled: true,
+					allowlistedAccountUuids: ["capped-seat", "available-seat"],
+					maxUsage: 0.9,
+				},
+			},
+			strategy: { select: (accounts: Account[]) => accounts },
+			dbOps: { getAvailableAccountsByProvider: () => [capped, available] },
+			teamRouter: { order: (accounts: Account[]) => accounts },
+		} as unknown as ResolvedProxyContext;
+
+		expect(
+			selectAccountsForRequest(
+				{
+					id: "stale-at-cap",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
+			).map((account) => account.name),
+		).toEqual(["fresh-seat"]);
+	});
+
+	it("does not indefinitely block a stale pooled rejection without a reset", () => {
+		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
+		const staleUnknownReset = Object.assign(
+			createAccount("unknown-reset", "stale-unknown-reset", "claude-code"),
+			{
+				auth_method: "oauth" as const,
+				account_uuid: "unknown-reset-seat",
+				quota_state: {
+					windows: {
+						unified5h: {
+							resetAt: null,
+							seenAt: now - 30 * 60_000 - 1,
+							status: "rejected" as const,
+							utilization: null,
+						},
+					},
+				},
+			},
+		);
+		const ctx = {
+			providerName: "claude-code",
+			provider: quotaProvider,
+			runtime: {
+				quotaThreshold: 0.98,
+				teamRouting: {
+					enabled: true,
+					allowlistedAccountUuids: ["unknown-reset-seat"],
+					maxUsage: 0.9,
+				},
+			},
+			strategy: { select: (accounts: Account[]) => accounts },
+			dbOps: { getAvailableAccountsByProvider: () => [staleUnknownReset] },
+			teamRouter: { order: (accounts: Account[]) => accounts },
+		} as unknown as ResolvedProxyContext;
+
+		expect(
+			selectAccountsForRequest(
+				{
+					id: "stale-unknown-reset",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
+			).map((account) => account.name),
+		).toEqual(["stale-unknown-reset"]);
 	});
 
 	it("uses the resolved provider's quota buckets to filter accounts", () => {

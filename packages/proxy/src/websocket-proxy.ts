@@ -11,6 +11,7 @@ import { ERROR_MESSAGES, resolveProxyContext } from "./handlers/proxy-types";
 import { createRequestMetadata } from "./handlers/request-handler";
 import { getValidAccessToken } from "./handlers/token-manager";
 import { normalizeOpenAIUsage, type OpenAIUsagePayload } from "./openai-usage";
+import { alertWhenFleetFull } from "./seat-alerts";
 import type { TeamRoutingRequest } from "./team-router";
 import type {
 	ChunkMessage,
@@ -687,6 +688,7 @@ export function handleWebSocketUpgradeRequest(
 		teamRequest,
 	);
 	if (accounts.length === 0) {
+		alertWhenFleetFull(requestMeta, requestContext, 0);
 		log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);
 		return errorResponse(
 			new ServiceUnavailableError(

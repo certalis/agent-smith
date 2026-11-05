@@ -93,7 +93,8 @@ The config file is JSON, read at startup from:
   on macOS and Linux,
 - or the path in `ccflare_CONFIG_PATH`.
 
-Restart agent-smith after changing `providers` or `provider_pools`.
+Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
+`block_when_all_full`.
 
 | Key | What it does |
 |---|---|
@@ -103,6 +104,8 @@ Restart agent-smith after changing `providers` or `provider_pools`.
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
 | `team_routing` | Which subscription accounts may share a pool, and their usage caps. See the [configuration guide](docs/configuration.md#team-routing). |
+| `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
+| `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
 
 Every key, the environment variables and the HTTP API are in the
 [configuration guide](docs/configuration.md).

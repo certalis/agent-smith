@@ -6,6 +6,7 @@ import {
 	createResolvedProxyContext,
 	ERROR_MESSAGES,
 	getSoonestQuotaReset,
+	isEveryAccountQuotaBlocked,
 	type ProxyContext,
 } from "./handlers";
 import {
@@ -19,6 +20,7 @@ import {
 	resolveUpstreamFailure,
 } from "./handlers/proxy-attempts";
 import {
+	getRequestRetryAt,
 	type ProxyRequest,
 	prepareProxyRequest,
 } from "./handlers/proxy-request";
@@ -207,8 +209,23 @@ export async function proxyProviderPool(
 		firstContext.dbOps,
 	);
 	const pinnedAccount = pinnedId ? ctx.dbOps.getAccount(pinnedId) : null;
-	let soonestReset: number | null = null;
+	let soonestRetry: number | null = null;
+	let soonestFleetReset: number | null = null;
+	let everyCandidateFull = true;
 	let emittedIngress = false;
+	const earliest = (current: number | null, next: number | null) =>
+		next !== null && (current === null || next < current) ? next : current;
+	const recordUnserved = (request: ProxyRequest) => {
+		everyCandidateFull &&= isEveryAccountQuotaBlocked(
+			request.meta,
+			request.ctx,
+		);
+		soonestRetry = earliest(soonestRetry, getRequestRetryAt(request));
+		soonestFleetReset = earliest(
+			soonestFleetReset,
+			getSoonestQuotaReset(request.meta, request.ctx),
+		);
+	};
 
 	const candidates = preferPinnedProvider(pool, pinnedAccount).slice(0, 2);
 	for (const [candidateIndex, candidate] of candidates.entries()) {
@@ -239,11 +256,7 @@ export async function proxyProviderPool(
 		}
 		accounts = preferPinnedAccount(accounts, pinnedId);
 		if (accounts.length === 0) {
-			const resetAt = getSoonestQuotaReset(candidateMeta, candidateContext);
-			soonestReset =
-				resetAt !== null && (soonestReset === null || resetAt < soonestReset)
-					? resetAt
-					: soonestReset;
+			recordUnserved(prepared.request);
 			continue;
 		}
 
@@ -278,14 +291,17 @@ export async function proxyProviderPool(
 			return result.response;
 		}
 
-		const resetAt = getSoonestQuotaReset(candidateMeta, candidateContext);
-		soonestReset =
-			resetAt !== null && (soonestReset === null || resetAt < soonestReset)
-				? resetAt
-				: soonestReset;
+		recordUnserved(prepared.request);
 	}
 
-	if (soonestReset !== null) return quotaExhaustionResponse(soonestReset);
+	if (everyCandidateFull && soonestFleetReset !== null) {
+		ctx.seatAlerts?.allAccountsFull(
+			`provider_pools.${pool.wire}`,
+			soonestFleetReset,
+			{ blocked: true, holdSeconds: 0 },
+		);
+	}
+	if (soonestRetry !== null) return quotaExhaustionResponse(soonestRetry);
 	log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);
 	throw new ServiceUnavailableError(
 		ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT,
