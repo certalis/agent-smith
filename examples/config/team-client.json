@@ -1,0 +1,6 @@
+{
+	"client": {
+		"base_url": "http://127.0.0.1:18181",
+		"proxy_key_file": "~/.config/ccflare/team-pool.key"
+	}
+}

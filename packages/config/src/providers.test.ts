@@ -32,6 +32,33 @@ function exampleConfig(name: string): Config {
 }
 
 describe("provider configuration", () => {
+	it("reads the Agent-smith endpoint and forwarding-key file used by clients", () => {
+		const config = configFrom({
+			client: {
+				base_url: "http://127.0.0.1:18181/",
+				proxy_key_file: "/tmp/agent-smith.key",
+			},
+		});
+
+		expect(config.getClientRouting()).toEqual({
+			baseUrl: "http://127.0.0.1:18181",
+			proxyKeyFile: "/tmp/agent-smith.key",
+		});
+	});
+
+	it("does not retain a raw forwarding key from client config", () => {
+		const config = configFrom({
+			client: {
+				base_url: "http://127.0.0.1:18181",
+				proxy_key: "not-allowed-in-config",
+			},
+		});
+
+		expect(config.getClientRouting()).toEqual({
+			baseUrl: "http://127.0.0.1:18181",
+		});
+	});
+
 	it("enables API-key providers but leaves subscription sign-ins off by default", () => {
 		const config = configFrom({});
 

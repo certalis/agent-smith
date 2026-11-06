@@ -16,11 +16,16 @@ export interface ParsedArgs {
 	analyze?: boolean;
 	resetStats?: boolean;
 	clearHistory?: boolean;
+	installClient?: boolean;
 	theme?: string;
 	run?: string[];
 }
 
 export function parseArgs(args: string[]): ParsedArgs {
+	if (args.length === 1 && args[0] === "install-client") {
+		return { installClient: true };
+	}
+
 	if (args[0] === "run") {
 		const separator = args.indexOf("--");
 		if (separator === -1) {

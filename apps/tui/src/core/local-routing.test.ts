@@ -56,6 +56,47 @@ describe("local client routing", () => {
 		);
 	});
 
+	it("routes both clients through a configured Agent-smith server and forwarding key", async () => {
+		const directory = tempDir();
+		const realClaude = join(directory, "real-claude");
+		const realCodex = join(directory, "real-codex");
+		const proxyKeyFile = join(directory, "agent-smith.key");
+		writeFileSync(proxyKeyFile, "client-forwarding-key\n", { mode: 0o600 });
+		writeFileSync(
+			realClaude,
+			'#!/bin/sh\nprintf "%s|%s\n" "$ANTHROPIC_BASE_URL" "$ANTHROPIC_AUTH_TOKEN"\n',
+			{ mode: 0o700 },
+		);
+		writeFileSync(
+			realCodex,
+			'#!/bin/sh\nprintf "%s|%s\n" "$AGENT_SMITH_PROXY_KEY" "$*"\n',
+			{ mode: 0o700 },
+		);
+
+		await installClientWrappers({
+			binDir: join(directory, "bin"),
+			claudePath: realClaude,
+			codexPath: realCodex,
+			port: 8123,
+			baseUrl: "http://127.0.0.1:18181",
+			proxyKeyFile,
+		});
+
+		const claude = Bun.spawnSync([join(directory, "bin", "claude")]);
+		const codex = Bun.spawnSync([join(directory, "bin", "codex"), "exec"]);
+		expect(claude.stdout.toString()).toBe(
+			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key\n",
+		);
+		expect(codex.stdout.toString()).toContain("client-forwarding-key|");
+		expect(codex.stdout.toString()).toContain(" exec\n");
+		expect(codex.stdout.toString()).toContain(
+			'model_providers.agent_smith.base_url="http://127.0.0.1:18181/v1/codex"',
+		);
+		expect(
+			readFileSync(join(directory, "bin", "claude"), "utf8"),
+		).not.toContain("client-forwarding-key");
+	});
+
 	it("gives Codex its own local Responses endpoint and preserves the user's arguments", async () => {
 		const directory = tempDir();
 		const realCodex = join(directory, "real-codex");
@@ -148,6 +189,7 @@ describe("local client routing", () => {
 			claudePath: realClaude,
 			codexPath: realCodex,
 			port: 8123,
+			providerPoolWires: [],
 		});
 
 		expect(existsSync(realClaude)).toBe(true);
@@ -176,10 +218,64 @@ describe("local client routing", () => {
 			claudePath: realClaude,
 			path: directory,
 			port: 8123,
+			providerPoolWires: [],
 		});
 
 		expect(status.enabled).toBe(true);
 		expect(existsSync(join(binDir, "claude"))).toBe(true);
 		expect(existsSync(join(binDir, "codex"))).toBe(false);
+	});
+
+	it("refuses a configured Agent-smith server without a forwarding key file", async () => {
+		const directory = tempDir();
+		const realClaude = join(directory, "claude");
+		writeFileSync(realClaude, "#!/bin/sh\n", { mode: 0o700 });
+
+		await expect(
+			enableLocalClientRouting({
+				binDir: join(directory, "bin"),
+				shellProfile: join(directory, ".zshrc"),
+				statePath: join(directory, "routing.json"),
+				claudePath: realClaude,
+				path: directory,
+				port: 8123,
+				baseUrl: "http://127.0.0.1:18181",
+				providerPoolWires: [],
+			}),
+		).rejects.toThrow("requires a forwarding key file");
+	});
+
+	it("explains when the configured forwarding-key file is missing", async () => {
+		const directory = tempDir();
+		const realClaude = join(directory, "claude");
+		writeFileSync(realClaude, "#!/bin/sh\n", { mode: 0o700 });
+
+		await expect(
+			installClientWrappers({
+				binDir: join(directory, "bin"),
+				claudePath: realClaude,
+				port: 8123,
+				baseUrl: "http://127.0.0.1:18181",
+				proxyKeyFile: join(directory, "missing.key"),
+			}),
+		).rejects.toThrow("forwarding-key file is not readable");
+	});
+
+	it("refuses a forwarding-key file readable by other users", async () => {
+		const directory = tempDir();
+		const realClaude = join(directory, "claude");
+		const proxyKeyFile = join(directory, "agent-smith.key");
+		writeFileSync(realClaude, "#!/bin/sh\n", { mode: 0o700 });
+		writeFileSync(proxyKeyFile, "client-forwarding-key\n", { mode: 0o644 });
+
+		await expect(
+			installClientWrappers({
+				binDir: join(directory, "bin"),
+				claudePath: realClaude,
+				port: 8123,
+				baseUrl: "http://127.0.0.1:18181",
+				proxyKeyFile,
+			}),
+		).rejects.toThrow("forwarding-key file must be owner-only");
 	});
 });

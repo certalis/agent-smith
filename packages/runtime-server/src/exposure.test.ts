@@ -44,6 +44,41 @@ describe("exposure gate", () => {
 		expect(exposureFailure(req, url, loopbackServer, config)).toBeNull();
 	});
 
+	test("allows a Responses request with the configured bearer proxy key", () => {
+		const [req, url] = request("/v1/codex/responses", {
+			headers: {
+				authorization: "Bearer proxy-key",
+				"x-forwarded-for": "203.0.113.7",
+			},
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)).toBeNull();
+	});
+
+	test("does not accept a bearer proxy key for management", () => {
+		const [req, url] = request("/api/status", {
+			headers: {
+				authorization: "Bearer proxy-key",
+				"x-forwarded-for": "203.0.113.7",
+			},
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)?.status).toBe(401);
+	});
+
+	test("does not accept a bearer proxy key for OAuth token exchange", () => {
+		const [req, url] = request("/v1/oauth/token", {
+			headers: {
+				authorization: "Bearer proxy-key",
+				"x-forwarded-for": "203.0.113.7",
+			},
+			method: "POST",
+		});
+
+		expect(exposureFailure(req, url, loopbackServer, config)?.status).toBe(401);
+	});
+
 	test("rejects a cross-origin management write before it can mutate", () => {
 		const [req, url] = request("/api/accounts", {
 			headers: {

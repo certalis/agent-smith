@@ -88,6 +88,7 @@ ${POC_NOTICE}
 
 Usage: agent-smith [options]
        agent-smith run [--port <number>] -- [claude arguments]
+       agent-smith install-client
 
 Options:
   --serve              Start API server with dashboard
@@ -117,6 +118,7 @@ Examples:
   agent-smith --pause work       # Pause account
   agent-smith --analyze          # Run performance analysis
   agent-smith --stats            # View stats
+  agent-smith install-client     # Configure Claude Code and Codex for this Agent-smith server
 `);
 		process.exit(0);
 	}
@@ -130,6 +132,24 @@ Examples:
 		startServer({ port, withDashboard: true });
 		// Keep process alive
 		await new Promise(() => {});
+		return;
+	}
+
+	if (parsed.installClient) {
+		const config = new Config();
+		const client = config.getClientRouting();
+		if (!client.baseUrl || !client.proxyKeyFile) {
+			throw new Error(
+				"client.base_url and client.proxy_key_file are required before installing client wrappers",
+			);
+		}
+		const port = config.getRuntime().port || NETWORK.DEFAULT_PORT;
+		await tuiCore.enableLocalClientRouting({
+			port,
+			baseUrl: client.baseUrl,
+			proxyKeyFile: client.proxyKeyFile,
+		});
+		console.log(`Claude Code and Codex now route through ${client.baseUrl}`);
 		return;
 	}
 

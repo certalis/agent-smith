@@ -83,15 +83,38 @@ function safeKeyEqual(
 	return timingSafeEqual(Buffer.from(candidate), Buffer.from(expected));
 }
 
+function bearerToken(req: Request): string | null {
+	const authorization = req.headers.get("authorization");
+	const match = authorization?.match(/^Bearer ([^\s]+)$/);
+	return match?.[1] ?? null;
+}
+
+function isResponsesInferenceRoute(pathname: string): boolean {
+	return (
+		pathname === "/v1/codex/responses" ||
+		pathname === "/v1/pool/openai-responses/responses"
+	);
+}
+
 function keyRole(
 	req: Request,
+	url: URL,
 	config: ExposureConfig,
 ): "admin" | "proxy" | null {
-	const key = req.headers.get("x-api-key");
-	if (safeKeyEqual(key, config.adminKey)) {
+	const apiKey = req.headers.get("x-api-key");
+	if (safeKeyEqual(apiKey, config.adminKey)) {
 		return "admin";
 	}
-	if (safeKeyEqual(key, config.proxyKey)) {
+	if (safeKeyEqual(apiKey, config.proxyKey)) {
+		return "proxy";
+	}
+	// Codex's Responses provider can only pass its configured credential as a
+	// bearer token. Keep that compatibility path to the two wrapper endpoints:
+	// it must never turn an Authorization header into OAuth or management access.
+	if (
+		isResponsesInferenceRoute(url.pathname) &&
+		safeKeyEqual(bearerToken(req), config.proxyKey)
+	) {
 		return "proxy";
 	}
 	return null;
@@ -163,7 +186,7 @@ export function exposureFailure(
 			? isLoopbackAddress(remote.address)
 			: isLocalHostHeader(url.host, config.bindHost)) &&
 		!isForwardedRequest(req.headers);
-	const role = keyRole(req, config);
+	const role = keyRole(req, url, config);
 
 	if (!role && !loopbackExempt) {
 		return jsonError(401, "A proxy key is required for this request");

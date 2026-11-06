@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
@@ -111,6 +113,17 @@ export type ProviderConfig = {
 
 export type ProviderPoolsFileConfig = Partial<Record<ProviderWire, string[]>>;
 
+/** How locally installed Claude Code and Codex reach this Agent-smith server. */
+export type ClientRoutingFileConfig = {
+	base_url?: string;
+	proxy_key_file?: string;
+};
+
+export type ClientRoutingConfig = {
+	baseUrl?: string;
+	proxyKeyFile?: string;
+};
+
 const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
 	{ name: "anthropic", enabled: true, strategy: "anthropic-api" },
 	{ name: "openai", enabled: true, strategy: "openai-api" },
@@ -151,6 +164,7 @@ export interface ConfigData {
 	team_routing?: TeamRoutingFileConfig;
 	providers?: Record<string, ProviderFileConfig>;
 	provider_pools?: ProviderPoolsFileConfig;
+	client?: ClientRoutingFileConfig;
 	enrollment_emails?: string[];
 	alerts?: AlertsFileConfig;
 	block_when_all_full?: boolean;
@@ -162,6 +176,7 @@ export interface ConfigData {
 		| TeamRoutingFileConfig
 		| Record<string, ProviderFileConfig>
 		| ProviderPoolsFileConfig
+		| ClientRoutingFileConfig
 		| AlertsFileConfig
 		| undefined;
 }
@@ -217,6 +232,11 @@ function sanitizeConfigData(value: unknown): ConfigData {
 		if (key === "provider_pools") {
 			const providerPools = sanitizeProviderPools(entry);
 			if (providerPools) sanitized.provider_pools = providerPools;
+			continue;
+		}
+		if (key === "client") {
+			const client = sanitizeClientRouting(entry);
+			if (client) sanitized.client = client;
 			continue;
 		}
 		if (key === "alerts") {
@@ -322,6 +342,39 @@ function sanitizeProviderBaseUrl(value: unknown): string | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+function sanitizeClientRouting(
+	value: unknown,
+): ClientRoutingFileConfig | undefined {
+	if (!isRecord(value)) return undefined;
+	const client: ClientRoutingFileConfig = {};
+	if (typeof value.base_url === "string") {
+		try {
+			const url = new URL(value.base_url);
+			if (
+				(url.protocol === "http:" || url.protocol === "https:") &&
+				url.pathname === "/" &&
+				url.search === "" &&
+				url.hash === "" &&
+				url.username === "" &&
+				url.password === ""
+			) {
+				client.base_url = url.origin;
+			}
+		} catch {
+			// Ignore an invalid caller target rather than generating a broken wrapper.
+		}
+	}
+	if (
+		typeof value.proxy_key_file === "string" &&
+		(value.proxy_key_file.startsWith("/") ||
+			value.proxy_key_file.startsWith("~/")) &&
+		value.proxy_key_file.length <= 1024
+	) {
+		client.proxy_key_file = value.proxy_key_file;
+	}
+	return Object.keys(client).length > 0 ? client : undefined;
 }
 
 function sanitizeProviderModels(
@@ -465,18 +518,36 @@ export class Config extends EventEmitter {
 			try {
 				const content = readFileSync(this.configPath, "utf8");
 				this.data = sanitizeConfigData(JSON.parse(content));
-				if ("default_agent_model" in this.data) {
-					delete this.data.default_agent_model;
-					this.saveConfig();
-				}
 			} catch (error) {
 				log.error(`Failed to parse config file: ${error}`);
 				this.data = {};
+				return;
+			}
+
+			try {
+				chmodSync(this.configPath, 0o600);
+			} catch {
+				// Do not accept group/world-readable config merely because it parsed:
+				// it can contain alert credentials. A protected read-only file is safe.
+				let ownerOnly = false;
+				try {
+					ownerOnly = (statSync(this.configPath).mode & 0o077) === 0;
+				} catch {
+					// The clear failure below is safer than falling back to an empty config.
+				}
+				if (!ownerOnly) {
+					throw new Error("Config file must be owner-only");
+				}
+			}
+			if ("default_agent_model" in this.data) {
+				delete this.data.default_agent_model;
+				this.saveConfig();
 			}
 		} else {
 			// Create config directory if it doesn't exist
 			const dir = dirname(this.configPath);
-			mkdirSync(dir, { recursive: true });
+			mkdirSync(dir, { recursive: true, mode: 0o700 });
+			chmodSync(dir, 0o700);
 
 			// Initialize with default config
 			this.data = {
@@ -647,6 +718,16 @@ export class Config extends EventEmitter {
 			email: file?.email ?? null,
 			emailFrom: file?.email_from ?? null,
 			resendApiKey: file?.resend_api_key ?? null,
+		};
+	}
+
+	getClientRouting(): ClientRoutingConfig {
+		const client = this.data.client;
+		return {
+			...(client?.base_url && { baseUrl: client.base_url }),
+			...(client?.proxy_key_file && {
+				proxyKeyFile: client.proxy_key_file,
+			}),
 		};
 	}
 

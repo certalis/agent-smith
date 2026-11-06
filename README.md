@@ -1,6 +1,6 @@
 # agent-smith
 
-**A proof-of-concept local proxy and provider pool for Claude Code and Codex.**
+**A proof-of-concept proxy and provider pool for Claude Code and Codex.**
 
 > [!WARNING]
 > **This is a proof of concept for ideation, not a product.** It exists to
@@ -15,10 +15,10 @@
 >   providers' terms.
 > - Not affiliated with, endorsed by or sponsored by Anthropic or OpenAI.
 
-Claude Code and Codex keep talking their own protocol. agent-smith sits on
-localhost between them and the provider: it chooses a provider from the pool you
-configure, then an account inside that provider, watches the quota each
-provider reports, and fails over when one cannot serve.
+Claude Code and Codex keep talking their own protocol. agent-smith sits between
+them and the provider: it chooses a provider from the pool you configure, then
+an account inside that provider, watches the quota each provider reports, and
+fails over when one cannot serve.
 
 ## How it works
 
@@ -85,6 +85,40 @@ startServer({
 
 Codex works the same way with an OpenAI API key and an `openai-responses` pool.
 
+## Connect an authorized development caller through SSH
+
+The agents box and a development laptop both send requests to one proxy with a
+forwarding key. A laptop can reach a private server through an SSH tunnel in
+v1.
+
+This is connectivity only, not team tenancy: the shared forwarding key does
+not identify an individual caller or enforce per-client fairness. Do not
+distribute it team-wide until the B2/W7 tenancy work exists.
+
+Copy [`team-client.json`](examples/config/team-client.json) into your private
+Agent-smith config. Put the forwarding key in the owner-only file named by
+`proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
+visible to your machine, not a second pool. The key can spend from the pool, but
+cannot administer it.
+
+For an SSH tunnel, forward a local port to the private server and leave that SSH
+session running:
+
+```bash
+ssh -N -L 18181:127.0.0.1:8080 agent-smith-pool
+```
+
+Then install the normal `claude` and `codex` wrappers once:
+
+```bash
+agent-smith install-client
+```
+
+Open a new terminal and use `claude` or `codex` normally. The wrappers only add
+their own marked `PATH` entry; they do not replace the real binaries or start a
+second proxy. The forwarding key is for inference, not dashboard or management
+access.
+
 ## Configuration
 
 The config file is JSON, read at startup from:
@@ -103,6 +137,7 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
+| `client` | The Agent-smith origin and forwarding key used by `agent-smith install-client`. It is for this machine only; it does not define providers or a separate pool. |
 | `team_routing` | Which subscription accounts may share a pool, and their usage caps. See the [configuration guide](docs/configuration.md#team-routing). |
 | `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
 | `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
@@ -153,6 +188,20 @@ to `acme` and are sent as `acme-large`. `acme` serves no other model.
   },
   "provider_pools": {
     "anthropic-messages": ["anthropic", "acme"]
+  }
+}
+```
+
+**A laptop using a private shared pool**
+([`team-client.json`](examples/config/team-client.json)). The example uses an
+SSH-local port; use the direct private origin instead on a host that can reach
+the pool without SSH.
+
+```json
+{
+  "client": {
+    "base_url": "http://127.0.0.1:18181",
+    "proxy_key_file": "~/.config/ccflare/team-pool.key"
   }
 }
 ```

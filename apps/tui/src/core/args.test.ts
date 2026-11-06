@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { parseArgs } from "./args";
 
 describe("parseArgs", () => {
+	it("parses the explicit client-wrapper setup command", () => {
+		expect(parseArgs(["install-client"])).toEqual({ installClient: true });
+	});
+
 	it("parses all supported --provider values for add-account", () => {
 		for (const provider of [
 			"anthropic",

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Config } from "./index";
@@ -52,5 +58,46 @@ describe("alert configuration", () => {
 		new Config(path).set("port", 8080);
 
 		expect(statSync(path).mode & 0o777).toBe(0o600);
+	});
+
+	it("tightens a readable client config before using its forwarding-key file", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-alerts-"));
+		tempDirs.push(directory);
+		const path = join(directory, "config.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				client: {
+					base_url: "http://127.0.0.1:18181",
+					proxy_key_file: "/tmp/agent-smith.key",
+				},
+			}),
+			{ mode: 0o644 },
+		);
+
+		new Config(path);
+
+		expect(statSync(path).mode & 0o777).toBe(0o600);
+	});
+
+	it("creates the config directory 0700, since it holds client forwarding keys", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-alerts-"));
+		tempDirs.push(directory);
+		const configDirectory = join(directory, "private");
+
+		new Config(join(configDirectory, "config.json"));
+
+		expect(statSync(configDirectory).mode & 0o777).toBe(0o700);
+	});
+
+	it("tightens an existing config directory before writing client forwarding keys", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-alerts-"));
+		tempDirs.push(directory);
+		const configDirectory = join(directory, "private");
+		mkdirSync(configDirectory, { mode: 0o755 });
+
+		new Config(join(configDirectory, "config.json"));
+
+		expect(statSync(configDirectory).mode & 0o777).toBe(0o700);
 	});
 });

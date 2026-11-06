@@ -13,6 +13,7 @@ This setting does not enable team routing or change account-pool limits.
 - [Configuration Precedence](#configuration-precedence)
 - [Configuration File Format](#configuration-file-format)
 - [Configuration Options](#configuration-options)
+- [Client wrappers](#client-wrappers)
 - [Environment Variables](#environment-variables)
 - [Runtime Configuration API](#runtime-configuration-api)
 - [Example Configurations](#example-configurations)
@@ -69,6 +70,10 @@ The configuration file is stored at:
     "claude-code": { "enabled": false },
     "codex": { "enabled": false }
   },
+  "client": {
+    "base_url": "http://127.0.0.1:18181",
+    "proxy_key_file": "~/.config/ccflare/team-pool.key"
+  },
   "team_routing": {
     "enabled": false,
     "distribution_enabled": true,
@@ -115,6 +120,33 @@ The configuration file is stored at:
 | `enrollment_emails` | string[] | `[]` | Emails the stable `/pool-enroll` link admits (lowercased, at most 200). Edit it through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
 | `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
+| `client` | object | absent | The endpoint and forwarding key for wrappers installed on this machine. It does not configure providers or change the server's pool. |
+
+### Client wrappers
+
+`client` is optional and is only read by `agent-smith install-client`. It has
+two fields:
+
+- `base_url`: the HTTP(S) origin of the one Agent-smith server this machine can
+  reach. It has no path.
+- `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file
+  containing the forwarding key. The key lets Claude Code and Codex send
+  requests through the proxy but cannot change accounts or settings.
+
+The agents service and a development caller use the same two values: an origin
+and a forwarding key. On the agents service they are environment settings; on a
+laptop the origin lives in the private local config and the key stays in its
+own owner-only file, so generated wrappers can use it without embedding it.
+Agent-smith attempts to tighten its config to `0600` when it reads it; the key
+file must already be `0600`.
+
+This is not B2 tenancy. One forwarding key does not identify individual callers
+or provide per-client fairness, so it is for the isolated B1 development path,
+not a team-wide distribution mechanism.
+
+For SSH v1, point `base_url` at the local side of the SSH forward, for example
+`http://127.0.0.1:18181`. SSH is only the network path; it does not create a
+second pool or change routing. See the [SSH walkthrough](../README.md#connect-an-authorized-development-caller-through-ssh).
 
 ### Providers
 
@@ -236,7 +268,7 @@ The interactive **Local pool** screen can explicitly enable routing for the
 locally installed `claude` and `codex` clients. It writes wrappers under the
 ccflare config directory and one marked PATH block in the active shell profile;
 the original client binaries and their configuration are not modified. The
-wrappers route only to the loopback proxy and work while the TUI is running.
+wrappers route to the loopback proxy and work while the TUI is running.
 When a matching `provider_pools` entry is configured, the Claude and Codex
 wrappers use its protocol route; without one, they retain their direct provider
 routes.
@@ -244,6 +276,11 @@ routes.
 Enable or remove this integration from the Local pool screen with `e`. Open a
 new terminal after enabling it. The status in the screen is the source of truth;
 do not copy proxy credentials into shell profiles for local routing.
+
+For a shared Agent-smith server, use the [`client` configuration](#client-wrappers)
+and `agent-smith install-client` instead. Its wrappers use the configured origin
+and forwarding key, whether the origin is directly reachable or the local side
+of an SSH tunnel.
 
 ### Load Balancing Strategy
 
