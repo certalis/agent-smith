@@ -71,7 +71,7 @@ The configuration file is stored at:
     "codex": { "enabled": false }
   },
   "client": {
-    "base_url": "http://127.0.0.1:18181",
+    "base_url": "http://10.76.0.1:8080",
     "proxy_key_file": "~/.config/ccflare/team-pool.key"
   },
   "team_routing": {
@@ -112,7 +112,7 @@ The configuration file is stored at:
 | `request_scoped_429_retry_delay_ms` | number | `2000` | Delay before the one permitted retry after a request-scoped 429 |
 | `session_duration_ms` | number | `18000000` (5 hours) | Legacy compatibility field; it does not affect W2 account selection. |
 | `port` | number | `8080` | HTTP server port |
-| `host` | string | `"127.0.0.1"` | Interface to bind; use `CF_HOST` for deployment overrides |
+| `host` | string | `"127.0.0.1"` | Interface to bind; use `CF_HOST` for a single deployment override |
 | `trust_loopback` | boolean | `true` | Allow direct loopback requests without a key; set `false` behind a same-host reverse proxy that does not forward client-address headers |
 | `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
 | `block_when_all_full` | boolean | `true` | When every account is full, refuse every request with a 429 until the soonest reset. `false` lets one request a minute through to revalidate, and that request may spend extra usage. |
@@ -144,9 +144,12 @@ This is not B2 tenancy. One forwarding key does not identify individual callers
 or provide per-client fairness, so it is for the isolated B1 development path,
 not a team-wide distribution mechanism.
 
-For SSH v1, point `base_url` at the local side of the SSH forward, for example
-`http://127.0.0.1:18181`. SSH is only the network path; it does not create a
-second pool or change routing. See the [SSH walkthrough](../README.md#connect-an-authorized-development-caller-through-ssh).
+For a private network, point `base_url` at the server's WireGuard address, for
+example `http://10.76.0.1:8080`. This is only the network path; it does not
+create a second pool or change routing. See the
+[private-network deployment guide](private-network.md). An SSH-local origin is
+still possible for one-off development access, but is not the shared-pool
+deployment shape.
 
 ### Providers
 
@@ -258,7 +261,7 @@ and never retried.
 
 ### Exposure security
 
-The server binds to `127.0.0.1` by default. To serve requests outside that interface, set `CF_HOST` and a `CF_PROXY_KEY`; external callers must send that key in `x-api-key`. A request carrying `Forwarded`, `X-Forwarded-For`, or `X-Real-IP` is never treated as a direct loopback request, so the key is required even when a same-host reverse proxy connects from `127.0.0.1`.
+The server binds to `127.0.0.1` by default. To serve requests outside that interface, set `CF_HOST` and a `CF_PROXY_KEY`; external callers must send that key in `x-api-key`. For a private server that needs both loopback and a WireGuard address, set `CF_BIND_HOSTS` to the comma-separated addresses instead. Multiple listeners require Linux. A request carrying `Forwarded`, `X-Forwarded-For`, or `X-Real-IP` is never treated as a direct loopback request, so the key is required even when a same-host reverse proxy connects from `127.0.0.1`.
 
 Set `CF_ADMIN_KEY` separately for management writes under `/api`. Every management write requires this configured matching key; without it, writes are refused, including on direct loopback. The proxy key can forward provider requests but cannot make management changes. Keep both keys in the process environment, never in the JSON configuration file. Browser-originated management requests are rejected unless they are same-origin. In the dashboard, enter the admin key through **Unlock management**; it is kept only for that browser tab and is never embedded in the dashboard build.
 
@@ -279,8 +282,7 @@ do not copy proxy credentials into shell profiles for local routing.
 
 For a shared Agent-smith server, use the [`client` configuration](#client-wrappers)
 and `agent-smith install-client` instead. Its wrappers use the configured origin
-and forwarding key, whether the origin is directly reachable or the local side
-of an SSH tunnel.
+and forwarding key, including a private WireGuard origin.
 
 ### Load Balancing Strategy
 
@@ -317,6 +319,7 @@ an account.
 | `SESSION_DURATION_MS` | `session_duration_ms` | number | `SESSION_DURATION_MS=3600000` |
 | `PORT` | `port` | number | `PORT=3000` |
 | `CF_HOST` | `host` | string | `CF_HOST=127.0.0.1` |
+| `CF_BIND_HOSTS` | - (not persisted) | comma-separated strings | `CF_BIND_HOSTS=127.0.0.1,10.76.0.1` |
 | `CF_TRUST_LOOPBACK` | `trust_loopback` | boolean | `CF_TRUST_LOOPBACK=false` |
 | `CF_PROXY_KEY` | - (not persisted) | string | `CF_PROXY_KEY=proxy-secret` |
 | `CF_ADMIN_KEY` | - (not persisted) | string | `CF_ADMIN_KEY=admin-secret` |

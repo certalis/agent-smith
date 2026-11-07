@@ -1,5 +1,9 @@
 # ccflare Deployment Documentation
 
+For a single private Agent-smith pool shared by WireGuard peers, use the
+[private-network guide](private-network.md). It covers the private bind,
+firewall, client wrappers and revocation checks.
+
 For same-host administration, the programmatic server accepts an optional
 `additionalUnixSocket` absolute path. Put it in the pool user's private directory,
 with a restrictive umask; the host owns directory permissions and stale-socket

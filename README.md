@@ -85,28 +85,24 @@ startServer({
 
 Codex works the same way with an OpenAI API key and an `openai-responses` pool.
 
-## Connect an authorized development caller through SSH
+## Connect an authorized caller to a private shared pool
 
-The agents box and a development laptop both send requests to one proxy with a
-forwarding key. A laptop can reach a private server through an SSH tunnel in
-v1.
+The agents service and a laptop can send requests to one proxy with a
+forwarding key. Put the server and callers on a private network first; the
+recommended WireGuard shape is documented in the
+[private-network guide](docs/private-network.md). It keeps the database and
+provider tokens on the server, and exposes the proxy only on the private
+network.
 
 This is connectivity only, not team tenancy: the shared forwarding key does
 not identify an individual caller or enforce per-client fairness. Do not
 distribute it team-wide until the B2/W7 tenancy work exists.
 
-Copy [`team-client.json`](examples/config/team-client.json) into your private
-Agent-smith config. Put the forwarding key in the owner-only file named by
-`proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
-visible to your machine, not a second pool. The key can spend from the pool, but
-cannot administer it.
-
-For an SSH tunnel, forward a local port to the private server and leave that SSH
-session running:
-
-```bash
-ssh -N -L 18181:127.0.0.1:8080 agent-smith-pool
-```
+Copy [`private-network-client.json`](examples/config/private-network-client.json)
+into your private Agent-smith config. Put the forwarding key in the owner-only
+file named by `proxy_key_file`, not in the JSON or a shell profile. `base_url`
+is the private endpoint visible to that machine, not a second pool. The key can
+spend from the pool, but cannot administer it.
 
 Then install the normal `claude` and `codex` wrappers once:
 
@@ -116,8 +112,9 @@ agent-smith install-client
 
 Open a new terminal and use `claude` or `codex` normally. The wrappers only add
 their own marked `PATH` entry; they do not replace the real binaries or start a
-second proxy. The forwarding key is for inference, not dashboard or management
-access.
+second proxy. Edit the `client` section and rerun `agent-smith install-client`
+when the private address changes; do not hand-edit the generated wrappers. The
+forwarding key is for inference, not dashboard or management access.
 
 ## Configuration
 
@@ -193,14 +190,14 @@ to `acme` and are sent as `acme-large`. `acme` serves no other model.
 ```
 
 **A laptop using a private shared pool**
-([`team-client.json`](examples/config/team-client.json)). The example uses an
-SSH-local port; use the direct private origin instead on a host that can reach
-the pool without SSH.
+([`private-network-client.json`](examples/config/private-network-client.json)).
+The address is reachable only through the private network described in the
+[deployment guide](docs/private-network.md).
 
 ```json
 {
   "client": {
-    "base_url": "http://127.0.0.1:18181",
+    "base_url": "http://10.76.0.1:8080",
     "proxy_key_file": "~/.config/ccflare/team-pool.key"
   }
 }

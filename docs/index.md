@@ -72,6 +72,7 @@ When working with Claude API at scale, rate limits can become a significant bott
 
 ### Operations
 - [Deployment Guide](./deployment.md) - Production deployment with Docker, systemd, PM2, and Kubernetes
+- [Private Network Guide](./private-network.md) - WireGuard deployment for one private shared pool
 - [Security Considerations](./security.md) - Authentication, encryption, and best practices
 - [Troubleshooting](./troubleshooting.md) - Common issues and solutions
 - [Contributing](./contributing.md) - Development setup and contribution guidelines
