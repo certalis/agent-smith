@@ -79,6 +79,12 @@ ccflare/
 
 `packages/runtime-server` is the composition boundary.
 
+For managed HTTPS hosts, the Node-compatible `@certalis/agent-smith/edge`
+export forwards only exact inference routes and authenticated health to the
+existing private Unix socket. Runtime exposure checks authorize device keys
+from `CF_CLIENT_KEYS_FILE` and refuse their management access. The edge creates
+no second runtime or database; see [HTTPS deployment](https-edge.md).
+
 It currently owns:
 
 - server bootstrap
@@ -90,11 +96,9 @@ It currently owns:
 
 Programmatic `startServer({ additionalUnixSocket })` can also bind an absolute
 Unix socket path. It shares the same runtime and authenticated router as TCP;
-both listeners stop together. On Linux, `CF_BIND_HOSTS` can bind that same
-runtime to multiple explicit TCP addresses, such as loopback plus a WireGuard
-address. The embedding host must place the socket inside a directory other Unix
-users cannot replace or traverse. There is no TCP fallback for clients using
-this private control transport.
+both listeners stop together. The embedding host must place the socket inside
+a directory other Unix users cannot replace or traverse. There is no TCP fallback
+for clients using this private control transport.
 
 After the recent refactor, its internal modules are:
 

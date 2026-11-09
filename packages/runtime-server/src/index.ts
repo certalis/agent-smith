@@ -22,7 +22,6 @@ const lifecycleLog = new Logger("ServerLifecycle", LogLevel.INFO, {
 
 // Module-level server instance
 let serverInstance: ReturnType<typeof serve> | null = null;
-let additionalServerInstances: Array<ReturnType<typeof serve>> = [];
 let unixServerInstance: ReturnType<typeof serve> | null = null;
 let stopRetentionJob: (() => void) | null = null;
 let serverStopPromise: Promise<void> | null = null;
@@ -68,10 +67,8 @@ async function stopServerRuntime(): Promise<void> {
 	serverStopPromise = (async () => {
 		const errors: Error[] = [];
 		const activeServer = serverInstance;
-		const activeAdditionalServers = additionalServerInstances;
 		const activeUnixServer = unixServerInstance;
 		serverInstance = null;
-		additionalServerInstances = [];
 		unixServerInstance = null;
 
 		try {
@@ -84,16 +81,6 @@ async function stopServerRuntime(): Promise<void> {
 			await activeServer?.stop(true);
 		} catch (error) {
 			errors.push(toError("Failed to stop Bun server", error));
-		}
-
-		for (const [index, server] of activeAdditionalServers.entries()) {
-			try {
-				await server.stop(true);
-			} catch (error) {
-				errors.push(
-					toError(`Failed to stop additional Bun server ${index + 1}`, error),
-				);
-			}
 		}
 
 		stopRetentionMaintenance();
@@ -199,18 +186,6 @@ export default function startServer(
 			fetch: fetchHandler,
 			websocket: websocketProxyHandler,
 		});
-		const activePort = serverInstance.port ?? runtimeConfig.port;
-		for (const hostname of exposureConfig.bindHosts.slice(1)) {
-			additionalServerInstances.push(
-				serve({
-					hostname,
-					port: activePort,
-					idleTimeout: NETWORK.IDLE_TIMEOUT_MAX,
-					fetch: fetchHandler,
-					websocket: websocketProxyHandler,
-				}),
-			);
-		}
 	} catch (error) {
 		void stopServerRuntime().catch(() => {
 			lifecycleLog.error("Failed to clean up after listener startup failure");

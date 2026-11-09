@@ -46,15 +46,6 @@ describe("provider configuration", () => {
 		});
 	});
 
-	it("ships an editable private-network client configuration", () => {
-		expect(
-			exampleConfig("private-network-client.json").getClientRouting(),
-		).toEqual({
-			baseUrl: "http://10.76.0.1:8080",
-			proxyKeyFile: "~/.config/ccflare/team-pool.key",
-		});
-	});
-
 	it("does not retain a raw forwarding key from client config", () => {
 		const config = configFrom({
 			client: {

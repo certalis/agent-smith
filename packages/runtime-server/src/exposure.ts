@@ -1,4 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
+import { deviceKeyMatches } from "./device-keys";
+import { isDeviceRoute } from "./inference-routes";
 
 const FORWARDED_HEADERS = [
 	"forwarded",
@@ -11,8 +13,8 @@ const MUTATING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
 export type ExposureConfig = {
 	adminKey?: string;
 	bindHost: string;
-	bindHosts: readonly string[];
 	proxyKey?: string;
+	clientKeysFile?: string;
 	trustLoopback: boolean;
 };
 
@@ -41,34 +43,17 @@ function configuredKey(
 	return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function configuredBindHosts(value: string | undefined): string[] | undefined {
-	if (value === undefined) return undefined;
-
-	const bindHosts = [
-		...new Set(
-			value
-				.split(",")
-				.map((host) => host.trim())
-				.filter(Boolean),
-		),
-	];
-	return bindHosts.length > 0 ? bindHosts : undefined;
-}
-
 export function createExposureConfig(config: {
 	get(key: string): string | number | boolean | undefined;
 }): ExposureConfig {
 	const configuredHost =
 		configuredKey(process.env.CF_HOST) ?? configuredKey(config.get("host"));
-	const bindHosts = configuredBindHosts(process.env.CF_BIND_HOSTS) ?? [
-		configuredHost ?? "127.0.0.1",
-	];
 	const configuredTrustLoopback = process.env.CF_TRUST_LOOPBACK;
 	return {
 		adminKey: configuredKey(process.env.CF_ADMIN_KEY),
-		bindHost: bindHosts[0],
-		bindHosts,
+		bindHost: configuredHost ?? "127.0.0.1",
 		proxyKey: configuredKey(process.env.CF_PROXY_KEY),
+		clientKeysFile: configuredKey(process.env.CF_CLIENT_KEYS_FILE),
 		trustLoopback:
 			configuredTrustLoopback === undefined
 				? config.get("trust_loopback") !== false
@@ -95,7 +80,11 @@ function safeKeyEqual(
 	candidate: string | null,
 	expected: string | undefined,
 ): boolean {
-	if (!candidate || !expected || candidate.length !== expected.length) {
+	if (
+		!candidate ||
+		!expected ||
+		Buffer.byteLength(candidate) !== Buffer.byteLength(expected)
+	) {
 		return false;
 	}
 
@@ -119,7 +108,7 @@ function keyRole(
 	req: Request,
 	url: URL,
 	config: ExposureConfig,
-): "admin" | "proxy" | null {
+): "admin" | "proxy" | "device" | null {
 	const apiKey = req.headers.get("x-api-key");
 	if (safeKeyEqual(apiKey, config.adminKey)) {
 		return "admin";
@@ -135,6 +124,13 @@ function keyRole(
 		safeKeyEqual(bearerToken(req), config.proxyKey)
 	) {
 		return "proxy";
+	}
+	if (
+		deviceKeyMatches(apiKey, config.clientKeysFile) ||
+		(isResponsesInferenceRoute(url.pathname) &&
+			deviceKeyMatches(bearerToken(req), config.clientKeysFile))
+	) {
+		return "device";
 	}
 	return null;
 }
@@ -156,7 +152,7 @@ function isWildcardHost(host: string): boolean {
 
 export function isLocalHostHeader(
 	hostHeader: string | null,
-	bindHosts: readonly string[] | string,
+	bindHost: string,
 ): boolean {
 	if (hostHeader === null) {
 		return true;
@@ -167,14 +163,9 @@ export function isLocalHostHeader(
 		return false;
 	}
 
-	const configuredHosts =
-		typeof bindHosts === "string" ? [bindHosts] : bindHosts;
 	return (
 		LOOPBACK_HOSTS.has(hostname) ||
-		configuredHosts.some(
-			(bindHost) =>
-				!isWildcardHost(bindHost) && hostname === bindHost.toLowerCase(),
-		)
+		(!isWildcardHost(bindHost) && hostname === bindHost.toLowerCase())
 	);
 }
 
@@ -208,15 +199,21 @@ export function exposureFailure(
 		config.trustLoopback &&
 		(remote.hasRequestIp
 			? isLoopbackAddress(remote.address)
-			: isLocalHostHeader(url.host, config.bindHosts)) &&
+			: isLocalHostHeader(url.host, config.bindHost)) &&
 		!isForwardedRequest(req.headers);
 	const role = keyRole(req, url, config);
+	if (
+		role === "device" &&
+		!isDeviceRoute(req.method, url.pathname + url.search)
+	) {
+		return jsonError(403, "Device keys only allow health and inference");
+	}
 
 	if (!role && !loopbackExempt) {
 		return jsonError(401, "A proxy key is required for this request");
 	}
 
-	if (!role && !isLocalHostHeader(req.headers.get("host"), config.bindHosts)) {
+	if (!role && !isLocalHostHeader(req.headers.get("host"), config.bindHost)) {
 		return jsonError(403, "Host header is not allowed for a loopback request");
 	}
 

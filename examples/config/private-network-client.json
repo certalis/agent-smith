@@ -1,6 +1,0 @@
-{
-	"client": {
-		"base_url": "http://10.76.0.1:8080",
-		"proxy_key_file": "~/.config/ccflare/team-pool.key"
-	}
-}

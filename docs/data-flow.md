@@ -12,6 +12,11 @@ The major flows are:
 - request/log event streaming
 - OAuth account onboarding
 
+An optional [HTTPS entrance](https-edge.md) routes authenticated device
+inference through a protected Unix socket to this same runtime. Its allowlist
+excludes management/OAuth; the pool checks the current hash-only device registry
+before selecting an account. Deleting an entry stops subsequent requests.
+
 ## Runtime Flow
 
 ```mermaid

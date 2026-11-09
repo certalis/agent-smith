@@ -85,24 +85,30 @@ startServer({
 
 Codex works the same way with an OpenAI API key and an `openai-responses` pool.
 
-## Connect an authorized caller to a private shared pool
+## Connect an authorized caller to a shared pool
 
-The agents service and a laptop can send requests to one proxy with a
-forwarding key. Put the server and callers on a private network first; the
-recommended WireGuard shape is documented in the
-[private-network guide](docs/private-network.md). It keeps the database and
-provider tokens on the server, and exposes the proxy only on the private
-network.
+The agents service and laptops can use one server-side pool through the
+[authenticated HTTPS entrance](docs/https-edge.md) on managed HTTP hosts such as
+Render. HTTPS needs no VPN or extra server: an existing web service forwards
+only inference to the pool's private socket. Each device has its own revocable
+key; provider tokens and the single database stay on the server.
 
-This is connectivity only, not team tenancy: the shared forwarding key does
-not identify an individual caller or enforce per-client fairness. Do not
-distribute it team-wide until the B2/W7 tenancy work exists.
+Device keys allow independent revocation and cannot read management data.
+This does not add per-client fairness or budgets.
 
-Copy [`private-network-client.json`](examples/config/private-network-client.json)
-into your private Agent-smith config. Put the forwarding key in the owner-only
-file named by `proxy_key_file`, not in the JSON or a shell profile. `base_url`
-is the private endpoint visible to that machine, not a second pool. The key can
-spend from the pool, but cannot administer it.
+Copy [`https-client.json`](examples/config/https-client.json) into your private
+Agent-smith config. Put the device key in the owner-only file named by
+`proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
+visible to your machine, not a second pool. The key can spend from the pool, but
+cannot administer it.
+
+An SSH tunnel remains an option for development. Use
+[`team-client.json`](examples/config/team-client.json) and forward its local port
+to the private server:
+
+```bash
+ssh -N -L 18181:127.0.0.1:8080 agent-smith-pool
+```
 
 Then install the normal `claude` and `codex` wrappers once:
 
@@ -112,9 +118,8 @@ agent-smith install-client
 
 Open a new terminal and use `claude` or `codex` normally. The wrappers only add
 their own marked `PATH` entry; they do not replace the real binaries or start a
-second proxy. Edit the `client` section and rerun `agent-smith install-client`
-when the private address changes; do not hand-edit the generated wrappers. The
-forwarding key is for inference, not dashboard or management access.
+second proxy. The forwarding key is for inference, not dashboard or management
+access.
 
 ## Configuration
 
@@ -190,14 +195,14 @@ to `acme` and are sent as `acme-large`. `acme` serves no other model.
 ```
 
 **A laptop using a private shared pool**
-([`private-network-client.json`](examples/config/private-network-client.json)).
-The address is reachable only through the private network described in the
-[deployment guide](docs/private-network.md).
+([`team-client.json`](examples/config/team-client.json)). The example uses an
+SSH-local port; use the direct private origin instead on a host that can reach
+the pool without SSH.
 
 ```json
 {
   "client": {
-    "base_url": "http://10.76.0.1:8080",
+    "base_url": "http://127.0.0.1:18181",
     "proxy_key_file": "~/.config/ccflare/team-pool.key"
   }
 }

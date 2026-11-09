@@ -37,6 +37,12 @@ ccflare provides a RESTful HTTP API for managing accounts, monitoring usage, and
 
 ### Base URL
 
+For the [HTTPS device entrance](https-edge.md), the public health route is
+`GET /pool-health`; it maps to `/health` on the private pool. Only exact Messages,
+token-counting and Responses routes are forwarded. Device keys work in
+`x-api-key` (or Bearer on Responses) and cannot access management endpoints.
+This entrance does not expose the management API described below.
+
 ```
 http://localhost:8080
 ```

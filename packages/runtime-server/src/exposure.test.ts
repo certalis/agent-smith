@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-	createExposureConfig,
 	type ExposureConfig,
 	exposureFailure,
 	isForwardedRequest,
@@ -10,7 +9,6 @@ import {
 const config: ExposureConfig = {
 	adminKey: "admin-key",
 	bindHost: "127.0.0.1",
-	bindHosts: ["127.0.0.1"],
 	proxyKey: "proxy-key",
 	trustLoopback: true,
 };
@@ -107,7 +105,6 @@ describe("exposure gate", () => {
 		expect(
 			exposureFailure(req, url, loopbackServer, {
 				bindHost: "127.0.0.1",
-				bindHosts: ["127.0.0.1"],
 				trustLoopback: true,
 			})?.status,
 		).toBe(401);
@@ -124,27 +121,4 @@ test("forwarding marks and acceptable loopback hosts are precise", () => {
 	expect(isLocalHostHeader("localhost:8080", "127.0.0.1")).toBe(true);
 	expect(isLocalHostHeader("[::1]:8080", "127.0.0.1")).toBe(true);
 	expect(isLocalHostHeader("attacker.example", "127.0.0.1")).toBe(false);
-});
-
-test("uses every explicit bind host for one private listener set", () => {
-	const previousBindHosts = process.env.CF_BIND_HOSTS;
-	process.env.CF_BIND_HOSTS = "127.0.0.1, 10.76.0.1,10.76.0.1";
-
-	try {
-		const configured = createExposureConfig({ get: () => undefined });
-
-		expect(configured.bindHosts).toEqual(["127.0.0.1", "10.76.0.1"]);
-		expect(isLocalHostHeader("10.76.0.1:8080", configured.bindHosts)).toBe(
-			true,
-		);
-		expect(isLocalHostHeader("10.76.0.2:8080", configured.bindHosts)).toBe(
-			false,
-		);
-	} finally {
-		if (previousBindHosts === undefined) {
-			delete process.env.CF_BIND_HOSTS;
-		} else {
-			process.env.CF_BIND_HOSTS = previousBindHosts;
-		}
-	}
 });

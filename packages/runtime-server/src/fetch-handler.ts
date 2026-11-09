@@ -32,7 +32,6 @@ export function createServerFetchHandler({
 	withDashboard,
 	exposureConfig = {
 		bindHost: "127.0.0.1",
-		bindHosts: ["127.0.0.1"],
 		trustLoopback: true,
 	},
 	handleProxyRequest = handleProxy,

@@ -1,8 +1,7 @@
 # ccflare Deployment Documentation
 
-For a single private Agent-smith pool shared by WireGuard peers, use the
-[private-network guide](private-network.md). It covers the private bind,
-firewall, client wrappers and revocation checks.
+For a managed HTTPS host such as Render, the [HTTPS edge guide](https-edge.md)
+connects devices to the existing pool without a VPN or a second server.
 
 For same-host administration, the programmatic server accepts an optional
 `additionalUnixSocket` absolute path. Put it in the pool user's private directory,

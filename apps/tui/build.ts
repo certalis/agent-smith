@@ -46,6 +46,13 @@ if (!result.success) {
 	process.exit(1);
 }
 
+const edge = await Bun.build({
+	entrypoints: [join(tuiDir, "src/edge.ts")],
+	outdir: distDir,
+	target: "node",
+});
+if (!edge.success) throw new Error("Failed to build the HTTP proxy edge");
+
 await cp(join(webDir, "dist"), join(distDir, "dashboard"), { recursive: true });
 await chmod(join(distDir, "bin.js"), 0o755);
 
