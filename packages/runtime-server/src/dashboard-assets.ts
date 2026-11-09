@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { CACHE } from "@ccflare/core";
+import { CACHE } from "@agent-smith/core";
 
-const DASHBOARD_MANIFEST_EXPORT = "@ccflare/web/manifest.json";
-const DASHBOARD_DIST_DIR_ENV = "CF_DASHBOARD_DIST_DIR";
-const DASHBOARD_MANIFEST_PATH_ENV = "CF_DASHBOARD_MANIFEST_PATH";
+const DASHBOARD_MANIFEST_EXPORT = "@agent-smith/web/manifest.json";
+const DASHBOARD_DIST_DIR_ENV = "AGENT_SMITH_DASHBOARD_DIST_DIR";
+const DASHBOARD_MANIFEST_PATH_ENV = "AGENT_SMITH_DASHBOARD_MANIFEST_PATH";
 
 type DashboardAssetState = {
 	manifest: Record<string, string>;

@@ -1,7 +1,7 @@
-import { ServiceUnavailableError, TokenRefreshError } from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
-import type { TokenRefreshResult } from "@ccflare/providers";
-import type { Account } from "@ccflare/types";
+import { ServiceUnavailableError, TokenRefreshError } from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
+import type { TokenRefreshResult } from "@agent-smith/providers";
+import type { Account } from "@agent-smith/types";
 import { TOKEN_REFRESH_BACKOFF_MS, TOKEN_SAFETY_WINDOW_MS } from "../constants";
 import { ERROR_MESSAGES, type ResolvedProxyContext } from "./proxy-types";
 

@@ -1,4 +1,4 @@
-import type { ThemePalette } from "@ccflare/ui";
+import type { ThemePalette } from "@agent-smith/ui";
 import type { ReactNode } from "react";
 import { C } from "../theme.ts";
 

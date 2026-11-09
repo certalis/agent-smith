@@ -1,5 +1,9 @@
-import type { Provider } from "@ccflare/providers";
-import type { Account, AccountQuotaState, OutsideSpend } from "@ccflare/types";
+import type { Provider } from "@agent-smith/providers";
+import type {
+	Account,
+	AccountQuotaState,
+	OutsideSpend,
+} from "@agent-smith/types";
 
 const RESET_DROP_EPSILON = 0.05;
 const SETTLE_MS = 5_000;

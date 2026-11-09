@@ -1,5 +1,5 @@
-import { buildAnalyticsQuery, DatabaseFactory } from "@ccflare/database";
-import { isTimeRange } from "@ccflare/types";
+import { buildAnalyticsQuery, DatabaseFactory } from "@agent-smith/database";
+import { isTimeRange } from "@agent-smith/types";
 
 export interface TimeSeriesDataPoint {
 	time: number;

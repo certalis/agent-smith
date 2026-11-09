@@ -1,4 +1,4 @@
-import type { TimeRange } from "@ccflare/types";
+import type { TimeRange } from "@agent-smith/types";
 import { TIME_RANGES } from "./constants";
 
 export type SuccessRateTone = "good" | "warning" | "bad";

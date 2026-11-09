@@ -1,4 +1,4 @@
-import { registerDisposable, unregisterDisposable } from "@ccflare/core";
+import { registerDisposable, unregisterDisposable } from "@agent-smith/core";
 import { DatabaseOperations, type RuntimeConfig } from "./database-operations";
 
 let instance: DatabaseOperations | null = null;

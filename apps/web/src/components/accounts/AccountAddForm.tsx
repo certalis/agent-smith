@@ -6,7 +6,7 @@ import {
 	isApiKeyProvider,
 	isOAuthProvider,
 	type OAuthProvider,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -279,8 +279,8 @@ export function AccountAddForm({
 						<div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
 							This provider uses OAuth. Click{" "}
 							<span className="font-medium text-foreground">Start OAuth</span>{" "}
-							to open the authorization flow in a new tab. ccflare will detect
-							completion automatically.
+							to open the authorization flow in a new tab. agent-smith will
+							detect completion automatically.
 						</div>
 					)}
 				</>

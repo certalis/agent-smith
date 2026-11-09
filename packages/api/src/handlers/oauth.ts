@@ -1,22 +1,22 @@
-import type { Config } from "@ccflare/config";
-import { patterns, ValidationError, validateString } from "@ccflare/core";
-import type { DatabaseOperations } from "@ccflare/database";
+import type { Config } from "@agent-smith/config";
+import { patterns, ValidationError, validateString } from "@agent-smith/core";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	BadRequest,
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
 	NotFound,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import { createOAuthFlow } from "@ccflare/oauth-flow";
-import type { ProviderRegistry } from "@ccflare/providers";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import { createOAuthFlow } from "@agent-smith/oauth-flow";
+import type { ProviderRegistry } from "@agent-smith/providers";
 
 import type {
 	AuthCompleteData,
 	AuthInitData,
 	MutationResult,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { parseJsonObject } from "../utils/json";
 
 const log = new Logger("OAuthHandler");
@@ -436,7 +436,7 @@ export function createAuthCallbackHandler(
 			return htmlPage(
 				200,
 				"Account connected",
-				"Your OAuth account has been connected successfully. You can close this window and return to ccflare.",
+				"Your OAuth account has been connected successfully. You can close this window and return to agent-smith.",
 			);
 		} catch (error) {
 			dbOps.deleteAuthSession(authSession.id);

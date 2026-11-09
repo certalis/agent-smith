@@ -126,7 +126,7 @@ test("releases a later SSE chunk only after the client observes the first", asyn
 		const response = await withoutProxyEnvironment(() =>
 			fetch(`${upstream.url}/v1/messages`, {
 				method: "POST",
-				headers: { "x-ccflare-scenario-client-id": "sse-client" },
+				headers: { "x-agent-smith-scenario-client-id": "sse-client" },
 			}),
 		);
 		const reader = response.body?.getReader();

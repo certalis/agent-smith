@@ -1,9 +1,9 @@
-import { DatabaseFactory } from "@ccflare/database";
+import { DatabaseFactory } from "@agent-smith/database";
 import {
 	parseRequestPayload,
 	type Request,
 	type RequestPayload,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export type RequestSummary = Pick<
 	Request,

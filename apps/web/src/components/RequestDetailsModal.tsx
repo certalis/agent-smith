@@ -1,15 +1,15 @@
-import { formatCost } from "@ccflare/core";
+import { formatCost } from "@agent-smith/core";
 import {
 	decodeBase64Utf8,
 	type RequestPayload,
 	type RequestSummary,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import {
 	formatBody as formatBodyBase,
 	formatHeaders as formatHeadersBase,
 	formatTimestamp,
 	formatTokens,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Eye } from "lucide-react";
 import { useMemo, useState } from "react";

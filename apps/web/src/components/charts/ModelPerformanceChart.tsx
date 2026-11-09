@@ -1,4 +1,4 @@
-import { formatPercentage } from "@ccflare/ui";
+import { formatPercentage } from "@agent-smith/ui";
 import { useChartColors } from "../../hooks/useChartColors";
 import { formatCompactNumber } from "../../lib/chart-utils";
 import { BaseScatterChart } from "./BaseScatterChart";

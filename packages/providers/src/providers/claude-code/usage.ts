@@ -1,4 +1,4 @@
-import type { AccountQuotaState } from "@ccflare/types";
+import type { AccountQuotaState } from "@agent-smith/types";
 
 export const CLAUDE_CODE_USAGE_URL =
 	"https://api.anthropic.com/api/oauth/usage";

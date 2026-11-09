@@ -5,7 +5,7 @@
  * They contain no DOM or Ink dependencies -- only string/data transforms.
  */
 
-import { decodeBase64Utf8 } from "@ccflare/types";
+import { decodeBase64Utf8 } from "@agent-smith/types";
 
 export function decodeBase64Body(str: string | null): string {
 	if (!str) return "No data";

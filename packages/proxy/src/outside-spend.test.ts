@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Account } from "@ccflare/types";
+import type { Account } from "@agent-smith/types";
 import { OutsideSpendTracker } from "./outside-spend";
 
 const weeklyProvider = {

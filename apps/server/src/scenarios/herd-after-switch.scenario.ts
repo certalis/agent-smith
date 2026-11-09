@@ -31,11 +31,11 @@ export default defineScenario({
 			id: "each-client-uses-at-most-two-upstream-attempts",
 			type: "upstream",
 			atMostPerHeader: {
-				name: "x-ccflare-scenario-client-id",
+				name: "x-agent-smith-scenario-client-id",
 				count: 2,
 			},
 			eachHeaderIncludesAccount: {
-				name: "x-ccflare-scenario-client-id",
+				name: "x-agent-smith-scenario-client-id",
 				account: "b",
 				count: 10,
 			},

@@ -1,4 +1,4 @@
-import type { Account, RequestMeta } from "@ccflare/types";
+import type { Account, RequestMeta } from "@agent-smith/types";
 import type { TeamRoutingRequest } from "../team-router";
 import {
 	type AccountSelectionOptions,

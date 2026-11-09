@@ -1,4 +1,4 @@
-# ccflare HTTP API Documentation
+# agent-smith HTTP API Documentation
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ open http://localhost:8080
 
 ## Overview
 
-ccflare provides a RESTful HTTP API for managing accounts, monitoring usage, and proxying requests to Anthropic and OpenAI. The API runs on port 8080 by default. Direct loopback provider requests may be keyless; externally exposed or forwarded requests require `CF_PROXY_KEY` in `x-api-key`. Every mutating `/api` request requires a configured `CF_ADMIN_KEY` in that header.
+agent-smith provides a RESTful HTTP API for managing accounts, monitoring usage, and proxying requests to Anthropic and OpenAI. The API runs on port 8080 by default. Direct loopback provider requests may be keyless; externally exposed or forwarded requests require `AGENT_SMITH_PROXY_KEY` in `x-api-key`. Every mutating `/api` request requires a configured `AGENT_SMITH_ADMIN_KEY` in that header.
 
 ### Base URL
 
@@ -55,7 +55,7 @@ All API responses are in JSON format with `Content-Type: application/json`.
 
 ### Private Claude seat enrollment (opt-in)
 
-Set `CF_ENROLLMENT_ORIGIN` to the exact external HTTPS origin (no trailing slash,
+Set `AGENT_SMITH_ENROLLMENT_ORIGIN` to the exact external HTTPS origin (no trailing slash,
 path or credentials). Unset disables every enrollment route. HTTP loopback origins
 are accepted only for synthetic local tests. Keep normal admin/proxy keys and
 private listener isolation in place. Invitations also need
@@ -123,7 +123,7 @@ Existing-account reauthentication and reminder delivery are not implemented here
 
 #### GET /health
 
-Check the health status of the ccflare service.
+Check the health status of the agent-smith service.
 
 **Response:**
 ```json
@@ -155,7 +155,7 @@ Proxy requests to upstream provider APIs. The `/v1/{provider}` prefix is strippe
 
 **Headers:**
 - All standard provider API headers are supported
-- `Authorization` header is managed by ccflare (no need to provide)
+- `Authorization` header is managed by agent-smith (no need to provide)
 
 **Request Body:**
 Same as the upstream provider API requirements for the specific endpoint.
@@ -164,7 +164,7 @@ Same as the upstream provider API requirements for the specific endpoint.
 Proxied response from the upstream provider API, including streaming responses.
 
 **Automatic Failover:**
-If a request fails or an account is rate limited, ccflare automatically retries with the next available account according to the configured load balancing strategy. This ensures high availability and reliability.
+If a request fails or an account is rate limited, agent-smith automatically retries with the next available account according to the configured load balancing strategy. This ensures high availability and reliability.
 
 **Examples:**
 ```bash
@@ -901,7 +901,7 @@ All API errors follow a consistent format:
 
 ### Rate Limiting
 
-When an account hits rate limits, ccflare automatically fails over to the next available account. If all accounts are rate limited, a 503 error is returned.
+When an account hits rate limits, agent-smith automatically fails over to the next available account. If all accounts are rate limited, a 503 error is returned.
 
 Rate limit information is included in account responses:
 - `rateLimitStatus` - Current status (e.g., "allowed", "allowed_warning", "rate_limited")
@@ -919,7 +919,7 @@ The proxy endpoints support streaming responses for compatible Claude API calls.
 3. Each chunk is delivered as a Server-Sent Event
 
 **Streaming Responses:**
-ccflare reads the stream in the background for token usage and response IDs only:
+agent-smith reads the stream in the background for token usage and response IDs only:
 - The client's stream is not altered
 - Response bodies are not stored; the request history keeps `response.body: null`
 
@@ -958,21 +958,21 @@ The dashboard provides a visual interface for:
 
 ### Environment Variables
 
-ccflare can be configured using the following environment variables:
+agent-smith can be configured using the following environment variables:
 
 - `PORT` - Server port (default: 8080)
-- `LB_STRATEGY` - Legacy session-strategy setting; unused by quota- and priority-ordered routing (default: session)
-- `SESSION_DURATION_MS` - Legacy session-strategy duration; unused by the quota-aware proxy kernel (default: 18000000 / 5 hours)
-- `CLIENT_ID` - OAuth client ID for Anthropic authentication (default: 9d1c250a-e61b-44d9-88ed-5944d1962f5e)
-- `RETRY_ATTEMPTS` - Number of retry attempts for failed requests (default: 3)
-- `RETRY_DELAY_MS` - Initial delay between retries in milliseconds (default: 1000)
-- `RETRY_BACKOFF` - Exponential backoff multiplier for retries (default: 2)
+- `AGENT_SMITH_LB_STRATEGY` - Legacy session-strategy setting; unused by quota- and priority-ordered routing (default: session)
+- `AGENT_SMITH_SESSION_DURATION_MS` - Legacy session-strategy duration; unused by the quota-aware proxy kernel (default: 18000000 / 5 hours)
+- `AGENT_SMITH_CLIENT_ID` - OAuth client ID for Anthropic authentication (default: 9d1c250a-e61b-44d9-88ed-5944d1962f5e)
+- `AGENT_SMITH_RETRY_ATTEMPTS` - Number of retry attempts for failed requests (default: 3)
+- `AGENT_SMITH_RETRY_DELAY_MS` - Initial delay between retries in milliseconds (default: 1000)
+- `AGENT_SMITH_RETRY_BACKOFF` - Exponential backoff multiplier for retries (default: 2)
 
 ### Configuration File
 
-In addition to environment variables, ccflare supports configuration through a JSON file. The config file location varies by platform:
-- macOS/Linux: `~/.config/ccflare/ccflare.json` (or `$XDG_CONFIG_HOME/ccflare/ccflare.json`)
-- Windows: `%LOCALAPPDATA%\ccflare\ccflare.json` (or `%APPDATA%\ccflare\ccflare.json`)
+In addition to environment variables, agent-smith supports configuration through a JSON file. The config file location varies by platform:
+- macOS/Linux: `~/.config/agent-smith/agent-smith.json` (or `$XDG_CONFIG_HOME/agent-smith/agent-smith.json`)
+- Windows: `%LOCALAPPDATA%\agent-smith\agent-smith.json` (or `%APPDATA%\agent-smith\agent-smith.json`)
 
 **Supported Configuration Keys:**
 ```json
@@ -990,13 +990,13 @@ In addition to environment variables, ccflare supports configuration through a J
 
 ### Legacy Session Settings
 
-`LB_STRATEGY` and `SESSION_DURATION_MS` remain accepted for configuration compatibility only. They do not change quota-aware account selection, cooldowns, or OAuth token expiry.
+`AGENT_SMITH_LB_STRATEGY` and `AGENT_SMITH_SESSION_DURATION_MS` remain accepted for configuration compatibility only. They do not change quota-aware account selection, cooldowns, or OAuth token expiry.
 
 ## Notes
 
-1. **Authentication boundary**: Direct loopback provider requests may be keyless; forwarded and external requests require `CF_PROXY_KEY`. Every mutating management request requires `CF_ADMIN_KEY`.
+1. **Authentication boundary**: Direct loopback provider requests may be keyless; forwarded and external requests require `AGENT_SMITH_PROXY_KEY`. Every mutating management request requires `AGENT_SMITH_ADMIN_KEY`.
 
-2. **Automatic Failover**: When a request fails or an account is rate limited, ccflare automatically tries the next available account. If no account is eligible, requests are refused with HTTP 503 and never forwarded without credentials.
+2. **Automatic Failover**: When a request fails or an account is rate limited, agent-smith automatically tries the next available account. If no account is eligible, requests are refused with HTTP 503 and never forwarded without credentials.
 
 3. **Token Refresh**: Access tokens are automatically refreshed when they expire.
 

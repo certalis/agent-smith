@@ -2,7 +2,7 @@
 
 ## Overview
 
-ccflare is a Bun/TypeScript monorepo that:
+agent-smith is a Bun/TypeScript monorepo that:
 
 - proxies provider-native HTTP and websocket APIs
 - balances traffic across configured accounts
@@ -54,7 +54,7 @@ graph LR
 ## Workspace Layout
 
 ```text
-ccflare/
+agent-smith/
 ├── apps/
 │   ├── server/              # Main Bun server entrypoint
 │   ├── tui/                 # Ink-based terminal UI
@@ -82,8 +82,11 @@ ccflare/
 For managed HTTPS hosts, the Node-compatible `@certalis/agent-smith/edge`
 export forwards only exact inference routes and authenticated health to the
 existing private Unix socket. Runtime exposure checks authorize device keys
-from `CF_CLIENT_KEYS_FILE` and refuse their management access. The edge creates
+from `AGENT_SMITH_CLIENT_KEYS_FILE` and refuse their management access. The edge creates
 no second runtime or database; see [HTTPS deployment](https-edge.md).
+The standalone `start:https` launcher supervises that single Bun runtime from
+a Node HTTP entrance. Only the primary entrance is public; management uses the
+protected socket or a separately secured private-network listener.
 
 It currently owns:
 
@@ -328,7 +331,7 @@ and may be rebuilt when config changes.
 
 ## Background Processing
 
-ccflare pushes expensive observability work off the hot request path.
+agent-smith pushes expensive observability work off the hot request path.
 
 Two main mechanisms:
 

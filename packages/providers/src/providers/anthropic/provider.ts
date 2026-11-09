@@ -1,10 +1,10 @@
-import { BUFFER_SIZES } from "@ccflare/core";
+import { BUFFER_SIZES } from "@agent-smith/core";
 import {
 	type Account,
 	type AccountQuotaState,
 	getProviderDefaultBaseUrl,
 	isRecord,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import {
 	BaseProvider,
 	deleteClientCredentialHeaders,

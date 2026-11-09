@@ -3,7 +3,7 @@ import {
 	getLogSeverityMeta,
 	type LogFeedAction,
 	logFeedReducer,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useReducer } from "react";
 import * as tuiCore from "../core";

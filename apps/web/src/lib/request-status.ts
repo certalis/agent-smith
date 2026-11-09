@@ -1,4 +1,4 @@
-import { getStatusCategory, getStatusCodeCssClass } from "@ccflare/ui";
+import { getStatusCategory, getStatusCodeCssClass } from "@agent-smith/ui";
 
 export type RequestStatusBadgeVariant =
 	| "success"

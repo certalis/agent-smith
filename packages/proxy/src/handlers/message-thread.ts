@@ -1,4 +1,4 @@
-import type { Account } from "@ccflare/types";
+import type { Account } from "@agent-smith/types";
 
 export type MessageThreadRequest = {
 	continues: string | null;

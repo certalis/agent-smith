@@ -1,14 +1,14 @@
-import { Config } from "@ccflare/config";
-import { DatabaseFactory } from "@ccflare/database";
-import { type BeginResult, createOAuthFlow } from "@ccflare/oauth-flow";
-import { createConfiguredProviderRegistry } from "@ccflare/providers";
+import { Config } from "@agent-smith/config";
+import { DatabaseFactory } from "@agent-smith/database";
+import { type BeginResult, createOAuthFlow } from "@agent-smith/oauth-flow";
+import { createConfiguredProviderRegistry } from "@agent-smith/providers";
 import {
 	type AccountProvider,
 	type AddAccountOptions,
 	type AuthMethod,
 	getProviderDisplayLabel,
-} from "@ccflare/types";
-import { type AccountDisplay, toAccountDisplay } from "@ccflare/ui";
+} from "@agent-smith/types";
+import { type AccountDisplay, toAccountDisplay } from "@agent-smith/ui";
 import * as cliCommands from "./cli";
 import { openBrowser } from "./cli";
 import {

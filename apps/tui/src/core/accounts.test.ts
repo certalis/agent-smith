@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "@ccflare/config";
-import { DatabaseFactory } from "@ccflare/database";
+import { Config } from "@agent-smith/config";
+import { DatabaseFactory } from "@agent-smith/database";
 import { setAccountPoolMembership } from "./accounts";
 
 const tempDirs: string[] = [];
@@ -12,9 +12,9 @@ function setup() {
 	const directory = mkdtempSync(join(tmpdir(), "agent-smith-local-pool-"));
 	tempDirs.push(directory);
 	DatabaseFactory.reset();
-	DatabaseFactory.initialize(join(directory, "ccflare.db"));
+	DatabaseFactory.initialize(join(directory, "agent-smith.db"));
 	return {
-		config: new Config(join(directory, "ccflare.json")),
+		config: new Config(join(directory, "agent-smith.json")),
 		db: DatabaseFactory.getInstance(),
 	};
 }

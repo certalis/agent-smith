@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "@ccflare/config";
-import { DatabaseFactory } from "@ccflare/database";
-import type { AccountDisplay } from "@ccflare/ui";
+import { Config } from "@agent-smith/config";
+import { DatabaseFactory } from "@agent-smith/database";
+import type { AccountDisplay } from "@agent-smith/ui";
 import { addAccount, formatAccountsTable } from "./account";
 
 const tempDirs: string[] = [];
@@ -20,7 +20,7 @@ function setup() {
 	const directory = mkdtempSync(join(tmpdir(), "agent-smith-add-account-"));
 	tempDirs.push(directory);
 	DatabaseFactory.reset();
-	DatabaseFactory.initialize(join(directory, "ccflare.db"));
+	DatabaseFactory.initialize(join(directory, "agent-smith.db"));
 	return {
 		config: new Config(join(directory, "config.json")),
 		db: DatabaseFactory.getInstance(),

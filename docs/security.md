@@ -2,11 +2,11 @@
 
 **Last Security Review**: July 30, 2025
 
-This document outlines the security considerations, practices, and recommendations for the ccflare load balancer system.
+This document outlines the security considerations, practices, and recommendations for the agent-smith load balancer system.
 
 ## ⚠️ Critical Security Notice
 
-**IMPORTANT**: ccflare is designed for local development and trusted environments. The current implementation has several security limitations:
+**IMPORTANT**: agent-smith is designed for local development and trusted environments. The current implementation has several security limitations:
 
 1. **No Authentication**: All API endpoints and the dashboard are publicly accessible
 2. **Network Exposure**: Server binds to all interfaces (0.0.0.0) by default
@@ -45,7 +45,7 @@ Based on the latest security review, the following critical issues require immed
 
 ## Security Overview
 
-ccflare is a load balancer proxy that manages multiple OAuth accounts to distribute requests to the Claude API. The system handles sensitive authentication tokens and request/response data, requiring careful security considerations.
+agent-smith is a load balancer proxy that manages multiple OAuth accounts to distribute requests to the Claude API. The system handles sensitive authentication tokens and request/response data, requiring careful security considerations.
 
 ### Key Security Components
 
@@ -179,7 +179,7 @@ async function encryptToken(token: string, key: Buffer): Promise<EncryptedToken>
 ```
 
 #### 2. Key Management
-- Use environment variable for encryption key: `ccflare_ENCRYPTION_KEY`
+- Use environment variable for encryption key: `agent-smith_ENCRYPTION_KEY`
 - Implement key derivation from master password
 - Consider integration with OS keychain/credential store
 
@@ -268,7 +268,7 @@ const server = serve({
 # Nginx configuration example
 server {
     listen 443 ssl http2;
-    server_name ccflare.internal;
+    server_name agent-smith.internal;
     
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
@@ -488,7 +488,7 @@ interface User {
 ## Common Security Pitfalls
 
 ### 1. Exposed Development Instance
-**Risk**: Running ccflare with default settings exposes it to the network
+**Risk**: Running agent-smith with default settings exposes it to the network
 **Mitigation**: Always bind to localhost in development
 
 ### 2. Token in Logs
@@ -614,23 +614,23 @@ function addSecurityHeaders(response: Response): Response {
 
 ```bash
 # Logging and Debugging
-LOG_LEVEL=INFO                  # Set to ERROR in production
-LOG_FORMAT=json                 # Use json for structured logging
-ccflare_DEBUG=0            # Set to 1 only for debugging
+AGENT_SMITH_LOG_LEVEL=INFO                  # Set to ERROR in production
+AGENT_SMITH_LOG_FORMAT=json                 # Use json for structured logging
+AGENT_SMITH_DEBUG=0            # Set to 1 only for debugging
 
 # Configuration
-ccflare_CONFIG_PATH=/path/to/config.json  # Custom config location
-CLIENT_ID=your-client-id       # OAuth client ID
+AGENT_SMITH_CONFIG_PATH=/path/to/config.json  # Custom config location
+AGENT_SMITH_CLIENT_ID=your-client-id       # OAuth client ID
 
 # Server Configuration
 PORT=8080                      # Server port
-CF_PROXY_KEY=replace-with-a-secret # Client credential
-CF_ADMIN_KEY=replace-with-an-admin-secret # Management-write credential
+AGENT_SMITH_PROXY_KEY=replace-with-a-secret # Client credential
+AGENT_SMITH_ADMIN_KEY=replace-with-an-admin-secret # Management-write credential
 
 # Retry Configuration
-RETRY_ATTEMPTS=3              # Number of retry attempts
-RETRY_DELAY_MS=1000          # Initial retry delay
-RETRY_BACKOFF=2              # Backoff multiplier
+AGENT_SMITH_RETRY_ATTEMPTS=3              # Number of retry attempts
+AGENT_SMITH_RETRY_DELAY_MS=1000          # Initial retry delay
+AGENT_SMITH_RETRY_BACKOFF=2              # Backoff multiplier
 ```
 
 ### Security Considerations for Environment Variables
@@ -678,14 +678,14 @@ RETRY_BACKOFF=2              # Backoff multiplier
 grep -v "127.0.0.1\|::1" access.log
 
 # Monitor for high request volumes
-sqlite3 ccflare.db "SELECT COUNT(*) as count, account_used 
+sqlite3 agent-smith.db "SELECT COUNT(*) as count, account_used
 FROM requests 
 WHERE timestamp > strftime('%s', 'now', '-1 hour') * 1000 
 GROUP BY account_used 
 ORDER BY count DESC"
 
 # Check for configuration changes
-sqlite3 ccflare.db "SELECT * FROM audit_log WHERE action LIKE '%config%'"
+sqlite3 agent-smith.db "SELECT * FROM audit_log WHERE action LIKE '%config%'"
 ```
 
 ### Incident Response
@@ -694,7 +694,7 @@ sqlite3 ccflare.db "SELECT * FROM audit_log WHERE action LIKE '%config%'"
    - Immediately pause affected accounts via API
    - Rotate OAuth tokens through Anthropic console
    - Review request logs for unauthorized usage
-   - Update tokens in ccflare
+   - Update tokens in agent-smith
 
 2. **Unauthorized Access**
    - Implement firewall rules immediately
@@ -761,7 +761,7 @@ curl -I http://localhost:8080/api/health
 Security is an ongoing process. This documentation should be reviewed and updated regularly as the system evolves and new threats emerge. All contributors should familiarize themselves with these security considerations and follow the best practices outlined above.
 
 ### Key Takeaways
-1. **ccflare prioritizes functionality over security** - suitable for development, not production
+1. **agent-smith prioritizes functionality over security** - suitable for development, not production
 2. **Network isolation is critical** - always restrict access to trusted networks
 3. **Token security requires enhancement** - implement encryption for production use
 4. **Authentication is missing** - all endpoints are currently public

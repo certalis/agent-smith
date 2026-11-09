@@ -2,6 +2,6 @@
 	"client": {
 		"enabled": false,
 		"base_url": "https://agents.example.com",
-		"proxy_key_file": "~/.config/ccflare/device.key"
+		"proxy_key_file": "~/.config/agent-smith/device.key"
 	}
 }

@@ -9,4 +9,4 @@ export {
 	QUERY_CONFIG,
 	REFRESH_INTERVALS,
 	TIME_RANGES,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";

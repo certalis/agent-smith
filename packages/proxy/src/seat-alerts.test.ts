@@ -1,5 +1,5 @@
 import { expect, it, spyOn } from "bun:test";
-import { Logger } from "@ccflare/logger";
+import { Logger } from "@agent-smith/logger";
 import { waitForProxyBackgroundTasks } from "./background-tasks";
 import { SeatAlerts } from "./seat-alerts";
 

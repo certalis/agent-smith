@@ -1,5 +1,5 @@
-import type { Logger } from "@ccflare/logger";
-import type { Account } from "@ccflare/types";
+import type { Logger } from "@agent-smith/logger";
+import type { Account } from "@agent-smith/types";
 import type { TokenRefreshResult } from "./types";
 
 /**

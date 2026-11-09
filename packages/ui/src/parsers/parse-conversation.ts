@@ -1,4 +1,8 @@
-import { ContentBlockType, isRecord, type MessageData } from "@ccflare/types";
+import {
+	ContentBlockType,
+	isRecord,
+	type MessageData,
+} from "@agent-smith/types";
 import { normalizeText } from "../utils/normalize-text";
 
 type ConversationTextItem = { type: string; text?: string };

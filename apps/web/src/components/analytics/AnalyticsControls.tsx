@@ -2,8 +2,8 @@ import {
 	type AccountProvider,
 	isTimeRange,
 	type TimeRange,
-} from "@ccflare/types";
-import { TIME_RANGE_OPTIONS } from "@ccflare/ui";
+} from "@agent-smith/types";
+import { TIME_RANGE_OPTIONS } from "@agent-smith/ui";
 import { CalendarDays, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import {

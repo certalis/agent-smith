@@ -1,12 +1,12 @@
-import { formatCost } from "@ccflare/core";
-import type { RequestPayload } from "@ccflare/types";
+import { formatCost } from "@agent-smith/core";
+import type { RequestPayload } from "@agent-smith/types";
 import {
 	decodeBase64Body,
 	formatTime,
 	formatTokens,
 	getStatusCodeTermColor,
 	safeJsonPrettyPrint,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { useKeyboard } from "@opentui/react";
 import { useCallback, useEffect, useState } from "react";
 import * as tuiCore from "../core";

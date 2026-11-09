@@ -2,7 +2,7 @@
 
 ## Overview
 
-ccflare uses SQLite as its only runtime datastore.
+agent-smith uses SQLite as its only runtime datastore.
 
 The database layer stores:
 

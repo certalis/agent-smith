@@ -1,5 +1,9 @@
-import { formatCost, getModelShortName } from "@ccflare/core";
-import { formatNumber, formatTokens, formatTokensPerSecond } from "@ccflare/ui";
+import { formatCost, getModelShortName } from "@agent-smith/core";
+import {
+	formatNumber,
+	formatTokens,
+	formatTokensPerSecond,
+} from "@agent-smith/ui";
 import {
 	CartesianGrid,
 	Legend,

@@ -1,4 +1,4 @@
-import type { AccountProvider, HttpMethod, Request } from "@ccflare/types";
+import type { AccountProvider, HttpMethod, Request } from "@agent-smith/types";
 
 export type RequestWithAccountName = Request & {
 	accountName: string | null;

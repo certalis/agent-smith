@@ -1,5 +1,5 @@
 import { parseArgs as nodeParseArgs } from "node:util";
-import type { AccountProvider } from "@ccflare/types";
+import type { AccountProvider } from "@agent-smith/types";
 
 export interface ParsedArgs {
 	help?: boolean;

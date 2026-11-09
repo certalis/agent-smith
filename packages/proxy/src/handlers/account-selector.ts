@@ -1,4 +1,4 @@
-import type { Provider } from "@ccflare/providers";
+import type { Provider } from "@agent-smith/providers";
 import {
 	type Account,
 	type AccountProvider,
@@ -7,7 +7,7 @@ import {
 	type PoolStatus,
 	quotaThresholdFor,
 	type RequestMeta,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { soonestWeeklyReset } from "../seat-usage";
 import { isAllowlisted, type TeamRoutingRequest } from "../team-router";
 import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";

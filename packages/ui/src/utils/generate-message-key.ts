@@ -1,4 +1,4 @@
-import type { MessageData } from "@ccflare/types";
+import type { MessageData } from "@agent-smith/types";
 
 export const genMessageKey = (msg: MessageData, index: number): string => {
 	const preview = msg.content?.slice(0, 20).replace(/\s/g, "-");

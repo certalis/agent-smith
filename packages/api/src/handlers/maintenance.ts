@@ -1,8 +1,8 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
-import { errorResponse, jsonResponse } from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import type { CleanupResponse, MutationResult } from "@ccflare/types";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { errorResponse, jsonResponse } from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import type { CleanupResponse, MutationResult } from "@agent-smith/types";
 
 const log = new Logger("MaintenanceHandler");
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { CodexProvider } from "@ccflare/providers";
-import type { Account } from "@ccflare/types";
+import { CodexProvider } from "@agent-smith/providers";
+import type { Account } from "@agent-smith/types";
 import type { ResolvedProxyContext } from "./proxy-types";
 import { isQuotaRejection, processProxyResponse } from "./response-processor";
 

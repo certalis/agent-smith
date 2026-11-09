@@ -1,6 +1,9 @@
-import { requestEvents } from "@ccflare/core";
-import { sseResponse } from "@ccflare/http";
-import { isRequestStreamEvent, type RequestStreamEvent } from "@ccflare/types";
+import { requestEvents } from "@agent-smith/core";
+import { sseResponse } from "@agent-smith/http";
+import {
+	isRequestStreamEvent,
+	type RequestStreamEvent,
+} from "@agent-smith/types";
 
 export function createRequestsStreamHandler() {
 	return (): Response => {

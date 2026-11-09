@@ -1,4 +1,4 @@
-import { getThemeById } from "@ccflare/ui";
+import { getThemeById } from "@agent-smith/ui";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { useMemo, useState } from "react";
 import {
@@ -115,7 +115,7 @@ export function ThemePicker({ onClose }: ThemePickerProps) {
 							<box height={1} />
 
 							<text fg={C.muted}>
-								{"Persists to ~/.config/ccflare/theme.json"}
+								{"Persists to ~/.config/agent-smith/theme.json"}
 							</text>
 						</>
 					) : (

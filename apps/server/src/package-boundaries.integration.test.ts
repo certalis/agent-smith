@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import {
 	collectSourceFiles,
 	extractImports,
-	getCcflareDependencies,
+	getAgentSmithDependencies,
 	getWorkspaceManifests,
 	REPO_ROOT,
 	type Workspace,
@@ -35,8 +35,8 @@ function findWorkspaceCycles(workspaces: Workspace[]): string[] {
 	const graph = new Map<string, string[]>();
 
 	for (const { manifest } of workspaces) {
-		const dependencies = getCcflareDependencies(manifest).filter((dependency) =>
-			workspaceNames.has(dependency),
+		const dependencies = getAgentSmithDependencies(manifest).filter(
+			(dependency) => workspaceNames.has(dependency),
 		);
 		graph.set(manifest.name, dependencies);
 	}
@@ -82,8 +82,8 @@ describe("workspace package boundaries", () => {
 		expect(findWorkspaceCycles(getWorkspaceManifests())).toEqual([]);
 	});
 
-	it("keeps leaf workspaces free of @ccflare dependencies", () => {
-		const leafWorkspaceNames = new Set(["@ccflare/types"]);
+	it("keeps leaf workspaces free of @agent-smith dependencies", () => {
+		const leafWorkspaceNames = new Set(["@agent-smith/types"]);
 		const violations: string[] = [];
 
 		for (const workspace of getWorkspaceManifests()) {
@@ -91,7 +91,9 @@ describe("workspace package boundaries", () => {
 				continue;
 			}
 
-			const manifestDependencies = getCcflareDependencies(workspace.manifest);
+			const manifestDependencies = getAgentSmithDependencies(
+				workspace.manifest,
+			);
 			if (manifestDependencies.length > 0) {
 				violations.push(
 					`${relative(REPO_ROOT, workspace.manifestPath)} declares ${manifestDependencies.join(", ")}`,
@@ -100,7 +102,7 @@ describe("workspace package boundaries", () => {
 
 			violations.push(
 				...findImportViolations(workspace.root, (specifier) =>
-					specifier.startsWith("@ccflare/"),
+					specifier.startsWith("@agent-smith/"),
 				),
 			);
 		}
@@ -115,19 +117,20 @@ describe("workspace package boundaries", () => {
 		);
 		const violations = [
 			...findImportViolations(
-				workspaceByName.get("@ccflare/proxy")?.root ??
+				workspaceByName.get("@agent-smith/proxy")?.root ??
 					join(REPO_ROOT, "packages/proxy"),
-				(specifier) => specifier === "@ccflare/ui",
+				(specifier) => specifier === "@agent-smith/ui",
 			),
 			...findImportViolations(
-				workspaceByName.get("@ccflare/types")?.root ??
+				workspaceByName.get("@agent-smith/types")?.root ??
 					join(REPO_ROOT, "packages/types"),
 				(specifier) =>
-					specifier === "@ccflare/config" || specifier === "@ccflare/database",
+					specifier === "@agent-smith/config" ||
+					specifier === "@agent-smith/database",
 			),
 			...findImportViolations(
-				workspaceByName.get("ccflare")?.root ?? join(REPO_ROOT, "apps/tui"),
-				(specifier) => specifier === "@ccflare/server",
+				workspaceByName.get("agent-smith")?.root ?? join(REPO_ROOT, "apps/tui"),
+				(specifier) => specifier === "@agent-smith/server",
 			),
 		];
 

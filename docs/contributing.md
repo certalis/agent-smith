@@ -1,6 +1,6 @@
-# Contributing to ccflare
+# Contributing to agent-smith
 
-Welcome to ccflare! We're thrilled that you're interested in contributing to our Claude load balancer project. This document provides guidelines and instructions for contributing to the project.
+Welcome to agent-smith! We're thrilled that you're interested in contributing to our Claude load balancer project. This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Welcome to ccflare! We're thrilled that you're interested in contributing to our
 
 ## Welcome & Code of Conduct
 
-First off, thank you for considering contributing to ccflare! We welcome contributions from everyone, regardless of their background or experience level.
+First off, thank you for considering contributing to agent-smith! We welcome contributions from everyone, regardless of their background or experience level.
 
 ### Our Pledge
 
@@ -64,13 +64,13 @@ Before you begin, ensure you have the following installed:
 
 2. **Clone your fork**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/ccflare.git
-   cd ccflare
+   git clone https://github.com/YOUR_USERNAME/agent-smith.git
+   cd agent-smith
    ```
 
 3. **Add the upstream remote**:
    ```bash
-   git remote add upstream https://github.com/ORIGINAL_OWNER/ccflare.git
+   git remote add upstream https://github.com/ORIGINAL_OWNER/agent-smith.git
    ```
 
 4. **Install dependencies**:
@@ -94,10 +94,10 @@ Before you begin, ensure you have the following installed:
 
 The following environment variables can be used during development:
 
-- `LB_STRATEGY` - Override the default load balancing strategy
-- `CLIENT_ID` - Set a custom OAuth client ID
-- `RETRY_ATTEMPTS` - Number of retry attempts for failed requests
-- `RETRY_DELAY_MS` - Delay between retry attempts in milliseconds
+- `AGENT_SMITH_LB_STRATEGY` - Override the default load balancing strategy
+- `AGENT_SMITH_CLIENT_ID` - Set a custom OAuth client ID
+- `AGENT_SMITH_RETRY_ATTEMPTS` - Number of retry attempts for failed requests
+- `AGENT_SMITH_RETRY_DELAY_MS` - Delay between retry attempts in milliseconds
 
 **Note**: Most configuration is handled through the config file and CLI. Environment variables are optional overrides.
 
@@ -146,10 +146,10 @@ bun run format
 
 ## Project Structure
 
-ccflare is organized as a Bun monorepo with clear separation of concerns:
+agent-smith is organized as a Bun monorepo with clear separation of concerns:
 
 ```
-ccflare/
+agent-smith/
 ├── apps/                    # Deployable applications
 │   ├── server/            # Main HTTP server
 │   ├── tui/               # Terminal UI (Ink-based)
@@ -182,7 +182,7 @@ ccflare/
 ### Package Naming Convention
 
 - Apps: Simple names (e.g., `server`, `tui`, `web`)
-- Packages: Prefixed with `@ccflare/` (e.g., `@ccflare/core`, `@ccflare/database`)
+- Packages: Prefixed with `@agent-smith/` (e.g., `@agent-smith/core`, `@agent-smith/database`)
 
 ## Coding Standards
 
@@ -277,7 +277,7 @@ bun run lint
 
 1. **Import Order** (automatically organized by Biome):
    - External packages
-   - Internal packages (`@ccflare/*`)
+   - Internal packages (`@agent-smith/*`)
    - Relative imports
    - Type imports
 
@@ -288,10 +288,10 @@ bun run lint
 
    ```typescript
    // Good
-   import { Database } from '@ccflare/database';
-   import { SessionStrategy } from '@ccflare/proxy';
+   import { Database } from '@agent-smith/database';
+   import { SessionStrategy } from '@agent-smith/proxy';
    import { formatDate } from './utils';
-   import type { Account } from '@ccflare/types';
+   import type { Account } from '@agent-smith/types';
    
    // Bad
    import { Database } from '../../../packages/database/src';
@@ -666,46 +666,46 @@ Contributors are recognized in:
 
 ### Working with the CLI
 
-The CLI functionality is integrated into the TUI application. Use `ccflare` with command-line flags:
+The CLI functionality is integrated into the TUI application. Use `agent-smith` with command-line flags:
 
 ```bash
-# If ccflare is not installed globally, use:
+# If agent-smith is not installed globally, use:
 # bun run tui [options]
-# or build and run with: bun run ccflare
+# or build and run with: bun run agent-smith
 
 # Add a new account
-ccflare --add-account <name> --provider <anthropic|openai|claude-code|codex>
+agent-smith --add-account <name> --provider <anthropic|openai|claude-code|codex>
 
 # List all accounts
-ccflare --list
+agent-smith --list
 
 # Remove an account
-ccflare --remove <name>
+agent-smith --remove <name>
 
 # Pause/resume accounts
-ccflare --pause <name>
-ccflare --resume <name>
+agent-smith --pause <name>
+agent-smith --resume <name>
 
 # Reset usage statistics
-ccflare --reset-stats
+agent-smith --reset-stats
 
 # Clear request history
-ccflare --clear-history
+agent-smith --clear-history
 
 # View statistics (JSON output)
-ccflare --stats
+agent-smith --stats
 
 # Stream logs
-ccflare --logs [N]  # Show N lines of history then follow
+agent-smith --logs [N]  # Show N lines of history then follow
 
 # Analyze database performance
-ccflare --analyze
+agent-smith --analyze
 
 # Start server with dashboard
-ccflare --serve --port 8080
+agent-smith --serve --port 8080
 
 # Show help
-ccflare --help
+agent-smith --help
 ```
 
 ### Running the Server
@@ -740,7 +740,7 @@ bun run tui
 # or
 bun run dev
 # or (builds first, then runs)
-bun run ccflare
+bun run agent-smith
 
 # Build the TUI
 bun run build:tui
@@ -761,7 +761,7 @@ bun run build:tui
 
 1. **TypeScript errors**: Run `bun run typecheck` to identify issues
 2. **Formatting issues**: Run `bun run format` to auto-fix
-3. **Import errors**: Ensure you're using workspace imports (`@ccflare/*`) for cross-package dependencies
+3. **Import errors**: Ensure you're using workspace imports (`@agent-smith/*`) for cross-package dependencies
 4. **Database issues**: The SQLite database is created automatically in the data directory
 
-Thank you for contributing to ccflare! Your efforts help make Claude AI more accessible to everyone.
+Thank you for contributing to agent-smith! Your efforts help make Claude AI more accessible to everyone.

@@ -31,6 +31,7 @@ const result = await Bun.build({
 	entrypoints: [
 		join(tuiDir, "src/bin.ts"),
 		join(tuiDir, "src/server.ts"),
+		join(tuiDir, "src/pool.ts"),
 		join(tuiDir, "../../packages/proxy/src/post-processor.worker.ts"),
 	],
 	outdir: distDir,
@@ -47,7 +48,7 @@ if (!result.success) {
 }
 
 const edge = await Bun.build({
-	entrypoints: [join(tuiDir, "src/edge.ts")],
+	entrypoints: [join(tuiDir, "src/edge.ts"), join(tuiDir, "src/https.ts")],
 	outdir: distDir,
 	target: "node",
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { Logger } from "@ccflare/logger";
+import { Logger } from "@agent-smith/logger";
 import type { DatabaseOperations } from "./database-operations";
 import { resolveDbPath } from "./paths";
 import { analyzeIndexUsage } from "./performance-indexes";

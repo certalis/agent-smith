@@ -14,7 +14,7 @@ export type ProviderDefinition = {
 };
 
 export type ProviderPools = Partial<
-	Record<import("@ccflare/types").ProviderWire, readonly string[]>
+	Record<import("@agent-smith/types").ProviderWire, readonly string[]>
 >;
 
 function createProvider(definition: ProviderDefinition): Provider {

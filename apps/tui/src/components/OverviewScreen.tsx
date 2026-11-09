@@ -1,11 +1,11 @@
-import { formatCost } from "@ccflare/core";
-import type { StrategyName } from "@ccflare/types";
+import { formatCost } from "@agent-smith/core";
+import type { StrategyName } from "@agent-smith/types";
 import {
 	formatNumber,
 	formatPercentage,
 	formatTokensPerSecond,
 	getSuccessRateTermColor,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { useKeyboard } from "@opentui/react";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "../App.tsx";

@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/ui",
+	"name": "@agent-smith/ui",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -12,8 +12,8 @@
 		"test": "bun test ./src"
 	},
 	"dependencies": {
-		"@ccflare/core": "workspace:*",
-		"@ccflare/types": "workspace:*"
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/types": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",

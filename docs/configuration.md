@@ -1,8 +1,8 @@
-# ccflare Configuration Guide
+# agent-smith Configuration Guide
 
-This guide covers all configuration options for ccflare, including file-based configuration, environment variables, and runtime API updates.
+This guide covers all configuration options for agent-smith, including file-based configuration, environment variables, and runtime API updates.
 
-`CF_ENROLLMENT_ORIGIN` optionally enables the [stable link and private invitation flow](api-http.md#private-claude-seat-enrollment-opt-in).
+`AGENT_SMITH_ENROLLMENT_ORIGIN` optionally enables the [stable link and private invitation flow](api-http.md#private-claude-seat-enrollment-opt-in).
 It must be an exact HTTPS origin, with no path/trailing slash; HTTP is accepted
 only for loopback tests. Invalid values fail startup. Unset disables enrollment.
 This setting does not enable team routing or change account-pool limits.
@@ -22,34 +22,34 @@ This setting does not enable team routing or change account-pool limits.
 
 ## Configuration Overview
 
-ccflare uses a flexible configuration system that supports:
+agent-smith uses a flexible configuration system that supports:
 
 - **File-based configuration**: JSON configuration file for persistent settings
 - **Environment variables**: Override configuration for deployment flexibility
 - **Runtime updates**: Modify certain settings via API without restart
 
-Configuration is managed through the `@ccflare/config` package, which provides automatic loading, validation, and change notifications.
+Configuration is managed through the `@agent-smith/config` package, which provides automatic loading, validation, and change notifications.
 
 ## Configuration Precedence
 
 Configuration values are resolved in the following order (highest to lowest priority):
 
 1. **Environment variables** - Always take precedence when set
-2. **Configuration file** - Values from `~/.config/ccflare/ccflare.json` (or custom path)
+2. **Configuration file** - Values from `~/.config/agent-smith/agent-smith.json` (or custom path)
 3. **Default values** - Built-in defaults when no other value is specified
 
 ### Special Cases
 
-- **Load balancing strategy**: Environment variable `LB_STRATEGY` overrides file configuration
+- **Load balancing strategy**: Environment variable `AGENT_SMITH_LB_STRATEGY` overrides file configuration
 - **Runtime configuration**: Some values (like strategy) can be changed at runtime via API
 
 ## Configuration File Format
 
 The configuration file is stored at:
 
-- **Linux/macOS**: `~/.config/ccflare/ccflare.json` (or `$XDG_CONFIG_HOME/ccflare/ccflare.json`)
-- **Windows**: `%LOCALAPPDATA%\ccflare\ccflare.json` (or `%APPDATA%\ccflare\ccflare.json`)
-- **Custom path**: Set via `ccflare_CONFIG_PATH` environment variable
+- **Linux/macOS**: `~/.config/agent-smith/agent-smith.json` (or `$XDG_CONFIG_HOME/agent-smith/agent-smith.json`)
+- **Windows**: `%LOCALAPPDATA%\agent-smith\agent-smith.json` (or `%APPDATA%\agent-smith\agent-smith.json`)
+- **Custom path**: Set via `AGENT_SMITH_CONFIG_PATH` environment variable
 
 ### File Structure
 
@@ -73,7 +73,7 @@ The configuration file is stored at:
   "client": {
     "enabled": false,
     "base_url": "http://127.0.0.1:18181",
-    "proxy_key_file": "~/.config/ccflare/team-pool.key"
+    "proxy_key_file": "~/.config/agent-smith/team-pool.key"
   },
   "team_routing": {
     "enabled": false,
@@ -113,7 +113,7 @@ The configuration file is stored at:
 | `request_scoped_429_retry_delay_ms` | number | `2000` | Delay before the one permitted retry after a request-scoped 429 |
 | `session_duration_ms` | number | `18000000` (5 hours) | Legacy compatibility field; it does not affect W2 account selection. |
 | `port` | number | `8080` | HTTP server port |
-| `host` | string | `"127.0.0.1"` | Interface to bind; use `CF_HOST` for deployment overrides |
+| `host` | string | `"127.0.0.1"` | Interface to bind; use `AGENT_SMITH_HOST` for deployment overrides |
 | `trust_loopback` | boolean | `true` | Allow direct loopback requests without a key; set `false` behind a same-host reverse proxy that does not forward client-address headers |
 | `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
 | `block_when_all_full` | boolean | `true` | When every account is full, refuse every request with a 429 until the soonest reset. `false` lets one request a minute through to revalidate, and that request may spend extra usage. |
@@ -131,7 +131,7 @@ three fields:
 - `enabled`: `false` by default. Only literal `true` enables shared-pool wrappers.
   Run `agent-smith install-client` after changing it. When off, that command
   removes the wrappers and their marked shell entry, restoring ordinary client use.
-- `base_url`: the HTTP(S) origin of the one Agent-smith server this machine can
+- `base_url`: the HTTP(S) origin of the one Agent Smith server this machine can
   reach. It has no path.
 - `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file
   containing the forwarding key. The key lets Claude Code and Codex send
@@ -141,7 +141,7 @@ The agents service and a development caller use the same two values: an origin
 and a forwarding key. On the agents service they are environment settings; on a
 laptop the origin lives in the private local config and the key stays in its
 own owner-only file, so generated wrappers can use it without embedding it.
-Agent-smith attempts to tighten its config to `0600` when it reads it; the key
+Agent Smith attempts to tighten its config to `0600` when it reads it; the key
 file must already be `0600`.
 
 This is not B2 tenancy. One forwarding key does not identify individual callers
@@ -262,15 +262,15 @@ and never retried.
 
 ### Exposure security
 
-The server binds to `127.0.0.1` by default. To serve requests outside that interface, set `CF_HOST` and a `CF_PROXY_KEY`; external callers must send that key in `x-api-key`. A request carrying `Forwarded`, `X-Forwarded-For`, or `X-Real-IP` is never treated as a direct loopback request, so the key is required even when a same-host reverse proxy connects from `127.0.0.1`.
+The server binds to `127.0.0.1` by default. To serve requests outside that interface, set `AGENT_SMITH_HOST` and a `AGENT_SMITH_PROXY_KEY`; external callers must send that key in `x-api-key`. A request carrying `Forwarded`, `X-Forwarded-For`, or `X-Real-IP` is never treated as a direct loopback request, so the key is required even when a same-host reverse proxy connects from `127.0.0.1`.
 
-Set `CF_ADMIN_KEY` separately for management writes under `/api`. Every management write requires this configured matching key; without it, writes are refused, including on direct loopback. The proxy key can forward provider requests but cannot make management changes. Keep both keys in the process environment, never in the JSON configuration file. Browser-originated management requests are rejected unless they are same-origin. In the dashboard, enter the admin key through **Unlock management**; it is kept only for that browser tab and is never embedded in the dashboard build.
+Set `AGENT_SMITH_ADMIN_KEY` separately for management writes under `/api`. Every management write requires this configured matching key; without it, writes are refused, including on direct loopback. The proxy key can forward provider requests but cannot make management changes. Keep both keys in the process environment, never in the JSON configuration file. Browser-originated management requests are rejected unless they are same-origin. In the dashboard, enter the admin key through **Unlock management**; it is kept only for that browser tab and is never embedded in the dashboard build.
 
 ### Local client routing
 
 The interactive **Local pool** screen can explicitly enable routing for the
 locally installed `claude` and `codex` clients. It writes wrappers under the
-ccflare config directory and one marked PATH block in the active shell profile;
+agent-smith config directory and one marked PATH block in the active shell profile;
 the original client binaries and their configuration are not modified. The
 wrappers route to the loopback proxy and work while the TUI is running.
 When a matching `provider_pools` entry is configured, the Claude and Codex
@@ -281,7 +281,7 @@ Enable or remove this integration from the Local pool screen with `e`. Open a
 new terminal after enabling it. The status in the screen is the source of truth;
 do not copy proxy credentials into shell profiles for local routing.
 
-For a shared Agent-smith server, use the [`client` configuration](#client-wrappers)
+For a shared Agent Smith server, use the [`client` configuration](#client-wrappers)
 and `agent-smith install-client` instead. Its wrappers use the configured origin
 and forwarding key, whether the origin is directly reachable or the local side
 of an SSH tunnel.
@@ -301,9 +301,9 @@ an account.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `LOG_LEVEL` | string | `"INFO"` | Logging level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `LOG_FORMAT` | string | `"pretty"` | Log format: `"pretty"` or `"json"` |
-| `ccflare_DEBUG` | string | - | Set to `"1"` to enable debug mode with console output |
+| `AGENT_SMITH_LOG_LEVEL` | string | `"INFO"` | Logging level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `AGENT_SMITH_LOG_FORMAT` | string | `"pretty"` | Log format: `"pretty"` or `"json"` |
+| `AGENT_SMITH_DEBUG` | string | - | Set to `"1"` to enable debug mode with console output |
 
 ## Environment Variables
 
@@ -311,23 +311,23 @@ an account.
 
 | Environment Variable | Config Field | Type | Example |
 |---------------------|--------------|------|---------|
-| `LB_STRATEGY` | `lb_strategy` | string | `LB_STRATEGY=session` |
-| `CLIENT_ID` | `client_id` | string | `CLIENT_ID=your-client-id` |
-| `MAX_BODY_BYTES` | `max_body_bytes` | number | `MAX_BODY_BYTES=67108864` |
-| `RETRY_ATTEMPTS` | `retry_attempts` | number | `RETRY_ATTEMPTS=5` |
-| `RETRY_DELAY_MS` | `retry_delay_ms` | number | `RETRY_DELAY_MS=2000` |
-| `RETRY_BACKOFF` | `retry_backoff` | number | `RETRY_BACKOFF=1.5` |
-| `REQUEST_SCOPED_429_RETRY_DELAY_MS` | `request_scoped_429_retry_delay_ms` | number | `REQUEST_SCOPED_429_RETRY_DELAY_MS=2000` |
-| `SESSION_DURATION_MS` | `session_duration_ms` | number | `SESSION_DURATION_MS=3600000` |
+| `AGENT_SMITH_LB_STRATEGY` | `lb_strategy` | string | `AGENT_SMITH_LB_STRATEGY=session` |
+| `AGENT_SMITH_CLIENT_ID` | `client_id` | string | `AGENT_SMITH_CLIENT_ID=your-client-id` |
+| `AGENT_SMITH_MAX_BODY_BYTES` | `max_body_bytes` | number | `AGENT_SMITH_MAX_BODY_BYTES=67108864` |
+| `AGENT_SMITH_RETRY_ATTEMPTS` | `retry_attempts` | number | `AGENT_SMITH_RETRY_ATTEMPTS=5` |
+| `AGENT_SMITH_RETRY_DELAY_MS` | `retry_delay_ms` | number | `AGENT_SMITH_RETRY_DELAY_MS=2000` |
+| `AGENT_SMITH_RETRY_BACKOFF` | `retry_backoff` | number | `AGENT_SMITH_RETRY_BACKOFF=1.5` |
+| `AGENT_SMITH_REQUEST_SCOPED_429_RETRY_DELAY_MS` | `request_scoped_429_retry_delay_ms` | number | `AGENT_SMITH_REQUEST_SCOPED_429_RETRY_DELAY_MS=2000` |
+| `AGENT_SMITH_SESSION_DURATION_MS` | `session_duration_ms` | number | `AGENT_SMITH_SESSION_DURATION_MS=3600000` |
 | `PORT` | `port` | number | `PORT=3000` |
-| `CF_HOST` | `host` | string | `CF_HOST=127.0.0.1` |
-| `CF_TRUST_LOOPBACK` | `trust_loopback` | boolean | `CF_TRUST_LOOPBACK=false` |
-| `CF_PROXY_KEY` | - (not persisted) | string | `CF_PROXY_KEY=proxy-secret` |
-| `CF_CLIENT_KEYS_FILE` | - (disabled) | absolute path | Owner-only JSON mapping device names to SHA-256 key digests; reloaded each request |
-| `CF_ADMIN_KEY` | - (not persisted) | string | `CF_ADMIN_KEY=admin-secret` |
-| `DATA_RETENTION_DAYS` | `data_retention_days` | number | `DATA_RETENTION_DAYS=7` (payloads) |
-| `REQUEST_RETENTION_DAYS` | `request_retention_days` | number | `REQUEST_RETENTION_DAYS=365` (metadata) |
-| `ccflare_CONFIG_PATH` | - | string | `ccflare_CONFIG_PATH=/etc/ccflare.json` |
+| `AGENT_SMITH_HOST` | `host` | string | `AGENT_SMITH_HOST=127.0.0.1` |
+| `AGENT_SMITH_TRUST_LOOPBACK` | `trust_loopback` | boolean | `AGENT_SMITH_TRUST_LOOPBACK=false` |
+| `AGENT_SMITH_PROXY_KEY` | - (not persisted) | string | `AGENT_SMITH_PROXY_KEY=proxy-secret` |
+| `AGENT_SMITH_CLIENT_KEYS_FILE` | - (disabled) | absolute path | Owner-only JSON mapping device names to SHA-256 key digests; reloaded each request |
+| `AGENT_SMITH_ADMIN_KEY` | - (not persisted) | string | `AGENT_SMITH_ADMIN_KEY=admin-secret` |
+| `AGENT_SMITH_DATA_RETENTION_DAYS` | `data_retention_days` | number | `AGENT_SMITH_DATA_RETENTION_DAYS=7` (payloads) |
+| `AGENT_SMITH_REQUEST_RETENTION_DAYS` | `request_retention_days` | number | `AGENT_SMITH_REQUEST_RETENTION_DAYS=365` (metadata) |
+| `AGENT_SMITH_CONFIG_PATH` | - | string | `AGENT_SMITH_CONFIG_PATH=/etc/agent-smith.json` |
 
 ### Additional Environment Variables
 
@@ -335,13 +335,13 @@ These environment variables are not stored in the configuration file and must be
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `LOG_LEVEL` | Set logging verbosity (DEBUG, INFO, WARN, ERROR) | `INFO` | `LOG_LEVEL=DEBUG` |
-| `LOG_FORMAT` | Set log output format (pretty, json) | `pretty` | `LOG_FORMAT=json` |
-| `ccflare_DEBUG` | Enable debug mode with console output | - | `ccflare_DEBUG=1` |
-| `ccflare_DB_PATH` | Custom database file path | Platform-specific | `ccflare_DB_PATH=/var/lib/ccflare/db.sqlite` |
-| `CF_PRICING_REFRESH_HOURS` | Hours between pricing data refreshes | `24` | `CF_PRICING_REFRESH_HOURS=12` |
-| `CF_STREAM_USAGE_BUFFER_KB` | Stream usage buffer size in KB | `64` | `CF_STREAM_USAGE_BUFFER_KB=128` |
-| `CF_STREAM_TIMEOUT_MS` | Stream processing timeout in milliseconds | `60000` (1 minute) | `CF_STREAM_TIMEOUT_MS=120000` |
+| `AGENT_SMITH_LOG_LEVEL` | Set logging verbosity (DEBUG, INFO, WARN, ERROR) | `INFO` | `AGENT_SMITH_LOG_LEVEL=DEBUG` |
+| `AGENT_SMITH_LOG_FORMAT` | Set log output format (pretty, json) | `pretty` | `AGENT_SMITH_LOG_FORMAT=json` |
+| `AGENT_SMITH_DEBUG` | Enable debug mode with console output | - | `AGENT_SMITH_DEBUG=1` |
+| `AGENT_SMITH_DB_PATH` | Custom database file path | Platform-specific | `AGENT_SMITH_DB_PATH=/var/lib/agent-smith/db.sqlite` |
+| `AGENT_SMITH_PRICING_REFRESH_HOURS` | Hours between pricing data refreshes | `24` | `AGENT_SMITH_PRICING_REFRESH_HOURS=12` |
+| `AGENT_SMITH_STREAM_USAGE_BUFFER_KB` | Stream usage buffer size in KB | `64` | `AGENT_SMITH_STREAM_USAGE_BUFFER_KB=128` |
+| `AGENT_SMITH_STREAM_TIMEOUT_MS` | Stream processing timeout in milliseconds | `60000` (1 minute) | `AGENT_SMITH_STREAM_TIMEOUT_MS=120000` |
 
 ## Runtime Configuration API
 
@@ -418,7 +418,7 @@ Content-Type: application/json
 
 `POST` replaces the policy object using the snake_case fields shown above and
 takes effect for subsequent selection without a server restart. Management
-writes require `CF_ADMIN_KEY` through `x-api-key`; do not put that key in the
+writes require `AGENT_SMITH_ADMIN_KEY` through `x-api-key`; do not put that key in the
 configuration file.
 
 ### Runtime Update Behavior
@@ -445,9 +445,9 @@ Optimized for maximum request throughput with minimal overhead:
 
 Environment variables:
 ```bash
-export RETRY_ATTEMPTS=2
-export RETRY_DELAY_MS=500
-export LOG_LEVEL=WARN  # Reduce logging overhead
+export AGENT_SMITH_RETRY_ATTEMPTS=2
+export AGENT_SMITH_RETRY_DELAY_MS=500
+export AGENT_SMITH_LOG_LEVEL=WARN  # Reduce logging overhead
 ```
 
 ### Quota-Aware Pool Setup
@@ -467,8 +467,8 @@ need a fixed session duration.
 
 Environment variables:
 ```bash
-export RETRY_ATTEMPTS=3
-export LOG_LEVEL=INFO
+export AGENT_SMITH_RETRY_ATTEMPTS=3
+export AGENT_SMITH_LOG_LEVEL=INFO
 ```
 
 ### Development Setup
@@ -487,10 +487,10 @@ Configuration for local development and debugging:
 Environment variables:
 ```bash
 export PORT=3000
-export LOG_LEVEL=DEBUG
-export LOG_FORMAT=pretty
-export ccflare_DEBUG=1
-export RETRY_ATTEMPTS=5
+export AGENT_SMITH_LOG_LEVEL=DEBUG
+export AGENT_SMITH_LOG_FORMAT=pretty
+export AGENT_SMITH_DEBUG=1
+export AGENT_SMITH_RETRY_ATTEMPTS=5
 ```
 
 ### Production Setup
@@ -508,15 +508,15 @@ Recommended configuration for production deployments:
 
 Environment variables:
 ```bash
-export LOG_LEVEL=INFO
-export LOG_FORMAT=json
+export AGENT_SMITH_LOG_LEVEL=INFO
+export AGENT_SMITH_LOG_FORMAT=json
 ```
 
 ## Configuration Validation
 
 ### Automatic Validation
 
-ccflare performs validation on:
+agent-smith performs validation on:
 
 1. **Strategy names**: `session` is retained only as a validated compatibility name
 2. **Numeric values**: Parsed and validated as integers/floats
@@ -547,24 +547,24 @@ If migrating from environment variables to file-based configuration:
 
 1. Create the configuration file:
    ```bash
-   mkdir -p ~/.config/ccflare
+   mkdir -p ~/.config/agent-smith
    ```
 
 2. Export current configuration:
    ```bash
-   curl http://localhost:8080/api/config > ~/.config/ccflare/ccflare.json
+   curl http://localhost:8080/api/config > ~/.config/agent-smith/agent-smith.json
    ```
 
 3. Edit and format the file:
    ```bash
-   jq '.' ~/.config/ccflare/ccflare.json > temp.json && mv temp.json ~/.config/ccflare/ccflare.json
+   jq '.' ~/.config/agent-smith/agent-smith.json > temp.json && mv temp.json ~/.config/agent-smith/agent-smith.json
    ```
 
 ### From Older Versions
 
 #### Pre-1.0 to Current
 
-1. **Configuration location**: Move from `~/.ccflare/config.json` to platform-specific paths
+1. **Configuration location**: Move from `~/.agent-smith/config.json` to platform-specific paths
 2. **Field naming**: Update any deprecated field names (none currently deprecated)
 3. **Strategy names**: Only `"session"` strategy is available (must be lowercase)
 
@@ -573,7 +573,7 @@ If migrating from environment variables to file-based configuration:
 Always backup your configuration before upgrades:
 
 ```bash
-cp ~/.config/ccflare/ccflare.json ~/.config/ccflare/ccflare.json.backup
+cp ~/.config/agent-smith/agent-smith.json ~/.config/agent-smith/agent-smith.json.backup
 ```
 
 ### Rollback Procedure
@@ -589,8 +589,8 @@ If issues occur after configuration changes:
 ### Common Issues
 
 1. **Configuration not loading**:
-   - Check file permissions: `ls -la ~/.config/ccflare/`
-   - Verify JSON syntax: `jq '.' ~/.config/ccflare/ccflare.json`
+   - Check file permissions: `ls -la ~/.config/agent-smith/`
+   - Verify JSON syntax: `jq '.' ~/.config/agent-smith/agent-smith.json`
    - Check logs for parse errors
 
 2. **Environment variables not working**:
@@ -608,9 +608,9 @@ If issues occur after configuration changes:
 Enable comprehensive debugging:
 
 ```bash
-export ccflare_DEBUG=1
-export LOG_LEVEL=DEBUG
-export LOG_FORMAT=json  # For structured logging
+export AGENT_SMITH_DEBUG=1
+export AGENT_SMITH_LOG_LEVEL=DEBUG
+export AGENT_SMITH_LOG_FORMAT=json  # For structured logging
 ```
 
 This provides detailed configuration loading information and operation logs.

@@ -1,4 +1,4 @@
-import { formatTokens } from "@ccflare/ui";
+import { formatTokens } from "@agent-smith/ui";
 import { formatCompactNumber } from "../../lib/chart-utils";
 import { AnalyticsAreaChart } from "./AnalyticsAreaChart";
 

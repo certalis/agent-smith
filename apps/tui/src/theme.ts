@@ -7,9 +7,9 @@ import {
 	THEME_REGISTRY,
 	type TuiColorMap,
 	themeToTuiColors,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 
-const CONFIG_DIR = join(homedir(), ".config", "ccflare");
+const CONFIG_DIR = join(homedir(), ".config", "agent-smith");
 const CONFIG_FILE = join(CONFIG_DIR, "theme.json");
 
 function loadPersistedThemeId(): string {
@@ -23,7 +23,7 @@ function loadPersistedThemeId(): string {
 	} catch {
 		// ignore
 	}
-	return "ccflare-dark";
+	return "agent-smith-dark";
 }
 
 function persistThemeId(themeId: string): void {

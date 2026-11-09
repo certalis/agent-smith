@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/http",
+	"name": "@agent-smith/http",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",

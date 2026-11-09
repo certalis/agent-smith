@@ -1,5 +1,5 @@
 /**
- * Centralized constants for the ccflare application
+ * Centralized constants for the agent-smith application
  * All magic numbers should be defined here to improve maintainability
  */
 

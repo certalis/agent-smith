@@ -98,12 +98,12 @@ export function extractImports(filePath: string): string[] {
 	return [...specifiers];
 }
 
-export function getCcflareDependencies(manifest: PackageManifest): string[] {
+export function getAgentSmithDependencies(manifest: PackageManifest): string[] {
 	return [
 		...Object.keys(manifest.dependencies ?? {}),
 		...Object.keys(manifest.devDependencies ?? {}),
 		...Object.keys(manifest.peerDependencies ?? {}),
 	]
-		.filter((dependency) => dependency.startsWith("@ccflare/"))
+		.filter((dependency) => dependency.startsWith("@agent-smith/"))
 		.sort();
 }

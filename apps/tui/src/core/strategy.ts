@@ -1,5 +1,5 @@
-import { Config } from "@ccflare/config";
-import type { StrategyName, StrategyResponse } from "@ccflare/types";
+import { Config } from "@agent-smith/config";
+import type { StrategyName, StrategyResponse } from "@agent-smith/types";
 
 async function getPort(): Promise<number> {
 	const config = new Config();

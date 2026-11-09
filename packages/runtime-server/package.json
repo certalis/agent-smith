@@ -1,24 +1,25 @@
 {
-	"name": "@ccflare/runtime-server",
+	"name": "@agent-smith/runtime-server",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./edge": "./src/proxy-edge.ts"
+		"./edge": "./src/proxy-edge.ts",
+		"./standalone": "./src/standalone.ts"
 	},
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit"
 	},
 	"dependencies": {
-		"@ccflare/config": "workspace:*",
-		"@ccflare/core": "workspace:*",
-		"@ccflare/web": "workspace:*",
-		"@ccflare/database": "workspace:*",
-		"@ccflare/api": "workspace:*",
-		"@ccflare/http": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/providers": "workspace:*",
-		"@ccflare/proxy": "workspace:*"
+		"@agent-smith/config": "workspace:*",
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/web": "workspace:*",
+		"@agent-smith/database": "workspace:*",
+		"@agent-smith/api": "workspace:*",
+		"@agent-smith/http": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/providers": "workspace:*",
+		"@agent-smith/proxy": "workspace:*"
 	}
 }

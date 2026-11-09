@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseOperations } from "@ccflare/database";
+import { DatabaseOperations } from "@agent-smith/database";
 import { resetAllStats } from "./stats";
 
 const tempDirs: string[] = [];
@@ -15,10 +15,10 @@ afterEach(() => {
 
 describe("resetAllStats", () => {
 	it("clears request history and resets session counters consistently", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-cli-stats-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-cli-stats-"));
 		tempDirs.push(tempDir);
 
-		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
 
 		try {
 			const account = dbOps.createAccount({

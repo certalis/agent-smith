@@ -1,5 +1,9 @@
 import { expect } from "bun:test";
-import type { Account, ApiKeyProvider, OAuthProvider } from "@ccflare/types";
+import type {
+	Account,
+	ApiKeyProvider,
+	OAuthProvider,
+} from "@agent-smith/types";
 import type { Provider } from "../types";
 
 export const originalFetch = globalThis.fetch;

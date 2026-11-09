@@ -1,6 +1,6 @@
-import { requestEvents, ServiceUnavailableError } from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
-import { isRequestPayload, isRequestSummary } from "@ccflare/types";
+import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
+import { isRequestPayload, isRequestSummary } from "@agent-smith/types";
 import {
 	createRequestMetadata,
 	ERROR_MESSAGES,

@@ -2,7 +2,7 @@ import type {
 	AccountProvider,
 	AnalyticsStatusFilter,
 	TimeRange,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import type { AnalyticsQueryOptions } from "./repositories/analytics.repository";
 
 interface AnalyticsRangeConfig {

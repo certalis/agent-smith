@@ -1,4 +1,4 @@
-import { formatCost } from "@ccflare/core";
+import { formatCost } from "@agent-smith/core";
 import {
 	formatDuration,
 	formatTokens,

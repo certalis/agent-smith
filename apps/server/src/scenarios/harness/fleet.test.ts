@@ -2,12 +2,12 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseOperations } from "@ccflare/database";
+import { DatabaseOperations } from "@agent-smith/database";
 import { seedFleet } from "./fleet";
 
 test("seeds claude-code OAuth accounts with deterministic tokens and state", () => {
-	const directory = mkdtempSync(join(tmpdir(), "ccflare-scenario-fleet-"));
-	const dbPath = join(directory, "ccflare.db");
+	const directory = mkdtempSync(join(tmpdir(), "agent-smith-scenario-fleet-"));
+	const dbPath = join(directory, "agent-smith.db");
 	const now = 1_700_000_000_000;
 
 	try {

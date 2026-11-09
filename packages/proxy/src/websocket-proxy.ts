@@ -1,7 +1,7 @@
-import { requestEvents, ServiceUnavailableError } from "@ccflare/core";
-import { errorResponse, sanitizeRequestHeaders } from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import type { Account, AccountProvider } from "@ccflare/types";
+import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
+import { errorResponse, sanitizeRequestHeaders } from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import type { Account, AccountProvider } from "@agent-smith/types";
 import { selectAccountsForRequest } from "./handlers/account-selector";
 import type {
 	ProxyContext,

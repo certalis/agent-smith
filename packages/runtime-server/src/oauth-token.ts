@@ -1,10 +1,10 @@
-import { CLAUDE_CODE_OAUTH_TOKEN_URL } from "@ccflare/providers";
+import { CLAUDE_CODE_OAUTH_TOKEN_URL } from "@agent-smith/providers";
 
 const PROXY_ONLY_HEADERS = [
 	"host",
 	"content-length",
 	"x-api-key",
-	"x-ccflare-scenario-client-id",
+	"x-agent-smith-scenario-client-id",
 ] as const;
 
 /**

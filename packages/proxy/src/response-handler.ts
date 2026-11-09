@@ -1,9 +1,9 @@
-import { requestEvents } from "@ccflare/core";
+import { requestEvents } from "@agent-smith/core";
 import {
 	sanitizeRequestHeaders,
 	withSanitizedProxyHeaders,
-} from "@ccflare/http";
-import type { Account, HttpMethod } from "@ccflare/types";
+} from "@agent-smith/http";
+import type { Account, HttpMethod } from "@agent-smith/types";
 import { trackProxyBackgroundTask } from "./background-tasks";
 import type { ResolvedProxyContext } from "./handlers";
 import type { ChunkMessage, EndMessage, StartMessage } from "./worker-messages";

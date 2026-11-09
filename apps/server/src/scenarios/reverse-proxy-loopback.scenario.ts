@@ -2,7 +2,7 @@ import { defineScenario } from "./harness/scenario";
 
 export default defineScenario({
 	name: "a forwarded keyless request cannot spend a pooled credential",
-	environment: { CF_PROXY_KEY: "scenario-proxy-key" },
+	environment: { AGENT_SMITH_PROXY_KEY: "scenario-proxy-key" },
 	fleet: [{ name: "pooled" }],
 	upstream: [{ path: "/v1/messages", status: 200, json: { ok: true } }],
 	steps: [

@@ -1,8 +1,8 @@
-# Load balancing in ccflare
+# Load balancing in agent-smith
 
 ## Routing model
 
-ccflare orders eligible accounts for each provider-native request. A direct
+agent-smith orders eligible accounts for each provider-native request. A direct
 `/v1/<provider>/*` route stays with that provider. A configured
 `/v1/pool/<wire>/*` route starts with its first compatible provider and may
 make one bounded move to the next compatible provider. It does not create a

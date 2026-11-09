@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/proxy",
+	"name": "@agent-smith/proxy",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "./src/index.ts",
@@ -11,13 +11,13 @@
 		"test": "bun test ./src"
 	},
 	"dependencies": {
-		"@ccflare/config": "workspace:*",
-		"@ccflare/core": "workspace:*",
-		"@ccflare/database": "workspace:*",
-		"@ccflare/http": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/providers": "workspace:*",
-		"@ccflare/types": "workspace:*",
+		"@agent-smith/config": "workspace:*",
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/database": "workspace:*",
+		"@agent-smith/http": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/providers": "workspace:*",
+		"@agent-smith/types": "workspace:*",
 		"@dqbd/tiktoken": "^1.0.21"
 	}
 }

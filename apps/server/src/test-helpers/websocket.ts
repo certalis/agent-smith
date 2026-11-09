@@ -1,10 +1,10 @@
-import { CodexProvider, ProviderRegistry } from "@ccflare/providers";
+import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import type {
 	IncomingWorkerMessage,
 	ProxyContext,
 	WebSocketProxyData,
-} from "@ccflare/proxy";
-import type { Account } from "@ccflare/types";
+} from "@agent-smith/proxy";
+import type { Account } from "@agent-smith/types";
 
 export type FakeUpstreamCapture = {
 	url: string;

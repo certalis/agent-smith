@@ -7,7 +7,7 @@ import {
 	getAccountRateLimitInfo,
 	getAccountSessionInfo,
 	getAccountTokenStatus,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export interface AccountRateLimitStatusView {
 	code: string;

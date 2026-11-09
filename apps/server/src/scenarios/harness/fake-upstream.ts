@@ -7,6 +7,8 @@ export type RecordedUpstreamRequest = {
 	manualHoldsActive?: string[];
 	method: string;
 	path: string;
+	closed?: boolean;
+	responseEnded?: boolean;
 };
 
 type FakeUpstreamOptions = {
@@ -343,7 +345,7 @@ export class FakeUpstream {
 	private async handle(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		const clientId =
-			request.headers.get("x-ccflare-scenario-client-id") ?? undefined;
+			request.headers.get("x-agent-smith-scenario-client-id") ?? undefined;
 		const account = accountFromRequest(request, this.options.tokenToAccount);
 		const rule = this.matchingRule(account, url.pathname);
 		if (rule) {

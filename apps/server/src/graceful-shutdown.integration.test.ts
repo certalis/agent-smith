@@ -13,10 +13,10 @@ describe("graceful shutdown integration", () => {
 
 			const SERVER_URL = "http://localhost:8080";
 			const originalFetch = globalThis.fetch;
-			const tempDir = mkdtempSync(join(tmpdir(), "ccflare-shutdown-"));
-			process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-			process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
-			process.env.CF_ADMIN_KEY = "shutdown-admin-key";
+			const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-shutdown-"));
+			process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+			process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
+			process.env.AGENT_SMITH_ADMIN_KEY = "shutdown-admin-key";
 
 			async function waitFor(run, isReady, timeoutMs = 4000) {
 				const deadline = Date.now() + timeoutMs;

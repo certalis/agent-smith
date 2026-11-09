@@ -27,7 +27,7 @@ export const dashboardRoutes: DashboardRoute[] = [
 		label: "Overview",
 		icon: LayoutDashboard,
 		title: "Dashboard Overview",
-		subtitle: "Monitor your ccflare performance and usage",
+		subtitle: "Monitor your agent-smith performance and usage",
 		element: <OverviewTab />,
 	},
 	{

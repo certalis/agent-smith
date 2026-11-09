@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "@ccflare/config";
-import { DatabaseFactory } from "@ccflare/database";
-import { createConfiguredProviderRegistry } from "@ccflare/providers";
+import { Config } from "@agent-smith/config";
+import { DatabaseFactory } from "@agent-smith/database";
+import { createConfiguredProviderRegistry } from "@agent-smith/providers";
 import { stopAllOAuthCallbackForwarders } from "./handlers/oauth";
 import { APIRouter } from "./router";
 
@@ -18,7 +18,7 @@ function unsignedJwt(claims: Record<string, unknown>): string {
 }
 
 function createRouterContext(configData?: Record<string, unknown>) {
-	const tempDir = mkdtempSync(join(tmpdir(), "ccflare-http-api-"));
+	const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-http-api-"));
 	tempDirs.push(tempDir);
 
 	const configPath = join(tempDir, "config.json");
@@ -28,7 +28,7 @@ function createRouterContext(configData?: Record<string, unknown>) {
 		config.getProviderConfigs(),
 	);
 	DatabaseFactory.reset();
-	DatabaseFactory.initialize(join(tempDir, "ccflare.db"));
+	DatabaseFactory.initialize(join(tempDir, "agent-smith.db"));
 	const dbOps = DatabaseFactory.getInstance();
 
 	return {

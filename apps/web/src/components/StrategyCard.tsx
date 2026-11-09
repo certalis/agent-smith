@@ -1,4 +1,4 @@
-import { isLbStrategy, type StrategyName } from "@ccflare/types";
+import { isLbStrategy, type StrategyName } from "@agent-smith/types";
 import { RefreshCw, Settings } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";

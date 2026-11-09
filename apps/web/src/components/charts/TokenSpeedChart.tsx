@@ -1,4 +1,4 @@
-import { formatTokensPerSecond } from "@ccflare/ui";
+import { formatTokensPerSecond } from "@agent-smith/ui";
 import { useChartColors } from "../../hooks/useChartColors";
 import { formatCompactNumber } from "../../lib/chart-utils";
 import { BaseAreaChart } from "./BaseAreaChart";

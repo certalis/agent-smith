@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes how requests and management operations move through ccflare today.
+This document describes how requests and management operations move through agent-smith today.
 
 The major flows are:
 
@@ -134,7 +134,7 @@ For streaming and websocket traffic:
 
 ## Event Streaming
 
-ccflare exposes two real-time SSE streams:
+agent-smith exposes two real-time SSE streams:
 
 - `/api/requests/stream`
 - `/api/logs/stream`

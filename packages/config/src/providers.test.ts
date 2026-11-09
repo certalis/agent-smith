@@ -46,7 +46,7 @@ describe("provider configuration", () => {
 		expect(configFrom(data).getClientRouting().enabled).toBe(enabled);
 	});
 
-	it("reads the Agent-smith endpoint and forwarding-key file used by clients", () => {
+	it("reads the Agent Smith endpoint and forwarding-key file used by clients", () => {
 		const config = configFrom({
 			client: {
 				base_url: "http://127.0.0.1:18181/",

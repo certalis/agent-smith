@@ -1,4 +1,4 @@
-import { isRecord } from "@ccflare/types";
+import { isRecord } from "@agent-smith/types";
 import type { PreExtractedUsage } from "./worker-messages";
 
 type UsageDetails = {

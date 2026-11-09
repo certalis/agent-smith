@@ -23,9 +23,9 @@ const status = (eligibleAccounts: number, retryAtMs: number | null) =>
 export default defineScenario({
 	name: "pool capacity is read-only, authenticated and excludes non-routable seats",
 	environment: {
-		CF_TRUST_LOOPBACK: "false",
-		CF_PROXY_KEY: "scenario-proxy-key",
-		CF_ADMIN_KEY: "scenario-admin-key",
+		AGENT_SMITH_TRUST_LOOPBACK: "false",
+		AGENT_SMITH_PROXY_KEY: "scenario-proxy-key",
+		AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
 	},
 	config: {
 		team_routing: {

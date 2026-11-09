@@ -1,5 +1,9 @@
-import { sanitizeProxyHeaders } from "@ccflare/http";
-import type { Account, AccountQuotaState, ProviderWire } from "@ccflare/types";
+import { sanitizeProxyHeaders } from "@agent-smith/http";
+import type {
+	Account,
+	AccountQuotaState,
+	ProviderWire,
+} from "@agent-smith/types";
 import type { Provider, RateLimitInfo } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

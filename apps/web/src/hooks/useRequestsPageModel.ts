@@ -1,9 +1,9 @@
-import type { AccountResponse } from "@ccflare/api";
+import type { AccountResponse } from "@agent-smith/api";
 import {
 	parseRequestStreamEvent,
 	type RequestPayload,
 	type RequestSummary,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api";

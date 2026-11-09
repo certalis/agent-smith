@@ -3,7 +3,7 @@ import {
 	getSiblingTheme,
 	getThemeById,
 	type ThemePalette,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import type React from "react";
 import {
 	createContext,
@@ -24,7 +24,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = "ccflare-theme";
+const STORAGE_KEY = "agent-smith-theme";
 const LEGACY_KEY = "theme";
 
 interface StoredTheme {
@@ -43,17 +43,17 @@ function readStoredTheme(): StoredTheme {
 		if (legacy) {
 			localStorage.removeItem(LEGACY_KEY);
 			if (legacy === "system") {
-				return { themeId: "ccflare-dark", systemMode: true };
+				return { themeId: "agent-smith-dark", systemMode: true };
 			}
 			return {
-				themeId: legacy === "light" ? "ccflare-light" : "ccflare-dark",
+				themeId: legacy === "light" ? "agent-smith-light" : "agent-smith-dark",
 				systemMode: false,
 			};
 		}
 	} catch {
 		// ignore
 	}
-	return { themeId: "ccflare-dark", systemMode: true };
+	return { themeId: "agent-smith-dark", systemMode: true };
 }
 
 function getSystemAppearance(): "dark" | "light" {

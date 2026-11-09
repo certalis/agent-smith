@@ -1,4 +1,4 @@
-import { type Account, isLbStrategy, StrategyName } from "@ccflare/types";
+import { type Account, isLbStrategy, StrategyName } from "@agent-smith/types";
 
 export function isValidStrategy(strategy: string): strategy is StrategyName {
 	return isLbStrategy(strategy);

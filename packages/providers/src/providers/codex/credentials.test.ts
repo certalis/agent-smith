@@ -16,7 +16,7 @@ function unsignedJwt(claims: Record<string, unknown>): string {
 }
 
 function writeNativeAuthFile(contents: unknown): string {
-	const home = mkdtempSync(join(tmpdir(), "ccflare-codex-auth-"));
+	const home = mkdtempSync(join(tmpdir(), "agent-smith-codex-auth-"));
 	tempDirs.push(home);
 	const codexDirectory = join(home, ".codex");
 	mkdirSync(codexDirectory);

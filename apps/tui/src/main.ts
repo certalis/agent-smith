@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
-import { Config } from "@ccflare/config";
-import { container, NETWORK, SERVICE_KEYS, shutdown } from "@ccflare/core";
-import { DatabaseFactory } from "@ccflare/database";
-import { Logger } from "@ccflare/logger";
-import startServer, { type ServerHandle } from "@ccflare/runtime-server";
-import type { AccountDisplay } from "@ccflare/ui";
+import { Config } from "@agent-smith/config";
+import { container, NETWORK, SERVICE_KEYS, shutdown } from "@agent-smith/core";
+import { DatabaseFactory } from "@agent-smith/database";
+import { Logger } from "@agent-smith/logger";
+import startServer, { type ServerHandle } from "@agent-smith/runtime-server";
+import type { AccountDisplay } from "@agent-smith/ui";
 import * as tuiCore from "./core";
 import { parseArgs } from "./core";
 import { POC_NOTICE } from "./poc-notice";
@@ -118,7 +118,7 @@ Examples:
   agent-smith --pause work       # Pause account
   agent-smith --analyze          # Run performance analysis
   agent-smith --stats            # View stats
-  agent-smith install-client     # Configure Claude Code and Codex for this Agent-smith server
+  agent-smith install-client     # Configure Claude Code and Codex for this Agent Smith server
 `);
 		process.exit(0);
 	}
@@ -154,7 +154,10 @@ Examples:
 			baseUrl: client.baseUrl,
 			proxyKeyFile: client.proxyKeyFile,
 		});
-		console.log(`Claude Code and Codex now route through ${client.baseUrl}`);
+		console.log(`Client wrappers configured for ${client.baseUrl}.`);
+		console.log(
+			"Open a new shell and launch Claude Code or Codex through these wrappers. Already-running sessions are unchanged; restart or resume them through the wrapper.",
+		);
 		return;
 	}
 
@@ -163,7 +166,9 @@ Examples:
 		const config = new Config();
 		const port =
 			parsed.port || config.getRuntime().port || NETWORK.DEFAULT_PORT;
-		const proxyKey = tuiCore.requireProxyKey(process.env.CF_PROXY_KEY ?? "");
+		const proxyKey = tuiCore.requireProxyKey(
+			process.env.AGENT_SMITH_PROXY_KEY ?? "",
+		);
 		const proxyServer = startServer({ port, withDashboard: false });
 		let exitCode: number;
 		try {

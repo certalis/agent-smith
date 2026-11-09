@@ -1,6 +1,6 @@
-import { TokenRefreshError } from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
-import type { Account, RequestMeta } from "@ccflare/types";
+import { TokenRefreshError } from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
+import type { Account, RequestMeta } from "@agent-smith/types";
 import { forwardToClient } from "../response-handler";
 import {
 	type MessageThreadRequest,
@@ -123,6 +123,7 @@ function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 			headers,
 			() => input.createBodyStream(input.requestBody),
 			!!input.req.body,
+			input.req.signal,
 		);
 		return {
 			response,
@@ -329,6 +330,8 @@ export async function proxyWithAccount(
 			? upstream
 			: await classifyUpstreamResponse(input, upstream);
 	} catch (err) {
+		// A client cancellation is not a provider failure to retry elsewhere.
+		req.signal.throwIfAborted();
 		handleProxyError(err, account, log);
 		return err instanceof TokenRefreshError
 			? { kind: "failed" }

@@ -1,4 +1,4 @@
-import { DatabaseFactory } from "@ccflare/database";
+import { DatabaseFactory } from "@agent-smith/database";
 import * as cliCommands from "./cli";
 
 export interface Stats {

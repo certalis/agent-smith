@@ -1,4 +1,4 @@
-import type { DatabaseOperations } from "@ccflare/database";
+import type { DatabaseOperations } from "@agent-smith/database";
 
 /**
  * Reset all account statistics

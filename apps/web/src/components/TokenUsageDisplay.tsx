@@ -1,5 +1,5 @@
-import type { RequestSummary } from "@ccflare/types";
-import { processTokenUsage, type TokenUsageInfo } from "@ccflare/ui";
+import type { RequestSummary } from "@agent-smith/types";
+import { processTokenUsage, type TokenUsageInfo } from "@agent-smith/ui";
 
 type Section = TokenUsageInfo["sections"];
 

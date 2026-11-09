@@ -1,6 +1,6 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
-import { Logger } from "@ccflare/logger";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { Logger } from "@agent-smith/logger";
 
 export function runStartupMaintenance(
 	config: Config,

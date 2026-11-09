@@ -1,6 +1,6 @@
-import { validateNumber } from "@ccflare/core";
-import { errorResponse, NotFound } from "@ccflare/http";
-import { isAccountProvider } from "@ccflare/types";
+import { validateNumber } from "@agent-smith/core";
+import { errorResponse, NotFound } from "@agent-smith/http";
+import { isAccountProvider } from "@agent-smith/types";
 import {
 	createAccountAddHandler,
 	createAccountPauseHandler,

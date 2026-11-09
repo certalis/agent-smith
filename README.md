@@ -45,7 +45,7 @@ agent-smith
 ```
 
 Or run it once without installing: `bunx @certalis/agent-smith`. To work from
-source, clone this repository, then run `bun install && bun run ccflare`.
+source, clone this repository, then run `bun install && bun run agent-smith`.
 
 A host that supervises agent-smith itself can start the server in its own Bun
 process, without the dashboard and with a private Unix socket beside the TCP port:
@@ -89,7 +89,7 @@ Codex works the same way with an OpenAI API key and an `openai-responses` pool.
 
 The agents service and laptops can use one server-side pool through the
 [authenticated HTTPS entrance](docs/https-edge.md) on managed HTTP hosts such as
-Render. HTTPS needs no VPN or extra server: an existing web service forwards
+Render. HTTPS needs no VPN: use the shipped standalone launcher or let an existing web service forward
 only inference to the pool's private socket. Each device has its own revocable
 key; provider tokens and the single database stay on the server.
 
@@ -97,7 +97,7 @@ Device keys allow independent revocation and cannot read management data.
 This does not add per-client fairness or budgets.
 
 Copy [`https-client.json`](examples/config/https-client.json) into your private
-Agent-smith config. Put the device key in the owner-only file named by
+Agent Smith config. Put the device key in the owner-only file named by
 `proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
 visible to your machine, not a second pool. The key can spend from the pool, but
 cannot administer it. Remote client routing is off by default: set
@@ -122,6 +122,10 @@ their own marked `PATH` entry; they do not replace the real binaries or start a
 second proxy. The forwarding key is for inference, not dashboard or management
 access.
 
+Claude sends one device credential in the API-key header to the gateway; it is
+not an Anthropic Console key. Claude.ai cloud connectors are not available by default in this
+mode; see the [client behavior and limits](docs/https-edge.md#configure-and-prove).
+
 To switch back to ordinary local Claude Code/Codex, set `client.enabled` to
 `false` and run `agent-smith install-client` again. It removes only its wrappers
 and marked shell entry; it does not change the real clients or their credentials.
@@ -130,9 +134,9 @@ and marked shell entry; it does not change the real clients or their credentials
 
 The config file is JSON, read at startup from:
 
-- `~/.config/ccflare/ccflare.json` (or `$XDG_CONFIG_HOME/ccflare/ccflare.json`)
+- `~/.config/agent-smith/agent-smith.json` (or `$XDG_CONFIG_HOME/agent-smith/agent-smith.json`)
   on macOS and Linux,
-- or the path in `ccflare_CONFIG_PATH`.
+- or the path in `AGENT_SMITH_CONFIG_PATH`.
 
 Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 `block_when_all_full`.
@@ -144,7 +148,7 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
-| `client` | The Agent-smith origin and forwarding key used by `agent-smith install-client`. It is for this machine only; it does not define providers or a separate pool. |
+| `client` | The Agent Smith origin and forwarding key used by `agent-smith install-client`. It is for this machine only; it does not define providers or a separate pool. |
 | `team_routing` | Which subscription accounts may share a pool, and their usage caps. See the [configuration guide](docs/configuration.md#team-routing). |
 | `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
 | `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
@@ -209,7 +213,7 @@ the pool without SSH.
   "client": {
     "enabled": false,
     "base_url": "http://127.0.0.1:18181",
-    "proxy_key_file": "~/.config/ccflare/team-pool.key"
+    "proxy_key_file": "~/.config/agent-smith/team-pool.key"
   }
 }
 ```
@@ -356,7 +360,7 @@ The server also exposes the routes directly:
 - `http://localhost:8080/v1/pool/<protocol>/*`: a configured pool.
 
 Run only the server with `agent-smith --serve`. Management writes need an
-explicit `CF_ADMIN_KEY` sent as the `x-api-key` header. Read the
+explicit `AGENT_SMITH_ADMIN_KEY` sent as the `x-api-key` header. Read the
 [configuration guide](docs/configuration.md) and the
 [HTTP API reference](docs/api-http.md) before exposing anything beyond
 localhost.

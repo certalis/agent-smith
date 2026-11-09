@@ -1,5 +1,5 @@
-import type { AccountResponse } from "@ccflare/api";
-import { AccountPresenter } from "@ccflare/ui";
+import type { AccountResponse } from "@agent-smith/api";
+import { AccountPresenter } from "@agent-smith/ui";
 import {
 	AlertCircle,
 	CheckCircle,

@@ -1,11 +1,11 @@
-import type { LogEvent } from "@ccflare/types";
+import type { LogEvent } from "@agent-smith/types";
 import {
 	createLogFeedInitialState,
 	formatTime,
 	getLogSeverityMeta,
 	type LogFeedAction,
 	logFeedReducer,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { Pause, Play, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { api } from "../api";

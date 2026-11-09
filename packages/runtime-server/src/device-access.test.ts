@@ -10,7 +10,7 @@ import {
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ProxyContext } from "@ccflare/proxy";
+import type { ProxyContext } from "@agent-smith/proxy";
 import { deviceKeyMatches } from "./device-keys";
 import { createServerFetchHandler } from "./fetch-handler";
 import { createProxyEdgeHandler } from "./proxy-edge";

@@ -108,7 +108,7 @@ class FakeWorker implements WorkerLike {
 }
 
 const controllers: UsageWorkerController[] = [];
-const originalUsageWorkerPath = process.env.CF_USAGE_WORKER_PATH;
+const originalUsageWorkerPath = process.env.AGENT_SMITH_USAGE_WORKER_PATH;
 
 afterEach(async () => {
 	for (const controller of controllers) {
@@ -117,15 +117,15 @@ afterEach(async () => {
 	controllers.length = 0;
 
 	if (originalUsageWorkerPath === undefined) {
-		delete process.env.CF_USAGE_WORKER_PATH;
+		delete process.env.AGENT_SMITH_USAGE_WORKER_PATH;
 	} else {
-		process.env.CF_USAGE_WORKER_PATH = originalUsageWorkerPath;
+		process.env.AGENT_SMITH_USAGE_WORKER_PATH = originalUsageWorkerPath;
 	}
 });
 
 describe("UsageWorkerController", () => {
 	it("resolves an explicit usage worker path from the environment", () => {
-		process.env.CF_USAGE_WORKER_PATH = "/tmp/post-processor.worker.js";
+		process.env.AGENT_SMITH_USAGE_WORKER_PATH = "/tmp/post-processor.worker.js";
 
 		expect(resolveUsageWorkerEntrypoint()).toBe(
 			"file:///tmp/post-processor.worker.js",

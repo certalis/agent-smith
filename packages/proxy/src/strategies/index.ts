@@ -1,10 +1,10 @@
-import { isAccountAvailable } from "@ccflare/core";
+import { isAccountAvailable } from "@agent-smith/core";
 import type {
 	Account,
 	LoadBalancingStrategy,
 	RequestMeta,
 	StrategyStore,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export class SessionStrategy implements LoadBalancingStrategy {
 	/**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { ProviderRegistry } from "@ccflare/providers";
-import type { ProxyContext } from "@ccflare/proxy";
+import { ProviderRegistry } from "@agent-smith/providers";
+import type { ProxyContext } from "@agent-smith/proxy";
 import { createServerFetchHandler, createStartupBanner } from "./server";
 
 function createProxyContext(): ProxyContext {
@@ -138,7 +138,7 @@ describe("createServerFetchHandler", () => {
 		expect(tokenCalls).toBe(0);
 	});
 
-	it("sends /v1/ccflare paths to the provider proxy, which has no such provider", async () => {
+	it("sends /v1/agent-smith paths to the provider proxy, which has no such provider", async () => {
 		const proxiedPaths: string[] = [];
 		const fetchHandler = createServerFetchHandler({
 			apiRouter: {
@@ -154,11 +154,14 @@ describe("createServerFetchHandler", () => {
 		});
 
 		const response = await fetchHandler(
-			new Request("http://localhost:8080/v1/ccflare/openai/chat/completions", {
-				method: "POST",
-				body: JSON.stringify({ model: "claude-opus-4.1" }),
-				headers: { "content-type": "application/json" },
-			}),
+			new Request(
+				"http://localhost:8080/v1/agent-smith/openai/chat/completions",
+				{
+					method: "POST",
+					body: JSON.stringify({ model: "claude-opus-4.1" }),
+					headers: { "content-type": "application/json" },
+				},
+			),
 		);
 
 		if (!response) {
@@ -167,7 +170,7 @@ describe("createServerFetchHandler", () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe("proxied");
-		expect(proxiedPaths).toEqual(["/v1/ccflare/openai/chat/completions"]);
+		expect(proxiedPaths).toEqual(["/v1/agent-smith/openai/chat/completions"]);
 	});
 
 	it("routes websocket upgrade requests through the websocket upgrader", async () => {

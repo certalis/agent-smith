@@ -5,8 +5,8 @@ const body = '{"messages":[]}' as const;
 export default defineScenario({
 	name: "exposure checks reject hostile Host and Origin before forwarding",
 	environment: {
-		CF_ADMIN_KEY: "scenario-admin-key",
-		CF_PROXY_KEY: "scenario-proxy-key",
+		AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
+		AGENT_SMITH_PROXY_KEY: "scenario-proxy-key",
 	},
 	fleet: [{ name: "pooled" }],
 	upstream: [{ path: "/v1/messages", status: 200, json: { ok: true } }],

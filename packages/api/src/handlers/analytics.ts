@@ -1,11 +1,11 @@
-import { buildAnalyticsQuery } from "@ccflare/database";
+import { buildAnalyticsQuery } from "@agent-smith/database";
 import {
 	BadRequest,
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
 import {
 	type AccountProvider,
 	type AnalyticsMode,
@@ -15,7 +15,7 @@ import {
 	isAnalyticsStatusFilter,
 	isTimeRange,
 	type TimeRange,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import type { APIContext } from "../types";
 
 const log = new Logger("AnalyticsHandler");

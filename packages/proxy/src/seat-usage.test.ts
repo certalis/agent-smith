@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { AnthropicProvider } from "@ccflare/providers";
-import type { Account, QuotaWindow } from "@ccflare/types";
+import { AnthropicProvider } from "@agent-smith/providers";
+import type { Account, QuotaWindow } from "@agent-smith/types";
 import { compareSeatUsage } from "./seat-usage";
 
 const now = 1_700_000_000_000;

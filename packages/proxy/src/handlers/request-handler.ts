@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { HttpError } from "@ccflare/http";
-import { isHttpMethod, type RequestMeta } from "@ccflare/types";
+import { HttpError } from "@agent-smith/http";
+import { isHttpMethod, type RequestMeta } from "@agent-smith/types";
 
 export const DEFAULT_MAX_BODY_BYTES = 64 * 1024 * 1024;
 
@@ -119,11 +119,13 @@ export async function makeProxyRequest(
 	headers: Headers,
 	createBodyStream: () => ReadableStream<Uint8Array> | undefined,
 	hasBody: boolean,
+	signal: AbortSignal,
 ): Promise<Response> {
 	return fetch(targetUrl, {
 		method,
 		headers,
 		body: createBodyStream(),
+		signal,
 		...(hasBody ? ({ duplex: "half" } as RequestInit) : {}),
 	});
 }

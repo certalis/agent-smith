@@ -1,11 +1,11 @@
-import type { DatabaseOperations } from "@ccflare/database";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import type { MutationResult, StatsWithAccounts } from "@ccflare/types";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import type { MutationResult, StatsWithAccounts } from "@agent-smith/types";
 
 const log = new Logger("StatsHandler");
 

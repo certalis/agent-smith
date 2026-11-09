@@ -15,7 +15,7 @@ export default defineScenario({
 			admission_cap: 5,
 		},
 	},
-	environment: { CF_ADMIN_KEY: "scenario-admin-key" },
+	environment: { AGENT_SMITH_ADMIN_KEY: "scenario-admin-key" },
 	fleet: [
 		{ name: "a", accountUuid: "acct-a" },
 		{ name: "b", accountUuid: "acct-b" },

@@ -2,7 +2,7 @@ import type {
 	Account,
 	AccountQuotaState,
 	AccountSwitchThreshold,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { type AccountRow, toAccount } from "../models/account-row";
 import { BaseRepository } from "./base.repository";
 

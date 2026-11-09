@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { TeamRoutingConfig } from "@ccflare/config";
-import type { Account } from "@ccflare/types";
+import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { Account } from "@agent-smith/types";
 import {
 	formatPoolLimits,
 	isPoolEligible,

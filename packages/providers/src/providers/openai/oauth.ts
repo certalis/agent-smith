@@ -1,4 +1,4 @@
-import { OAuthError } from "@ccflare/core";
+import { OAuthError } from "@agent-smith/core";
 import type {
 	OAuthProvider,
 	OAuthProviderConfig,

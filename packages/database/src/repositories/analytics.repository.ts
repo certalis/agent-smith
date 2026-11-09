@@ -5,8 +5,8 @@ import type {
 	ModelPerformance,
 	TimePoint,
 	TokenBreakdown,
-} from "@ccflare/types";
-import { NO_ACCOUNT_ID } from "@ccflare/types";
+} from "@agent-smith/types";
+import { NO_ACCOUNT_ID } from "@agent-smith/types";
 import { BaseRepository } from "./base.repository";
 
 export interface AnalyticsQueryOptions {

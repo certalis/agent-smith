@@ -13,6 +13,11 @@ export type ClientResult = {
 	chunks: string[];
 	headers: Headers;
 	status: number;
+	uploadCompleted?: boolean;
+	uploadedBytes?: number;
+	uploadBufferedBytes?: number;
+	connectionRefused?: boolean;
+	cancelled?: boolean;
 };
 
 export type AssertionFailure = {
@@ -24,7 +29,7 @@ type AssertionContext = {
 	clients: ClientResult[];
 	now: number;
 	serverUrl: string;
-	upstream: FakeUpstream;
+	upstream: Pick<FakeUpstream, "requests"> & { connections?: number };
 };
 
 const ACCOUNT_ASSERTION_TIMEOUT_MS = 2_000;
@@ -32,6 +37,7 @@ const ACCOUNT_ASSERTION_TIMEOUT_MS = 2_000;
 export function upstreamFailure(
 	assertion: UpstreamAssertion,
 	recorded: RecordedUpstreamRequest[],
+	connections?: number,
 ): string | undefined {
 	const requests = assertion.onPath
 		? recorded.filter((request) => request.path === assertion.onPath)
@@ -39,6 +45,22 @@ export function upstreamFailure(
 	if (assertion.count !== undefined && requests.length !== assertion.count) {
 		return `expected ${assertion.count} upstream requests, received ${requests.length}`;
 	}
+	if (
+		assertion.connections !== undefined &&
+		connections !== assertion.connections
+	)
+		return `expected ${assertion.connections} upstream connections, received ${connections}`;
+	if (
+		assertion.closed !== undefined &&
+		requests.filter((request) => request.closed).length !== assertion.closed
+	)
+		return `expected ${assertion.closed} closed upstream requests, received ${requests.filter((request) => request.closed).length}`;
+	if (
+		assertion.responsesEnded !== undefined &&
+		requests.filter((request) => request.responseEnded).length !==
+			assertion.responsesEnded
+	)
+		return `expected ${assertion.responsesEnded} ended upstream responses, received ${requests.filter((request) => request.responseEnded).length}`;
 
 	if (assertion.atMostPerHeader) {
 		const { count, name } = assertion.atMostPerHeader;
@@ -174,6 +196,19 @@ export function clientFailure(
 					: [];
 	if (selectedClients.length === 0) {
 		return "expected a client response, but no request step ran";
+	}
+	for (const field of [
+		"uploadCompleted",
+		"uploadedBytes",
+		"uploadBufferedBytes",
+		"connectionRefused",
+		"cancelled",
+	] as const) {
+		if (
+			assertion[field] !== undefined &&
+			selectedClients.some((client) => client[field] !== assertion[field])
+		)
+			return `expected every client ${field} to equal ${assertion[field]}`;
 	}
 
 	if (
@@ -347,7 +382,11 @@ export async function evaluateAssertions(
 
 	for (const assertion of assertions) {
 		if (assertion.type === "upstream") {
-			const message = upstreamFailure(assertion, context.upstream.requests);
+			const message = upstreamFailure(
+				assertion,
+				context.upstream.requests,
+				context.upstream.connections,
+			);
 			if (message) failures.push({ id: assertion.id, message });
 		} else if (assertion.type === "client") {
 			const message = clientFailure(assertion, context.clients);

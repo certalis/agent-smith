@@ -1,4 +1,4 @@
 export {
 	createProxyEdgeHandler,
 	type ProxyEdgeOptions,
-} from "@ccflare/runtime-server/edge";
+} from "@agent-smith/runtime-server/edge";

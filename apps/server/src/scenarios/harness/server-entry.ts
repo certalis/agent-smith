@@ -20,16 +20,16 @@ function isLoopback(url: URL): boolean {
 	return ["127.0.0.1", "::1", "localhost"].includes(url.hostname);
 }
 
-const initialTime = Number(process.env.CCFLARE_SCENARIO_INITIAL_TIME);
+const initialTime = Number(process.env.AGENT_SMITH_SCENARIO_INITIAL_TIME);
 let now = Number.isFinite(initialTime) ? initialTime : Date.now();
 let server: ServerHandle | undefined;
 const originalFetch = globalThis.fetch;
-const oauthUpstream = process.env.CCFLARE_SCENARIO_CLAUDE_OAUTH_URL;
+const oauthUpstream = process.env.AGENT_SMITH_SCENARIO_CLAUDE_OAUTH_URL;
 const oauthUrls = new Set([
 	"https://platform.claude.com/v1/oauth/token",
 	"https://api.anthropic.com/api/oauth/profile",
 ]);
-const alertsUpstream = process.env.CCFLARE_SCENARIO_ALERTS_URL;
+const alertsUpstream = process.env.AGENT_SMITH_SCENARIO_ALERTS_URL;
 const alertHosts = new Set(["hooks.slack.com", "slack.com", "api.resend.com"]);
 
 function fixtureUpstream(url: URL): string | undefined {
@@ -100,9 +100,9 @@ process.on("disconnect", () => {
 
 try {
 	server = startServer({
-		port: 0,
+		port: Number(process.env.AGENT_SMITH_POOL_PORT ?? 0),
 		withDashboard: false,
-		additionalUnixSocket: process.env.CCFLARE_SCENARIO_UNIX_SOCKET,
+		additionalUnixSocket: process.env.AGENT_SMITH_SCENARIO_UNIX_SOCKET,
 	});
 	send({ pid: process.pid, port: server.port, type: "ready" });
 } catch (error) {

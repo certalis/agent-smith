@@ -1,4 +1,8 @@
-import type { Account, AccountQuotaState, ProviderWire } from "@ccflare/types";
+import type {
+	Account,
+	AccountQuotaState,
+	ProviderWire,
+} from "@agent-smith/types";
 
 export interface TokenRefreshResult {
 	accessToken: string;

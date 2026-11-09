@@ -1,4 +1,4 @@
-import { processTokenUsage } from "@ccflare/ui";
+import { processTokenUsage } from "@agent-smith/ui";
 import type { RequestSummary } from "../core";
 import { C } from "../theme.ts";
 

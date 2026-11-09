@@ -1,5 +1,5 @@
-import type { DatabaseOperations } from "@ccflare/database";
-import { analyzeDatabasePerformance } from "@ccflare/database";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { analyzeDatabasePerformance } from "@agent-smith/database";
 
 /**
  * Analyze query performance and index usage

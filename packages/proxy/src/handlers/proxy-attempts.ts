@@ -1,6 +1,6 @@
-import { ServiceUnavailableError } from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
-import type { Account } from "@ccflare/types";
+import { ServiceUnavailableError } from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
+import type { Account } from "@agent-smith/types";
 import { type AdmissionPermit, TeamAdmissionError } from "../team-admission";
 import { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
 import type { ProxyRequest } from "./proxy-request";
@@ -72,6 +72,7 @@ export async function attemptAccount(
 	account: Account,
 	failoverAttempts: number,
 ): Promise<ProxyAttempt> {
+	request.req.signal.throwIfAborted();
 	const admission = request.ctx.teamAdmission;
 	let permit: AdmissionPermit | undefined;
 	try {

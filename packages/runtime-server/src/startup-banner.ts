@@ -1,4 +1,4 @@
-import { DEFAULT_STRATEGY } from "@ccflare/core";
+import { DEFAULT_STRATEGY } from "@agent-smith/core";
 
 export function createStartupBanner(options: {
 	version: string;
@@ -12,7 +12,7 @@ export function createStartupBanner(options: {
 	const supportedProviders = providers.join(", ");
 
 	return `
-🎯 ccflare Server v${version}
+🎯 Agent Smith Server v${version}
 🌐 Port: ${port}
 📊 Dashboard: ${dashboardUrl}
 🔗 Management API: http://localhost:${port}/api

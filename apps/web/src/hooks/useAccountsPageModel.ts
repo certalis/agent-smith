@@ -1,5 +1,5 @@
-import type { AccountResponse } from "@ccflare/api";
-import type { ApiKeyProvider, OAuthProvider } from "@ccflare/types";
+import type { AccountResponse } from "@agent-smith/api";
+import type { ApiKeyProvider, OAuthProvider } from "@agent-smith/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api";

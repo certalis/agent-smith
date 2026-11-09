@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import type { TeamRoutingConfig } from "@ccflare/config";
-import type { Provider } from "@ccflare/providers";
-import type { Account } from "@ccflare/types";
+import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { Provider } from "@agent-smith/providers";
+import type { Account } from "@agent-smith/types";
 import { TeamRouter, type TeamRoutingRequest } from "./team-router";
 
 const config: TeamRoutingConfig = {

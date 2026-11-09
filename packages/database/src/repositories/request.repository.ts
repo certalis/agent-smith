@@ -1,4 +1,4 @@
-import { Logger } from "@ccflare/logger";
+import { Logger } from "@agent-smith/logger";
 import {
 	type AccountProvider,
 	extractRequestLinkageFromPayload,
@@ -7,7 +7,7 @@ import {
 	isRecord,
 	type RequestSummary,
 	toRequestSummary,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import {
 	type RequestRow,
 	type RequestWithAccountName,

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { requestEvents, ServiceUnavailableError } from "@ccflare/core";
-import { type Provider, ProviderRegistry } from "@ccflare/providers";
-import type { Account } from "@ccflare/types";
+import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
+import { type Provider, ProviderRegistry } from "@agent-smith/providers";
+import type { Account } from "@agent-smith/types";
 import { handleProxy, type ProxyContext } from "./proxy";
 
 const originalFetch = globalThis.fetch;

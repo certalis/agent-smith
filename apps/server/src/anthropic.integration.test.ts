@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseFactory } from "@ccflare/database";
+import { DatabaseFactory } from "@agent-smith/database";
 import startServer from "./server";
 
 const SERVER_URL = "http://localhost:8080";
@@ -292,19 +292,19 @@ afterEach(async () => {
 		tempDir = null;
 	}
 
-	delete process.env.ccflare_DB_PATH;
-	delete process.env.ccflare_CONFIG_PATH;
-	delete process.env.CF_ADMIN_KEY;
+	delete process.env.AGENT_SMITH_DB_PATH;
+	delete process.env.AGENT_SMITH_CONFIG_PATH;
+	delete process.env.AGENT_SMITH_ADMIN_KEY;
 });
 
 describe("Anthropic passthrough integration", () => {
 	it("proxies Anthropic traffic under /v1/anthropic and updates health/rate-limit state", async () => {
-		tempDir = mkdtempSync(join(tmpdir(), "ccflare-anthropic-"));
-		process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-		process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
-		process.env.CF_ADMIN_KEY = TEST_ADMIN_KEY;
+		tempDir = mkdtempSync(join(tmpdir(), "agent-smith-anthropic-"));
+		process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+		process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
+		process.env.AGENT_SMITH_ADMIN_KEY = TEST_ADMIN_KEY;
 		writeFileSync(
-			process.env.ccflare_CONFIG_PATH,
+			process.env.AGENT_SMITH_CONFIG_PATH,
 			JSON.stringify({
 				providers: {
 					"claude-code": { enabled: true },

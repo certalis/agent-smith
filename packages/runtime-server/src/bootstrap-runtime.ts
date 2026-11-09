@@ -1,19 +1,19 @@
-import { APIRouter } from "@ccflare/api";
-import { Config, type RuntimeConfig } from "@ccflare/config";
+import { APIRouter } from "@agent-smith/api";
+import { Config, type RuntimeConfig } from "@agent-smith/config";
 import {
 	container,
 	registerDisposable,
 	SERVICE_KEYS,
 	setPricingLogger,
 	TIME_CONSTANTS,
-} from "@ccflare/core";
-import type { DatabaseOperations } from "@ccflare/database";
-import { AsyncDbWriter, DatabaseFactory } from "@ccflare/database";
-import { Logger } from "@ccflare/logger";
+} from "@agent-smith/core";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { AsyncDbWriter, DatabaseFactory } from "@agent-smith/database";
+import { Logger } from "@agent-smith/logger";
 import {
 	createConfiguredProviderRegistry,
 	type ProviderRegistry,
-} from "@ccflare/providers";
+} from "@agent-smith/providers";
 import {
 	getPoolStatus,
 	getUsageWorker,
@@ -27,7 +27,7 @@ import {
 	SessionStrategy,
 	TeamAdmission,
 	TeamRouter,
-} from "@ccflare/proxy";
+} from "@agent-smith/proxy";
 import { createExposureConfig, type ExposureConfig } from "./exposure";
 
 export type BootstrappedRuntime = {
@@ -126,7 +126,7 @@ export function bootstrapRuntime(
 	setPricingLogger(pricingLogger);
 
 	const apiRouter = new APIRouter({
-		enrollmentOrigin: process.env.CF_ENROLLMENT_ORIGIN,
+		enrollmentOrigin: process.env.AGENT_SMITH_ENROLLMENT_ORIGIN,
 		config,
 		dbOps,
 		providerRegistry,

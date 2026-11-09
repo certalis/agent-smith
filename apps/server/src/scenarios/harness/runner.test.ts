@@ -6,7 +6,7 @@ import { defineScenario } from "./scenario";
 
 function scenarioWorkspaces(): string[] {
 	return readdirSync(tmpdir())
-		.filter((entry) => entry.startsWith("ccflare-scenario-server-"))
+		.filter((entry) => entry.startsWith("agent-smith-scenario-server-"))
 		.sort();
 }
 

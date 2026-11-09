@@ -1,4 +1,4 @@
-import type { TeamRoutingConfig } from "@ccflare/config";
+import type { TeamRoutingConfig } from "@agent-smith/config";
 
 const RAMP_INTERVAL_MS = 250;
 const RAMP_WINDOW_MS = 30_000;

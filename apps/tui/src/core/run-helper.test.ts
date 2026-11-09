@@ -13,12 +13,12 @@ describe("Claude run helper", () => {
 		expect(
 			claudeRunEnvironment(8123, "proxy-key", {
 				ANTHROPIC_API_KEY: "client-key",
-				CF_ADMIN_KEY: "admin-key",
-				CF_PROXY_KEY: "parent-proxy-key",
+				ANTHROPIC_AUTH_TOKEN: "inherited-bearer-token",
+				AGENT_SMITH_ADMIN_KEY: "admin-key",
+				AGENT_SMITH_PROXY_KEY: "parent-proxy-key",
 			}),
 		).toEqual({
 			ANTHROPIC_API_KEY: "proxy-key",
-			ANTHROPIC_AUTH_TOKEN: "proxy-key",
 			ANTHROPIC_BASE_URL: "http://127.0.0.1:8123/v1/claude-code",
 		});
 	});
@@ -30,7 +30,7 @@ describe("Claude run helper", () => {
 	});
 
 	it("requires a credential before launching Claude Code", () => {
-		expect(() => requireProxyKey("")).toThrow("requires CF_PROXY_KEY");
+		expect(() => requireProxyKey("")).toThrow("requires AGENT_SMITH_PROXY_KEY");
 		expect(requireProxyKey("proxy-key")).toBe("proxy-key");
 	});
 });

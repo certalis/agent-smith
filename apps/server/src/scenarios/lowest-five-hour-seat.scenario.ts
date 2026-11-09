@@ -1,4 +1,4 @@
-import type { QuotaWindow } from "@ccflare/types";
+import type { QuotaWindow } from "@agent-smith/types";
 import { defineScenario } from "./harness/scenario";
 
 const now = 1_700_000_000_000;

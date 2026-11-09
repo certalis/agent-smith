@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import type { LogEvent } from "@ccflare/types";
+import type { LogEvent } from "@agent-smith/types";
 import { logFileWriter } from "./file-writer";
 
 export enum LogLevel {
@@ -30,15 +30,15 @@ export class Logger {
 	) {
 		this.prefix = prefix;
 		this.level = this.getLogLevelFromEnv() || level;
-		this.format = (process.env.LOG_FORMAT as LogFormat) || "pretty";
-		// Only show console output in debug mode or if ccflare_DEBUG is set
+		this.format = (process.env.AGENT_SMITH_LOG_FORMAT as LogFormat) || "pretty";
+		// Only show console output in debug mode or if AGENT_SMITH_DEBUG is set
 		this.silentConsole =
 			options.silentConsole ??
-			!(process.env.ccflare_DEBUG === "1" || this.level === LogLevel.DEBUG);
+			!(process.env.AGENT_SMITH_DEBUG === "1" || this.level === LogLevel.DEBUG);
 	}
 
 	private getLogLevelFromEnv(): LogLevel | null {
-		const envLevel = process.env.LOG_LEVEL?.toUpperCase();
+		const envLevel = process.env.AGENT_SMITH_LOG_LEVEL?.toUpperCase();
 		if (envLevel && envLevel in LogLevel) {
 			return LogLevel[envLevel as keyof typeof LogLevel];
 		}
@@ -129,7 +129,7 @@ export class Logger {
 		this.level = level;
 		// Update silentConsole when level changes
 		this.silentConsole = !(
-			process.env.ccflare_DEBUG === "1" || this.level === LogLevel.DEBUG
+			process.env.AGENT_SMITH_DEBUG === "1" || this.level === LogLevel.DEBUG
 		);
 	}
 

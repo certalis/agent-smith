@@ -2,7 +2,7 @@ import {
 	type AuthMethod,
 	isProviderWire,
 	type ProviderWire,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import type { OAuthProvider, Provider } from "./types";
 
 type ProviderWithOAuth = Provider & {

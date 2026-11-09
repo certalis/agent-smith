@@ -3,9 +3,9 @@ import { defineScenario } from "./harness/scenario";
 export default defineScenario({
 	name: "private enrollment is absent without its origin opt-in",
 	environment: {
-		CF_ADMIN_KEY: "scenario-admin-key",
-		CF_PROXY_KEY: "scenario-proxy-key",
-		CF_TRUST_LOOPBACK: "false",
+		AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
+		AGENT_SMITH_PROXY_KEY: "scenario-proxy-key",
+		AGENT_SMITH_TRUST_LOOPBACK: "false",
 	},
 	fleet: [],
 	upstream: [],

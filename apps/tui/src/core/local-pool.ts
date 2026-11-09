@@ -1,5 +1,8 @@
-import type { TeamRoutingConfig, TeamRoutingFileConfig } from "@ccflare/config";
-import type { Account, AccountQuotaState } from "@ccflare/types";
+import type {
+	TeamRoutingConfig,
+	TeamRoutingFileConfig,
+} from "@agent-smith/config";
+import type { Account, AccountQuotaState } from "@agent-smith/types";
 
 export type LocalPoolState = "pooled" | "protected" | "unavailable";
 

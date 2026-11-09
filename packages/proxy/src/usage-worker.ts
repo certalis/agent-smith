@@ -1,7 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { TIME_CONSTANTS } from "@ccflare/core";
-import { isRecord } from "@ccflare/types";
+import { TIME_CONSTANTS } from "@agent-smith/core";
+import { isRecord } from "@agent-smith/types";
 import type {
 	AckMessage,
 	ControlMessage,
@@ -57,11 +57,11 @@ interface PendingAck {
 }
 
 const DEFAULT_READY_TIMEOUT_MS = Number(
-	process.env.CF_USAGE_WORKER_READY_TIMEOUT_MS ||
+	process.env.AGENT_SMITH_USAGE_WORKER_READY_TIMEOUT_MS ||
 		TIME_CONSTANTS.RETRY_DELAY_DEFAULT * 5,
 );
 const DEFAULT_ACK_TIMEOUT_MS = Number(
-	process.env.CF_USAGE_WORKER_ACK_TIMEOUT_MS ||
+	process.env.AGENT_SMITH_USAGE_WORKER_ACK_TIMEOUT_MS ||
 		TIME_CONSTANTS.RETRY_DELAY_DEFAULT * 5,
 );
 const DEFAULT_SHUTDOWN_DELAY_MS = 100;
@@ -78,7 +78,7 @@ function createDefaultLogger(): UsageWorkerLogger {
 }
 
 export function resolveUsageWorkerEntrypoint(): string {
-	const configuredPath = process.env.CF_USAGE_WORKER_PATH?.trim();
+	const configuredPath = process.env.AGENT_SMITH_USAGE_WORKER_PATH?.trim();
 	if (!configuredPath) {
 		return new URL("./post-processor.worker.ts", import.meta.url).href;
 	}

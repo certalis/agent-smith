@@ -1,4 +1,4 @@
-import type { AccountProvider } from "@ccflare/types";
+import type { AccountProvider } from "@agent-smith/types";
 import { Filter } from "lucide-react";
 import { ProviderBadge } from "../ProviderBadge";
 import { Badge } from "../ui/badge";

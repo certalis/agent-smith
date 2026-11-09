@@ -5,9 +5,9 @@ import {
 	estimateCostUSD,
 	formatCost,
 	TIME_CONSTANTS,
-} from "@ccflare/core";
-import { AsyncDbWriter, DatabaseOperations } from "@ccflare/database";
-import { Logger } from "@ccflare/logger";
+} from "@agent-smith/core";
+import { AsyncDbWriter, DatabaseOperations } from "@agent-smith/database";
+import { Logger } from "@agent-smith/logger";
 import {
 	extractClientSessionIdFromHeaders,
 	extractRequestLinkageFromPayload,
@@ -15,7 +15,7 @@ import {
 	type RequestPayload,
 	type RequestSummary,
 	type TokenCurveSample,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { get_encoding } from "@dqbd/tiktoken";
 import {
 	normalizeOpenAIUsage,
@@ -89,25 +89,26 @@ const asyncWriter = new AsyncDbWriter();
 // Environment variables
 const MAX_BUFFER_SIZE =
 	Number(
-		process.env.CF_STREAM_USAGE_BUFFER_KB ||
+		process.env.AGENT_SMITH_STREAM_USAGE_BUFFER_KB ||
 			BUFFER_SIZES.STREAM_USAGE_BUFFER_KB,
 	) * 1024;
 const TIMEOUT_MS = Number(
-	process.env.CF_STREAM_TIMEOUT_MS || TIME_CONSTANTS.STREAM_TIMEOUT_DEFAULT,
+	process.env.AGENT_SMITH_STREAM_TIMEOUT_MS ||
+		TIME_CONSTANTS.STREAM_TIMEOUT_DEFAULT,
 );
 // Hard cap on payload retention bytes per request (default: 2MB)
 const MAX_PAYLOAD_BYTES =
-	Number(process.env.CF_MAX_PAYLOAD_BYTES || 0) || 2 * 1024 * 1024;
+	Number(process.env.AGENT_SMITH_MAX_PAYLOAD_BYTES || 0) || 2 * 1024 * 1024;
 // Hard cap on concurrent tracked requests in the worker
 const MAX_TRACKED_REQUESTS =
-	Number(process.env.CF_MAX_TRACKED_REQUESTS || 0) || 100;
+	Number(process.env.AGENT_SMITH_MAX_TRACKED_REQUESTS || 0) || 100;
 const TOKEN_CURVE_SAMPLE_EVERY = Math.max(
 	1,
-	Number(process.env.CF_TOKEN_CURVE_SAMPLE_EVERY || 10) || 10,
+	Number(process.env.AGENT_SMITH_TOKEN_CURVE_SAMPLE_EVERY || 10) || 10,
 );
 const TOKEN_CURVE_MAX_SAMPLES = Math.max(
 	1,
-	Number(process.env.CF_TOKEN_CURVE_MAX_SAMPLES || 200) || 200,
+	Number(process.env.AGENT_SMITH_TOKEN_CURVE_MAX_SAMPLES || 200) || 200,
 );
 const RESPONSES_TERMINAL_EVENTS = new Set([
 	"response.completed",

@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { Logger } from "@ccflare/logger";
-import { extractRequestLinkageFromPayload } from "@ccflare/types";
+import { Logger } from "@agent-smith/logger";
+import { extractRequestLinkageFromPayload } from "@agent-smith/types";
 import { addPerformanceIndexes } from "./performance-indexes";
 
 const log = new Logger("DatabaseMigrations");

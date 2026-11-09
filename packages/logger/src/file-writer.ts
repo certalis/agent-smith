@@ -12,8 +12,8 @@ import {
 	type Disposable,
 	LIMITS,
 	registerDisposable,
-} from "@ccflare/core";
-import type { LogEvent } from "@ccflare/types";
+} from "@agent-smith/core";
+import type { LogEvent } from "@agent-smith/types";
 
 function writeToStderr(message: string, error: unknown): void {
 	if (typeof process === "undefined") {
@@ -33,7 +33,7 @@ export class LogFileWriter implements Disposable {
 
 	constructor() {
 		// Create log directory in tmp folder
-		this.logDir = join(tmpdir(), "ccflare-logs");
+		this.logDir = join(tmpdir(), "agent-smith-logs");
 		if (!existsSync(this.logDir)) {
 			mkdirSync(this.logDir, { recursive: true });
 		}

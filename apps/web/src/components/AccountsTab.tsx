@@ -1,4 +1,4 @@
-import type { AccountResponse } from "@ccflare/api";
+import type { AccountResponse } from "@agent-smith/api";
 import { AlertCircle, Plus } from "lucide-react";
 import { useState } from "react";
 import { useAccountsPageModel } from "../hooks/useAccountsPageModel";

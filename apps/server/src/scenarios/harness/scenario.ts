@@ -2,7 +2,7 @@ import type {
 	AccountProvider,
 	AccountQuotaState,
 	AccountSwitchThreshold,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export type Duration = `${number}${"ms" | "s" | "m" | "h"}`;
 
@@ -28,7 +28,7 @@ export type FleetAccount = {
 export type RequestStep = {
 	type: "request";
 	/** Defaults to TCP; Unix requests require the scenario's private socket. */
-	transport?: "tcp" | "unix";
+	transport?: "tcp" | "unix" | "edge";
 	id?: string;
 	method?: "GET" | "POST" | "PATCH" | "DELETE";
 	path?: string;
@@ -40,6 +40,10 @@ export type RequestStep = {
 	waitForCompletion?: boolean;
 	/** Wait until this many total requests have reached the fake upstream. */
 	waitForUpstream?: number;
+	/** Send only headers; the response must arrive before any declared body bytes. */
+	upload?: "headers-only";
+	/** Capture only an actual refused connection, for shutdown assertions. */
+	allowConnectionRefused?: boolean;
 	/** Capture string fields from the first successful response for later {{name}} references. */
 	capture?: Record<
 		string,
@@ -80,6 +84,8 @@ export type AssertStep = {
 
 export type ScenarioStep =
 	| { type: "restart" }
+	| { type: "stop" }
+	| { type: "terminate-pool" }
 	| { type: "block-config-write" }
 	| { type: "restore-config-write" }
 	| RequestStep
@@ -88,7 +94,10 @@ export type ScenarioStep =
 	| AwaitRequestsStep
 	| ReleaseHoldStep
 	| FlushStep
-	| WaitForUpstreamStep;
+	| WaitForUpstreamStep
+	| { type: "wait-for-client-chunk"; id: string }
+	| { type: "cancel"; id: string }
+	| { type: "wait-for-upstream-close"; count: number };
 
 export type SseChunk = {
 	body: string;
@@ -104,6 +113,10 @@ export type UpstreamRule = {
 	headers?: Record<string, string | RelativeTime>;
 	json?: unknown;
 	sse?: SseChunk[];
+	/** Leave a Node response unfinished until its client disconnects. */
+	keepOpen?: "before-headers" | "after-chunks";
+	/** Respond without waiting for any uploaded request body. */
+	respondAtHeaders?: boolean;
 	hold?: {
 		received: number;
 		within?: Duration;
@@ -117,6 +130,9 @@ export type UpstreamAssertion = {
 	/** Grade only the requests recorded at this path, such as one alert channel. */
 	onPath?: string;
 	count?: number;
+	connections?: number;
+	closed?: number;
+	responsesEnded?: number;
 	atMostPerHeader?: { name: string; count: number };
 	eachHeaderIncludesAccount?: { name: string; account: string; count?: number };
 	atLeastAccount?: { name: string; count: number };
@@ -143,6 +159,11 @@ export type ClientAssertion = {
 	bodyExcludes?: string[];
 	jsonPath?: { path: string; value: unknown };
 	chunks?: string[];
+	uploadCompleted?: boolean;
+	uploadedBytes?: number;
+	uploadBufferedBytes?: number;
+	connectionRefused?: boolean;
+	cancelled?: boolean;
 	header?: { name: string; value: string };
 	headerAbsent?: string;
 };
@@ -176,6 +197,14 @@ export type Scenario = {
 	name: string;
 	/** Start an extra Unix listener inside this scenario's temporary workspace. */
 	privateSocket?: boolean;
+	/** Run the real Node standalone supervisor and its Bun pool. */
+	standalone?: boolean;
+	/** Exercise the real Node edge against the Bun pool or a fake private listener. */
+	edge?: {
+		privateTarget?: "pool" | "upstream" | "missing";
+		maxConcurrentRequests?: number;
+	};
+	upstreamRuntime?: "bun" | "node";
 	config?: Record<string, unknown>;
 	environment?: Record<string, string>;
 	/** Remap only Claude OAuth token/profile fetches to this scenario's fake HTTP upstream. */

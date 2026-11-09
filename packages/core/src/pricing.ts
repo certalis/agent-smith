@@ -56,7 +56,7 @@ class PriceCatalogue {
 	}
 
 	private getCacheDir(): string {
-		return join(tmpdir(), "ccflare");
+		return join(tmpdir(), "agent-smith");
 	}
 
 	private getCachePath(): string {
@@ -64,7 +64,7 @@ class PriceCatalogue {
 	}
 
 	private getCacheDurationMs(): number {
-		const hours = Number(process.env.CF_PRICING_REFRESH_HOURS) || 24;
+		const hours = Number(process.env.AGENT_SMITH_PRICING_REFRESH_HOURS) || 24;
 		return hours * TIME_CONSTANTS.HOUR;
 	}
 

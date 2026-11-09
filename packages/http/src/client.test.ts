@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { HttpError } from "@ccflare/http";
+import { HttpError } from "@agent-smith/http";
 import { HttpClient } from "./client";
 
 class TestHttpClient extends HttpClient {

@@ -14,10 +14,10 @@ afterEach(() => {
 
 describe("DatabaseOperations", () => {
 	it("enables foreign key enforcement during initialization", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-db-ops-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);
 
-		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
 
 		try {
 			const pragma = dbOps.getDatabase().query("PRAGMA foreign_keys").get() as {
@@ -31,10 +31,10 @@ describe("DatabaseOperations", () => {
 	});
 
 	it("lists request summaries with account names and preserves zero-valued usage", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-db-ops-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);
 
-		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
 
 		try {
 			const account = dbOps.createAccount({
@@ -94,10 +94,10 @@ describe("DatabaseOperations", () => {
 	});
 
 	it("aggregates analytics through the repository facade", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-db-ops-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);
 
-		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
 
 		try {
 			const db = dbOps.getDatabase();
@@ -257,10 +257,10 @@ describe("DatabaseOperations", () => {
 	});
 
 	it("resets statistics consistently through the shared facade helper", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-db-ops-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);
 
-		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
 
 		try {
 			const account = dbOps.createAccount({

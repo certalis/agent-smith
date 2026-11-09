@@ -1,6 +1,6 @@
-# ccflare CLI Documentation
+# agent-smith CLI Documentation
 
-The ccflare CLI provides a command-line interface for managing OAuth accounts, monitoring usage statistics, and controlling the load balancer.
+The agent-smith CLI provides a command-line interface for managing OAuth accounts, monitoring usage statistics, and controlling the load balancer.
 
 ## Table of Contents
 
@@ -27,8 +27,8 @@ The ccflare CLI provides a command-line interface for managing OAuth accounts, m
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/snipe-code/ccflare.git
-cd ccflare
+git clone https://github.com/snipe-code/agent-smith.git
+cd agent-smith
 ```
 
 2. Install dependencies:
@@ -43,19 +43,19 @@ bun run build
 
 4. Run the CLI:
 ```bash
-ccflare [options]
+agent-smith [options]
 ```
 
 ### First-time Setup
 
 1. Add your first OAuth account:
 ```bash
-ccflare --add-account myaccount
+agent-smith --add-account myaccount
 ```
 
 2. Start the load balancer server:
 ```bash
-ccflare --serve
+agent-smith --serve
 ```
 
 ## Global Options and Help
@@ -65,21 +65,21 @@ ccflare --serve
 Display all available commands and options:
 
 ```bash
-ccflare --help
+agent-smith --help
 ```
 
 Or use the short form:
 
 ```bash
-ccflare -h
+agent-smith -h
 ```
 
 ### Help Output Format
 
 ```
-🎯 ccflare - Multi-provider Load Balancer
+🎯 agent-smith - Multi-provider Load Balancer
 
-Usage: ccflare [options]
+Usage: agent-smith [options]
 
 Options:
   --serve              Start API server with dashboard
@@ -98,7 +98,7 @@ Options:
   --help, -h           Show this help message
 
 Interactive Mode:
-  ccflare          Launch interactive TUI (default)
+  agent-smith          Launch interactive TUI (default)
 ```
 
 ## Command Reference
@@ -111,7 +111,7 @@ Add a new account to the load balancer pool.
 
 **Syntax:**
 ```bash
-ccflare --add-account <name> --provider <anthropic|openai|claude-code|codex>
+agent-smith --add-account <name> --provider <anthropic|openai|claude-code|codex>
 ```
 
 **Options:**
@@ -130,7 +130,7 @@ Display all configured accounts with their current status.
 
 **Syntax:**
 ```bash
-ccflare --list
+agent-smith --list
 ```
 
 **Output Format:**
@@ -147,13 +147,13 @@ Remove an account from the configuration.
 
 **Syntax:**
 ```bash
-ccflare --remove <name>
+agent-smith --remove <name>
 ```
 
 **Behavior:**
 - Removes account from database immediately
 - Cleans up associated session data
-- For confirmation prompts, use the older `ccflare-cli remove <name>` command
+- For confirmation prompts, use the older `agent-smith-cli remove <name>` command
 
 #### `--pause <name>`
 
@@ -161,7 +161,7 @@ Temporarily exclude an account from the load balancer rotation.
 
 **Syntax:**
 ```bash
-ccflare --pause <name>
+agent-smith --pause <name>
 ```
 
 **Use Cases:**
@@ -175,7 +175,7 @@ Re-enable a paused account for load balancing.
 
 **Syntax:**
 ```bash
-ccflare --resume <name>
+agent-smith --resume <name>
 ```
 
 ### Statistics and History
@@ -186,7 +186,7 @@ Display current statistics in JSON format.
 
 **Syntax:**
 ```bash
-ccflare --stats
+agent-smith --stats
 ```
 
 **Output:**
@@ -198,7 +198,7 @@ Reset request counters for all accounts.
 
 **Syntax:**
 ```bash
-ccflare --reset-stats
+agent-smith --reset-stats
 ```
 
 **Effects:**
@@ -212,7 +212,7 @@ Remove all request history records.
 
 **Syntax:**
 ```bash
-ccflare --clear-history
+agent-smith --clear-history
 ```
 
 **Effects:**
@@ -228,7 +228,7 @@ Analyze database performance and index usage.
 
 **Syntax:**
 ```bash
-ccflare --analyze
+agent-smith --analyze
 ```
 
 **Output:**
@@ -241,7 +241,7 @@ ccflare --analyze
 Launch the interactive terminal interface (default mode):
 
 ```bash
-ccflare
+agent-smith
 ```
 
 **Features:**
@@ -258,7 +258,7 @@ Start the API server with dashboard.
 
 **Syntax:**
 ```bash
-ccflare --serve [--port <number>]
+agent-smith --serve [--port <number>]
 ```
 
 **Options:**
@@ -274,10 +274,10 @@ Launch Claude Code with its Anthropic base URL pointed at a dedicated local
 pool owned by the helper:
 
 ```bash
-ccflare run -- -p "hello"
+agent-smith run -- -p "hello"
 ```
 
-Set `CF_PROXY_KEY` before running the helper. It starts the local proxy itself,
+Set `AGENT_SMITH_PROXY_KEY` before running the helper. It starts the local proxy itself,
 then stops it as soon as Claude exits; it does not attach Claude to an
 already-running process. Use `--port <number>` before `--` for a non-default
 local port.
@@ -288,7 +288,7 @@ Stream request logs in real-time.
 
 **Syntax:**
 ```bash
-ccflare --logs [N]
+agent-smith --logs [N]
 ```
 
 **Options:**
@@ -297,10 +297,10 @@ ccflare --logs [N]
 **Examples:**
 ```bash
 # Stream live logs only
-ccflare --logs
+agent-smith --logs
 
 # Show last 50 lines then stream
-ccflare --logs 50
+agent-smith --logs 50
 ```
 
 ## Usage Examples
@@ -309,65 +309,65 @@ ccflare --logs 50
 
 ```bash
 # Add an Anthropic API key account
-ccflare --add-account work-account --provider anthropic
+agent-smith --add-account work-account --provider anthropic
 
 # Start a Claude Code OAuth flow
-ccflare --add-account personal-account --provider claude-code
+agent-smith --add-account personal-account --provider claude-code
 
 # List all accounts
-ccflare --list
+agent-smith --list
 
 # View statistics
-ccflare --stats
+agent-smith --stats
 ```
 
 ### Server Operations
 
 ```bash
 # Start server on default port
-ccflare --serve
+agent-smith --serve
 
 # Start server on custom port
-ccflare --serve --port 3000
+agent-smith --serve --port 3000
 
 # Stream logs
-ccflare --logs
+agent-smith --logs
 
 # View last 100 lines then stream
-ccflare --logs 100
+agent-smith --logs 100
 ```
 
 ### Managing Rate Limits
 
 ```bash
 # Pause account hitting rate limits
-ccflare --pause work-account
+agent-smith --pause work-account
 
 # Resume after cooldown
-ccflare --resume work-account
+agent-smith --resume work-account
 
 # Reset statistics for fresh start
-ccflare --reset-stats
+agent-smith --reset-stats
 ```
 
 ### Maintenance Operations
 
 ```bash
 # Remove account
-ccflare --remove old-account
+agent-smith --remove old-account
 
 # Clear old request logs
-ccflare --clear-history
+agent-smith --clear-history
 
 # Analyze database performance
-ccflare --analyze
+agent-smith --analyze
 ```
 
 ### Interactive Mode
 
 ```bash
 # Launch interactive TUI (default)
-ccflare
+agent-smith
 
 # TUI launches with auto-started server
 # Navigate with arrow keys, tab between sections
@@ -378,43 +378,43 @@ ccflare
 ```bash
 # Add multiple accounts via script
 for i in {1..3}; do
-  ccflare --add-account "account-$i" --provider anthropic
+  agent-smith --add-account "account-$i" --provider anthropic
 done
 
 # Monitor account status
-watch -n 5 'ccflare --list'
+watch -n 5 'agent-smith --list'
 
 # Automated cleanup
-ccflare --clear-history && ccflare --reset-stats
+agent-smith --clear-history && agent-smith --reset-stats
 
 # Export statistics for monitoring
-ccflare --stats > stats.json
+agent-smith --stats > stats.json
 ```
 
 ## Configuration
 
 ### Configuration File Location
 
-ccflare stores its configuration in platform-specific directories:
+agent-smith stores its configuration in platform-specific directories:
 
 #### macOS/Linux
 ```
-~/.config/ccflare/ccflare.json
+~/.config/agent-smith/agent-smith.json
 ```
 
 Or if `XDG_CONFIG_HOME` is set:
 ```
-$XDG_CONFIG_HOME/ccflare/ccflare.json
+$XDG_CONFIG_HOME/agent-smith/agent-smith.json
 ```
 
 #### Windows
 ```
-%LOCALAPPDATA%\ccflare\ccflare.json
+%LOCALAPPDATA%\agent-smith\agent-smith.json
 ```
 
 Or fallback to:
 ```
-%APPDATA%\ccflare\ccflare.json
+%APPDATA%\agent-smith\agent-smith.json
 ```
 
 ### Configuration Structure
@@ -434,8 +434,8 @@ Or fallback to:
 ### Database Location
 
 The SQLite database follows the same directory structure:
-- **macOS/Linux**: `~/.config/ccflare/ccflare.db`
-- **Windows**: `%LOCALAPPDATA%\ccflare\ccflare.db`
+- **macOS/Linux**: `~/.config/agent-smith/agent-smith.db`
+- **Windows**: `%LOCALAPPDATA%\agent-smith\agent-smith.db`
 
 ## Environment Variables
 
@@ -443,44 +443,44 @@ The SQLite database follows the same directory structure:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ccflare_CONFIG_PATH` | Override config file location | Platform default |
-| `ccflare_DB_PATH` | Override database location | Platform default |
+| `AGENT_SMITH_CONFIG_PATH` | Override config file location | Platform default |
+| `AGENT_SMITH_DB_PATH` | Override database location | Platform default |
 | `PORT` | Server port | 8080 |
-| `CLIENT_ID` | OAuth client ID | 9d1c250a-e61b-44d9-88ed-5944d1962f5e |
+| `AGENT_SMITH_CLIENT_ID` | OAuth client ID | 9d1c250a-e61b-44d9-88ed-5944d1962f5e |
 
 ### Load Balancing
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LB_STRATEGY` | Legacy compatibility setting; unused by quota- and priority-ordered routing | session |
+| `AGENT_SMITH_LB_STRATEGY` | Legacy compatibility setting; unused by quota- and priority-ordered routing | session |
 
 ### Retry Configuration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `RETRY_ATTEMPTS` | Number of retry attempts | 3 |
-| `RETRY_DELAY_MS` | Initial retry delay (ms) | 1000 |
-| `RETRY_BACKOFF` | Exponential backoff multiplier | 2 |
+| `AGENT_SMITH_RETRY_ATTEMPTS` | Number of retry attempts | 3 |
+| `AGENT_SMITH_RETRY_DELAY_MS` | Initial retry delay (ms) | 1000 |
+| `AGENT_SMITH_RETRY_BACKOFF` | Exponential backoff multiplier | 2 |
 
 ### Session Management
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SESSION_DURATION_MS` | Legacy session-strategy duration; unused by the quota-aware proxy kernel | 18000000 (5 hours) |
+| `AGENT_SMITH_SESSION_DURATION_MS` | Legacy session-strategy duration; unused by the quota-aware proxy kernel | 18000000 (5 hours) |
 
 ### Logging and Debugging
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LOG_LEVEL` | Log verbosity (DEBUG/INFO/WARN/ERROR) | INFO |
-| `LOG_FORMAT` | Output format (pretty/json) | pretty |
-| `ccflare_DEBUG` | Enable debug mode (1/0) - enables console output | 0 |
+| `AGENT_SMITH_LOG_LEVEL` | Log verbosity (DEBUG/INFO/WARN/ERROR) | INFO |
+| `AGENT_SMITH_LOG_FORMAT` | Output format (pretty/json) | pretty |
+| `AGENT_SMITH_DEBUG` | Enable debug mode (1/0) - enables console output | 0 |
 
 ### Pricing and Features
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CF_PRICING_REFRESH_HOURS` | Pricing cache duration | 24 |
+| `AGENT_SMITH_PRICING_REFRESH_HOURS` | Pricing cache duration | 24 |
 
 ## Troubleshooting
 
@@ -511,7 +511,7 @@ The SQLite database follows the same directory structure:
 
 **Solutions**:
 1. Add more accounts to the pool
-2. Inspect quota windows, account priority, and cooldown state with `ccflare status`
+2. Inspect quota windows, account priority, and cooldown state with `agent-smith status`
 3. Reduce client concurrency or add request throttling
 4. Monitor usage with `bun cli list`
 
@@ -520,12 +520,12 @@ The SQLite database follows the same directory structure:
 **Problem**: "Database is locked" or corruption errors
 
 **Solutions**:
-1. Stop all ccflare processes
+1. Stop all agent-smith processes
 2. Check file permissions on database
 3. Backup and recreate if corrupted:
    ```bash
-   cp ~/.config/ccflare/ccflare.db ~/.config/ccflare/ccflare.db.backup
-   rm ~/.config/ccflare/ccflare.db
+   cp ~/.config/agent-smith/agent-smith.db ~/.config/agent-smith/agent-smith.db.backup
+   rm ~/.config/agent-smith/agent-smith.db
    ```
 
 ### Debug Mode
@@ -534,14 +534,14 @@ Enable detailed logging for troubleshooting:
 
 ```bash
 # Enable debug logging
-export ccflare_DEBUG=1
-export LOG_LEVEL=DEBUG
+export AGENT_SMITH_DEBUG=1
+export AGENT_SMITH_LOG_LEVEL=DEBUG
 
 # Run with verbose output
-ccflare --list
+agent-smith --list
 
 # Stream debug logs
-ccflare --logs
+agent-smith --logs
 ```
 
 ### Getting Support
@@ -556,8 +556,8 @@ ccflare --logs
 1. **Regular Maintenance**
    - Clear history periodically to manage database size
    - Reset stats monthly for accurate metrics
-   - Monitor account health with regular `ccflare --list` commands
-   - Use `ccflare --analyze` to optimize database performance
+   - Monitor account health with regular `agent-smith --list` commands
+   - Use `agent-smith --analyze` to optimize database performance
 
 2. **Account Management**
    - Use descriptive account names
@@ -569,10 +569,10 @@ ccflare --logs
    - Protect configuration directory permissions
    - Don't share OAuth tokens or session data
    - Rotate accounts periodically
-   - Monitor logs with `ccflare --logs` for suspicious activity
+   - Monitor logs with `agent-smith --logs` for suspicious activity
 
 4. **Performance**
    - Use multiple accounts to spread traffic and absorb rate limits
    - Implement client-side retry logic
-   - Monitor rate limit patterns with `ccflare --stats`
-   - Run server with `ccflare --serve` for production use
+   - Monitor rate limit patterns with `agent-smith --stats`
+   - Run server with `agent-smith --serve` for production use

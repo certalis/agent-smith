@@ -1,12 +1,12 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
-import { jsonResponse } from "@ccflare/http";
-import type { ProviderRegistry } from "@ccflare/providers";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { jsonResponse } from "@agent-smith/http";
+import type { ProviderRegistry } from "@agent-smith/providers";
 import {
 	type Account,
 	isCurrentQuotaWindow,
 	quotaThresholdFor,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { serializeAccount } from "../serializers/account";
 
 function blockedReason(

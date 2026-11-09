@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Account } from "@ccflare/types";
+import type { Account } from "@agent-smith/types";
 import {
 	getThreadBoundAccountId,
 	MAX_MESSAGE_THREAD_BINDINGS,

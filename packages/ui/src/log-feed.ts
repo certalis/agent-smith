@@ -11,7 +11,7 @@
  * Consumers provide a transport adapter and subscribe to state updates.
  */
 
-import type { LogEvent } from "@ccflare/types";
+import type { LogEvent } from "@agent-smith/types";
 
 export interface LogFeedState {
 	/** Current visible log entries */

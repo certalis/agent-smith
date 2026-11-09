@@ -1,5 +1,5 @@
-import { isTimeRange, type TimeRange } from "@ccflare/types";
-import { TIME_RANGE_OPTIONS } from "@ccflare/ui";
+import { isTimeRange, type TimeRange } from "@agent-smith/types";
+import { TIME_RANGE_OPTIONS } from "@agent-smith/ui";
 import { Clock } from "lucide-react";
 import {
 	Select,

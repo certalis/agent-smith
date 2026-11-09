@@ -1,6 +1,6 @@
 {
 	"name": "@certalis/agent-smith",
-	"version": "0.1.9",
+	"version": "0.1.10",
 	"description": "PROOF OF CONCEPT for ideation only: an experimental local proxy and provider pool for Claude Code and Codex",
 	"license": "MIT",
 	"author": "Certalis",
@@ -37,15 +37,15 @@
 		"react": "^19.0.0"
 	},
 	"devDependencies": {
-		"@ccflare/config": "workspace:*",
-		"@ccflare/core": "workspace:*",
-		"@ccflare/database": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/oauth-flow": "workspace:*",
-		"@ccflare/providers": "workspace:*",
-		"@ccflare/runtime-server": "workspace:*",
-		"@ccflare/types": "workspace:*",
-		"@ccflare/ui": "workspace:*",
+		"@agent-smith/config": "workspace:*",
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/database": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/oauth-flow": "workspace:*",
+		"@agent-smith/providers": "workspace:*",
+		"@agent-smith/runtime-server": "workspace:*",
+		"@agent-smith/types": "workspace:*",
+		"@agent-smith/ui": "workspace:*",
 		"@types/react": "^19.0.0",
 		"@types/node": "^20.0.0"
 	},

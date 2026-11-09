@@ -1,4 +1,4 @@
-import type { TimeRange } from "@ccflare/types";
+import type { TimeRange } from "@agent-smith/types";
 import { Activity, BarChart3, TrendingUp, Zap } from "lucide-react";
 import { useState } from "react";
 import { ModelPerformanceComparison, ModelTokenSpeedChart } from "../charts";

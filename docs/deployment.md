@@ -1,7 +1,10 @@
-# ccflare Deployment Documentation
+# agent-smith Deployment Documentation
 
 For a managed HTTPS host such as Render, the [HTTPS edge guide](https-edge.md)
 connects devices to the existing pool without a VPN or a second server.
+For a standalone Render web service, use `bun run start:https`, health path
+`/readyz`, and the persistent-state settings in that guide. The ordinary
+`bun run start` remains a local/private server, not a restricted public entrance.
 
 For same-host administration, the programmatic server accepts an optional
 `additionalUnixSocket` absolute path. Put it in the pool user's private directory,
@@ -12,11 +15,11 @@ checks still apply. TCP and Unix listeners share one runtime and stop together.
 
 ## Overview
 
-ccflare is a load balancer proxy for Claude API accounts that can be deployed in various configurations, from simple local development to production-grade distributed systems. This document covers all deployment options, from single-instance setups to scalable architectures.
+agent-smith is a load balancer proxy for Claude API accounts that can be deployed in various configurations, from simple local development to production-grade distributed systems. This document covers all deployment options, from single-instance setups to scalable architectures.
 
-> **Recent Updates**: ccflare now includes a Terminal User Interface (TUI) for interactive monitoring and management, alongside the web dashboard. The async database writer improves performance for high-throughput scenarios.
+> **Recent Updates**: agent-smith now includes a Terminal User Interface (TUI) for interactive monitoring and management, alongside the web dashboard. The async database writer improves performance for high-throughput scenarios.
 > 
-> **Important**: ccflare uses an integrated binary that combines the TUI, CLI commands, and server functionality. The main executable `ccflare` provides all functionality through command-line flags.
+> **Important**: agent-smith uses an integrated binary that combines the TUI, CLI commands, and server functionality. The main executable `agent-smith` provides all functionality through command-line flags.
 
 ## Table of Contents
 
@@ -49,17 +52,17 @@ graph TB
     
     subgraph "Frontend Options"
         EMBEDDED[Embedded Dashboard<br/>Served by server]
-        CF_PAGES[Cloudflare Pages<br/>Static hosting]
+        AGENT_SMITH_PAGES[Cloudflare Pages<br/>Static hosting]
         NGINX_STATIC[Nginx Static<br/>Separate frontend]
     end
     
     DEV --> EMBEDDED
     BINARY --> EMBEDDED
-    BINARY --> CF_PAGES
+    BINARY --> AGENT_SMITH_PAGES
     DOCKER --> EMBEDDED
     PM2 --> EMBEDDED
     SYSTEMD --> EMBEDDED
-    K8S --> CF_PAGES
+    K8S --> AGENT_SMITH_PAGES
     K8S --> NGINX_STATIC
 ```
 
@@ -76,8 +79,8 @@ graph TB
 
 ```bash
 # Clone the repository
-git clone https://github.com/snipeship/ccflare.git
-cd ccflare
+git clone https://github.com/certalis/agent-smith.git
+cd agent-smith
 
 # Install dependencies
 bun install
@@ -85,8 +88,8 @@ bun install
 # Build the project (dashboard and TUI)
 bun run build
 
-# Start ccflare (TUI + Server combined)
-bun run ccflare
+# Start agent-smith (TUI + Server combined)
+bun run agent-smith
 
 # Or start components separately:
 # Terminal UI only
@@ -99,7 +102,7 @@ bun run server
 bun run dev:server
 
 # In another terminal, add Claude accounts
-bun run ccflare --add-account myaccount
+bun run agent-smith --add-account myaccount
 ```
 
 ### Development Configuration
@@ -108,11 +111,11 @@ bun run ccflare --add-account myaccount
 # Environment variables for development
 export PORT=8080
 # Account selection is quota-aware; configure seat priority through the management API.
-export LOG_LEVEL=DEBUG
-export LOG_FORMAT=pretty  # Options: pretty, json
+export AGENT_SMITH_LOG_LEVEL=DEBUG
+export AGENT_SMITH_LOG_FORMAT=pretty  # Options: pretty, json
 
 # Start with custom config
-bun run ccflare
+bun run agent-smith
 ```
 
 ## Production Deployment
@@ -162,41 +165,41 @@ provider is the operator's responsibility under that provider's terms.
 
 ### Bun Binary Compilation
 
-Compile ccflare into a single executable for easy deployment:
+Compile agent-smith into a single executable for easy deployment:
 
 ```bash
 # Build all components (dashboard and TUI)
 bun run build
 
-# Build the main ccflare binary (includes TUI, CLI, and server)
+# Build the main agent-smith binary (includes TUI, CLI, and server)
 cd apps/tui
-bun build src/main.ts --compile --outfile dist/ccflare --target=bun
+bun build src/main.ts --compile --outfile dist/agent-smith --target=bun
 
 # Build standalone server binary (optional, server-only deployment)
 cd ../server
-bun build src/server.ts --compile --outfile dist/ccflare-server
+bun build src/server.ts --compile --outfile dist/agent-smith-server
 
 # Copy binary to deployment location
-cp apps/tui/dist/ccflare /opt/ccflare/
+cp apps/tui/dist/agent-smith /opt/agent-smith/
 # Make it executable
-chmod +x /opt/ccflare/ccflare
+chmod +x /opt/agent-smith/agent-smith
 ```
 
 #### Binary Deployment Structure
 
 ```
-/opt/ccflare/
-├── ccflare             # Main binary (TUI + CLI + Server)
+/opt/agent-smith/
+├── agent-smith             # Main binary (TUI + CLI + Server)
 ├── config/
 │   └── config.json     # Configuration (optional)
 └── data/
-    ├── ccflare.db      # SQLite database
+    ├── agent-smith.db      # SQLite database
     └── logs/           # Log files (if configured)
 ```
 
 **Note**: The configuration and database are automatically created in platform-specific directories:
-- **Linux/macOS**: `~/.config/ccflare/`
-- **Windows**: `%LOCALAPPDATA%\ccflare\` or `%APPDATA%\ccflare\`
+- **Linux/macOS**: `~/.config/agent-smith/`
+- **Windows**: `%LOCALAPPDATA%\agent-smith\` or `%APPDATA%\agent-smith\`
 
 ### Process Management
 
@@ -210,23 +213,23 @@ npm install -g pm2
 cat > ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [{
-    name: 'ccflare',
-    script: '/opt/ccflare/ccflare',
+    name: 'agent-smith',
+    script: '/opt/agent-smith/agent-smith',
     args: '--serve',
     instances: 1,
     exec_mode: 'fork',
     env: {
       PORT: 8080,
-      LOG_LEVEL: 'INFO',
-      LOG_FORMAT: 'json',
-      CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
-      RETRY_ATTEMPTS: 3,
-      RETRY_DELAY_MS: 1000,
-      RETRY_BACKOFF: 2
+      AGENT_SMITH_LOG_LEVEL: 'INFO',
+      AGENT_SMITH_LOG_FORMAT: 'json',
+      AGENT_SMITH_CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
+      AGENT_SMITH_RETRY_ATTEMPTS: 3,
+      AGENT_SMITH_RETRY_DELAY_MS: 1000,
+      AGENT_SMITH_RETRY_BACKOFF: 2
     },
-    error_file: '/opt/ccflare/data/logs/error.log',
-    out_file: '/opt/ccflare/data/logs/out.log',
-    log_file: '/opt/ccflare/data/logs/combined.log',
+    error_file: '/opt/agent-smith/data/logs/error.log',
+    out_file: '/opt/agent-smith/data/logs/out.log',
+    log_file: '/opt/agent-smith/data/logs/combined.log',
     time: true,
     autorestart: true,
     max_restarts: 10,
@@ -248,35 +251,35 @@ Create a systemd service file:
 
 ```bash
 # Create service file
-sudo cat > /etc/systemd/system/ccflare.service << 'EOF'
+sudo cat > /etc/systemd/system/agent-smith.service << 'EOF'
 [Unit]
-Description=ccflare Load Balancer
+Description=agent-smith Load Balancer
 After=network.target
 
 [Service]
 Type=simple
-User=ccflare
-Group=ccflare
-WorkingDirectory=/opt/ccflare
-ExecStart=/opt/ccflare/ccflare --serve
+User=agent-smith
+Group=agent-smith
+WorkingDirectory=/opt/agent-smith
+ExecStart=/opt/agent-smith/agent-smith --serve
 Restart=always
 RestartSec=5
 
 # Environment
 Environment="PORT=8080"
-Environment="LOG_LEVEL=INFO"
-Environment="LOG_FORMAT=json"
-Environment="CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-Environment="RETRY_ATTEMPTS=3"
-Environment="RETRY_DELAY_MS=1000"
-Environment="RETRY_BACKOFF=2"
+Environment="AGENT_SMITH_LOG_LEVEL=INFO"
+Environment="AGENT_SMITH_LOG_FORMAT=json"
+Environment="AGENT_SMITH_CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+Environment="AGENT_SMITH_RETRY_ATTEMPTS=3"
+Environment="AGENT_SMITH_RETRY_DELAY_MS=1000"
+Environment="AGENT_SMITH_RETRY_BACKOFF=2"
 
 # Security
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/ccflare/data
+ReadWritePaths=/opt/agent-smith/data
 
 # Resource limits
 LimitNOFILE=65536
@@ -287,14 +290,14 @@ WantedBy=multi-user.target
 EOF
 
 # Create user and directories
-sudo useradd -r -s /bin/false ccflare
-sudo mkdir -p /opt/ccflare/{config,data/logs}
-sudo chown -R ccflare:ccflare /opt/ccflare
+sudo useradd -r -s /bin/false agent-smith
+sudo mkdir -p /opt/agent-smith/{config,data/logs}
+sudo chown -R agent-smith:agent-smith /opt/agent-smith
 
 # Enable and start service
 sudo systemctl daemon-reload
-sudo systemctl enable ccflare
-sudo systemctl start ccflare
+sudo systemctl enable agent-smith
+sudo systemctl start agent-smith
 ```
 
 ## Docker Deployment
@@ -318,8 +321,8 @@ COPY tsconfig.json ./
 # Install dependencies and build
 RUN bun install --frozen-lockfile
 RUN bun run build
-RUN cd apps/tui && bun build src/main.ts --compile --outfile dist/ccflare --target=bun
-RUN cd apps/server && bun build src/server.ts --compile --outfile dist/ccflare-server
+RUN cd apps/tui && bun build src/main.ts --compile --outfile dist/agent-smith --target=bun
+RUN cd apps/server && bun build src/server.ts --compile --outfile dist/agent-smith-server
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -330,32 +333,32 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create user
-RUN useradd -r -s /bin/false ccflare
+RUN useradd -r -s /bin/false agent-smith
 
 # Copy binary and dashboard
-COPY --from=builder /app/apps/tui/dist/ccflare /usr/local/bin/ccflare
-COPY --from=builder /app/apps/web/dist /opt/ccflare/dashboard
+COPY --from=builder /app/apps/tui/dist/agent-smith /usr/local/bin/agent-smith
+COPY --from=builder /app/apps/web/dist /opt/agent-smith/dashboard
 
 # Set permissions
-RUN chmod +x /usr/local/bin/ccflare
+RUN chmod +x /usr/local/bin/agent-smith
 
 # Create data directories
-RUN mkdir -p /data /config && chown -R ccflare:ccflare /data /config
+RUN mkdir -p /data /config && chown -R agent-smith:agent-smith /data /config
 
-USER ccflare
+USER agent-smith
 
 # Environment
 ENV PORT=8080
-ENV ccflare_CONFIG_PATH=/config/ccflare.json
+ENV AGENT_SMITH_CONFIG_PATH=/config/agent-smith.json
 
 EXPOSE 8080
 
 VOLUME ["/data", "/config"]
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD ["/usr/local/bin/ccflare-server", "health"] || exit 1
+  CMD ["/usr/local/bin/agent-smith-server", "health"] || exit 1
 
-ENTRYPOINT ["/usr/local/bin/ccflare", "--serve"]
+ENTRYPOINT ["/usr/local/bin/agent-smith", "--serve"]
 ```
 
 ### Example Docker Compose
@@ -364,20 +367,20 @@ ENTRYPOINT ["/usr/local/bin/ccflare", "--serve"]
 version: '3.8'
 
 services:
-  ccflare:
+  agent-smith:
     build: .
-    container_name: ccflare
+    container_name: agent-smith
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-      - LOG_LEVEL=INFO
-      - LOG_FORMAT=json
-      - CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e
-      - RETRY_ATTEMPTS=3
-      - RETRY_DELAY_MS=1000
-      - RETRY_BACKOFF=2
+      - AGENT_SMITH_LOG_LEVEL=INFO
+      - AGENT_SMITH_LOG_FORMAT=json
+      - AGENT_SMITH_CLIENT_ID=9d1c250a-e61b-44d9-88ed-5944d1962f5e
+      - AGENT_SMITH_RETRY_ATTEMPTS=3
+      - AGENT_SMITH_RETRY_DELAY_MS=1000
+      - AGENT_SMITH_RETRY_BACKOFF=2
     volumes:
       - ./data:/data
       - ./config:/config
@@ -388,12 +391,12 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - ccflare-net
+      - agent-smith-net
 
   # Optional: Reverse proxy
   nginx:
     image: nginx:alpine
-    container_name: ccflare-nginx
+    container_name: agent-smith-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -402,12 +405,12 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - ccflare
+      - agent-smith
     networks:
-      - ccflare-net
+      - agent-smith-net
 
 networks:
-  ccflare-net:
+  agent-smith-net:
     driver: bridge
 ```
 
@@ -415,15 +418,15 @@ networks:
 
 ```bash
 # Build the Docker image
-docker build -t ccflare:latest .
+docker build -t agent-smith:latest .
 
 # Run with Docker
 docker run -d \
-  --name ccflare \
+  --name agent-smith \
   -p 8080:8080 \
   -v $(pwd)/data:/data \
   -v $(pwd)/config:/config \
-  ccflare:latest
+  agent-smith:latest
 
 # Or use Docker Compose
 docker-compose up -d
@@ -473,25 +476,25 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 ### Nginx Configuration
 
 ```nginx
-# /etc/nginx/sites-available/ccflare
-upstream ccflare_backend {
+# /etc/nginx/sites-available/agent-smith
+upstream agent-smith_backend {
     server 127.0.0.1:8080 max_fails=3 fail_timeout=30s;
     keepalive 32;
 }
 
 server {
     listen 80;
-    server_name ccflare.yourdomain.com;
+    server_name agent-smith.yourdomain.com;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name ccflare.yourdomain.com;
+    server_name agent-smith.yourdomain.com;
 
     # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/ccflare.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/ccflare.yourdomain.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/agent-smith.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/agent-smith.yourdomain.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
@@ -518,12 +521,12 @@ server {
 
     # Main proxy
     location / {
-        proxy_pass http://ccflare_backend;
+        proxy_pass http://agent-smith_backend;
     }
 
     # API endpoints
     location /v1/ {
-        proxy_pass http://ccflare_backend;
+        proxy_pass http://agent-smith_backend;
         
         # Increase limits for AI requests
         client_max_body_size 100M;
@@ -533,7 +536,7 @@ server {
 
     # WebSocket support for real-time updates
     location /ws {
-        proxy_pass http://ccflare_backend;
+        proxy_pass http://agent-smith_backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -542,7 +545,7 @@ server {
 
     # Static assets caching
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        proxy_pass http://ccflare_backend;
+        proxy_pass http://agent-smith_backend;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
@@ -552,7 +555,7 @@ server {
 ### Caddy Configuration
 
 ```caddyfile
-ccflare.yourdomain.com {
+agent-smith.yourdomain.com {
     # Automatic HTTPS
     tls your-email@example.com
 
@@ -610,10 +613,10 @@ ccflare.yourdomain.com {
 ```mermaid
 graph TB
     subgraph "Logging Architecture"
-        APP[ccflare Server]
+        APP[agent-smith Server]
         
         subgraph "Log Outputs"
-            FILE[File Logs<br/>/var/log/ccflare/]
+            FILE[File Logs<br/>/var/log/agent-smith/]
             STDOUT[Container Stdout]
             SYSLOG[Syslog]
         end
@@ -653,26 +656,26 @@ import { register, Counter, Histogram, Gauge } from 'prom-client';
 
 export const metrics = {
   requestsTotal: new Counter({
-    name: 'ccflare_requests_total',
+    name: 'agent-smith_requests_total',
     help: 'Total number of requests',
     labelNames: ['method', 'status', 'account']
   }),
   
   requestDuration: new Histogram({
-    name: 'ccflare_request_duration_seconds',
+    name: 'agent-smith_request_duration_seconds',
     help: 'Request duration in seconds',
     labelNames: ['method', 'status'],
     buckets: [0.1, 0.5, 1, 2, 5, 10]
   }),
   
   activeAccounts: new Gauge({
-    name: 'ccflare_active_accounts',
+    name: 'agent-smith_active_accounts',
     help: 'Number of active accounts',
     labelNames: ['provider']
   }),
   
   rateLimitedAccounts: new Gauge({
-    name: 'ccflare_rate_limited_accounts',
+    name: 'agent-smith_rate_limited_accounts',
     help: 'Number of rate limited accounts'
   })
 };
@@ -721,7 +724,7 @@ services:
     volumes:
       - ./promtail-config.yaml:/etc/promtail/config.yml
       - /var/log:/var/log:ro
-      - /opt/ccflare/data/logs:/app/logs:ro
+      - /opt/agent-smith/data/logs:/app/logs:ro
     command: -config.file=/etc/promtail/config.yml
 
 volumes:
@@ -736,8 +739,8 @@ volumes:
 
 ```bash
 # Increase file descriptor limits
-echo "ccflare soft nofile 65536" >> /etc/security/limits.conf
-echo "ccflare hard nofile 65536" >> /etc/security/limits.conf
+echo "agent-smith soft nofile 65536" >> /etc/security/limits.conf
+echo "agent-smith hard nofile 65536" >> /etc/security/limits.conf
 
 # TCP tuning for high throughput
 cat >> /etc/sysctl.conf << EOF
@@ -763,7 +766,7 @@ sysctl -p
 ### Application Tuning
 
 ```json
-// ~/.config/ccflare/config.json (or platform-specific location)
+// ~/.config/agent-smith/config.json (or platform-specific location)
 {
   "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
   "retry_attempts": 3,
@@ -803,9 +806,9 @@ graph TB
     end
     
     subgraph "Application Instances"
-        APP1[ccflare-1<br/>Port 8081]
-        APP2[ccflare-2<br/>Port 8082]
-        APP3[ccflare-N<br/>Port 808N]
+        APP1[agent-smith-1<br/>Port 8081]
+        APP2[agent-smith-2<br/>Port 8082]
+        APP3[agent-smith-N<br/>Port 808N]
     end
     
     subgraph "Shared Data Layer"
@@ -840,12 +843,12 @@ graph TB
 
 ### Database Considerations
 
-ccflare uses SQLite by default, which is suitable for most single-instance deployments. The database is automatically created and managed in the platform-specific configuration directory.
+agent-smith uses SQLite by default, which is suitable for most single-instance deployments. The database is automatically created and managed in the platform-specific configuration directory.
 
 #### SQLite Optimization (Default)
 
 ```sql
--- These optimizations are automatically applied by ccflare
+-- These optimizations are automatically applied by agent-smith
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
 PRAGMA cache_size = -20000;  -- 20MB cache
@@ -922,38 +925,38 @@ CREATE INDEX idx_accounts_rate_limit ON accounts(rate_limited_until);
 ### Kubernetes Deployment
 
 ```yaml
-# ccflare-deployment.yaml
+# agent-smith-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ccflare
+  name: agent-smith
   labels:
-    app: ccflare
+    app: agent-smith
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: ccflare
+      app: agent-smith
   template:
     metadata:
       labels:
-        app: ccflare
+        app: agent-smith
     spec:
       containers:
-      - name: ccflare
-        image: your-registry/ccflare:latest
+      - name: agent-smith
+        image: your-registry/agent-smith:latest
         ports:
         - containerPort: 8080
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: ccflare-secrets
+              name: agent-smith-secrets
               key: database-url
         - name: REDIS_URL
           valueFrom:
             secretKeyRef:
-              name: ccflare-secrets
+              name: agent-smith-secrets
               key: redis-url
         resources:
           requests:
@@ -978,10 +981,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ccflare
+  name: agent-smith
 spec:
   selector:
-    app: ccflare
+    app: agent-smith
   ports:
   - port: 80
     targetPort: 8080
@@ -1033,7 +1036,7 @@ spec:
 
 ### Health Check Endpoint
 
-ccflare provides a health check endpoint for monitoring:
+agent-smith provides a health check endpoint for monitoring:
 
 ```bash
 # Check health status
@@ -1120,32 +1123,32 @@ healthcheck:
    ```bash
    # Find the actual database location
    # Linux/macOS:
-   sqlite3 ~/.config/ccflare/ccflare.db "PRAGMA journal_mode=WAL;"
+   sqlite3 ~/.config/agent-smith/agent-smith.db "PRAGMA journal_mode=WAL;"
    
    # Windows:
-   sqlite3 %LOCALAPPDATA%\ccflare\ccflare.db "PRAGMA journal_mode=WAL;"
+   sqlite3 %LOCALAPPDATA%\agent-smith\agent-smith.db "PRAGMA journal_mode=WAL;"
    ```
 
 2. **High Memory Usage**
    ```bash
    # Check for memory leaks
-   node --inspect=0.0.0.0:9229 /opt/ccflare/ccflare-server
+   node --inspect=0.0.0.0:9229 /opt/agent-smith/agent-smith-server
    ```
 
 3. **Connection Refused**
    ```bash
    # Check if service is running
-   systemctl status ccflare
+   systemctl status agent-smith
    # Check logs
-   journalctl -u ccflare -f
+   journalctl -u agent-smith -f
    ```
 
 4. **Rate Limit Issues**
    ```bash
    # Check account status
-   ccflare --list
+   agent-smith --list
    # Reset statistics
-   ccflare --reset-stats
+   agent-smith --reset-stats
    ```
 
 ## Maintenance
@@ -1154,18 +1157,18 @@ healthcheck:
 
 ```bash
 # Daily: Check recent logs
-ccflare --logs 100 | grep ERROR
+agent-smith --logs 100 | grep ERROR
 
 # Weekly: Database maintenance
 # Linux/macOS:
-sqlite3 ~/.config/ccflare/ccflare.db "VACUUM;"
-sqlite3 ~/.config/ccflare/ccflare.db "ANALYZE;"
+sqlite3 ~/.config/agent-smith/agent-smith.db "VACUUM;"
+sqlite3 ~/.config/agent-smith/agent-smith.db "ANALYZE;"
 
 # Monthly: Clean old request history
-ccflare --clear-history
+agent-smith --clear-history
 
 # Quarterly: Update dependencies (if running from source)
-cd /path/to/ccflare
+cd /path/to/agent-smith
 bun update
 ```
 
@@ -1175,20 +1178,20 @@ bun update
 #!/bin/bash
 # backup.sh - Run daily via cron
 
-BACKUP_DIR="/backup/ccflare/$(date +%Y%m%d)"
+BACKUP_DIR="/backup/agent-smith/$(date +%Y%m%d)"
 mkdir -p "$BACKUP_DIR"
 
 # Determine config directory based on OS
 if [[ "$OSTYPE" == "darwin"* ]] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    CONFIG_DIR="$HOME/.config/ccflare"
+    CONFIG_DIR="$HOME/.config/agent-smith"
 elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-    CONFIG_DIR="$LOCALAPPDATA/ccflare"
+    CONFIG_DIR="$LOCALAPPDATA/agent-smith"
 else
-    CONFIG_DIR="$HOME/.config/ccflare"  # Default fallback
+    CONFIG_DIR="$HOME/.config/agent-smith"  # Default fallback
 fi
 
 # Backup database and config
-sqlite3 "$CONFIG_DIR/ccflare.db" ".backup $BACKUP_DIR/ccflare.db"
+sqlite3 "$CONFIG_DIR/agent-smith.db" ".backup $BACKUP_DIR/agent-smith.db"
 cp "$CONFIG_DIR/config.json" "$BACKUP_DIR/" 2>/dev/null || true
 
 # Compress
@@ -1196,7 +1199,7 @@ tar -czf "$BACKUP_DIR.tar.gz" "$BACKUP_DIR"
 rm -rf "$BACKUP_DIR"
 
 # Keep only last 30 days
-find /backup/ccflare -name "*.tar.gz" -mtime +30 -delete
+find /backup/agent-smith -name "*.tar.gz" -mtime +30 -delete
 ```
 
 ## Environment Variables Reference
@@ -1206,26 +1209,26 @@ find /backup/ccflare -name "*.tar.gz" -mtime +30 -delete
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 8080 | Server port |
-| `LB_STRATEGY` | session | Legacy session-strategy setting; unused by the quota-aware proxy kernel |
-| `LOG_LEVEL` | INFO | Logging level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `LOG_FORMAT` | pretty | Log format: `pretty` (human-readable) or `json` (structured) |
-| `ccflare_DEBUG` | 0 | Enable debug mode (1/0) - enables console output |
+| `AGENT_SMITH_LB_STRATEGY` | session | Legacy session-strategy setting; unused by the quota-aware proxy kernel |
+| `AGENT_SMITH_LOG_LEVEL` | INFO | Logging level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `AGENT_SMITH_LOG_FORMAT` | pretty | Log format: `pretty` (human-readable) or `json` (structured) |
+| `AGENT_SMITH_DEBUG` | 0 | Enable debug mode (1/0) - enables console output |
 
 ### Advanced Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLIENT_ID` | 9d1c250a-e61b-44d9-88ed-5944d1962f5e | OAuth client ID for authentication |
-| `SESSION_DURATION_MS` | 18000000 | Legacy session-strategy duration; unused by the quota-aware proxy kernel |
-| `RETRY_ATTEMPTS` | 3 | Number of retry attempts for failed requests |
-| `RETRY_DELAY_MS` | 1000 | Initial delay between retries in milliseconds |
-| `RETRY_BACKOFF` | 2 | Backoff multiplier for exponential retry delays |
-| `ccflare_CONFIG_PATH` | Platform-specific | Path to configuration file |
-| `ccflare_DB_PATH` | Platform-specific | Path to SQLite database file |
+| `AGENT_SMITH_CLIENT_ID` | 9d1c250a-e61b-44d9-88ed-5944d1962f5e | OAuth client ID for authentication |
+| `AGENT_SMITH_SESSION_DURATION_MS` | 18000000 | Legacy session-strategy duration; unused by the quota-aware proxy kernel |
+| `AGENT_SMITH_RETRY_ATTEMPTS` | 3 | Number of retry attempts for failed requests |
+| `AGENT_SMITH_RETRY_DELAY_MS` | 1000 | Initial delay between retries in milliseconds |
+| `AGENT_SMITH_RETRY_BACKOFF` | 2 | Backoff multiplier for exponential retry delays |
+| `AGENT_SMITH_CONFIG_PATH` | Platform-specific | Path to configuration file |
+| `AGENT_SMITH_DB_PATH` | Platform-specific | Path to SQLite database file |
 
 ### Configuration File
 
-ccflare also supports a JSON configuration file that takes precedence over environment variables:
+agent-smith also supports a JSON configuration file that takes precedence over environment variables:
 
 ```json
 {
@@ -1238,12 +1241,12 @@ ccflare also supports a JSON configuration file that takes precedence over envir
 ```
 
 The configuration file is located at:
-- **Linux/macOS**: `~/.config/ccflare/config.json`
-- **Windows**: `%APPDATA%\ccflare\config.json`
+- **Linux/macOS**: `~/.config/agent-smith/config.json`
+- **Windows**: `%APPDATA%\agent-smith\config.json`
 
 ## Conclusion
 
-ccflare is designed to be flexible and scalable, supporting everything from simple local deployments to complex distributed architectures. Choose the deployment option that best fits your needs and scale as your requirements grow.
+agent-smith is designed to be flexible and scalable, supporting everything from simple local deployments to complex distributed architectures. Choose the deployment option that best fits your needs and scale as your requirements grow.
 
 ### Key Features Summary
 
@@ -1260,26 +1263,26 @@ ccflare is designed to be flexible and scalable, supporting everything from simp
 - [Configuration Guide](./configuration.md)
 - [Load Balancing Strategies](./load-balancing.md)
 - [API Reference](./api-http.md)
-- [GitHub Repository](https://github.com/snipeship/ccflare)
+- [GitHub Repository](https://github.com/certalis/agent-smith)
 
 ## Terminal User Interface (TUI)
 
-ccflare includes a powerful Terminal User Interface for interactive monitoring and management.
+agent-smith includes a powerful Terminal User Interface for interactive monitoring and management.
 
 ### Starting the TUI
 
 ```bash
-# Start ccflare in interactive mode (TUI + Server)
-ccflare
+# Start agent-smith in interactive mode (TUI + Server)
+agent-smith
 
 # Or from source:
-bun run ccflare
+bun run agent-smith
 
 # Start server only (no TUI)
-ccflare --serve
+agent-smith --serve
 
 # View help for all available commands
-ccflare --help
+agent-smith --help
 ```
 
 ### TUI Features
@@ -1318,12 +1321,12 @@ ccflare --help
 
 ### Remote API Connection
 
-The ccflare binary can connect to a remote API server for distributed deployments:
+The agent-smith binary can connect to a remote API server for distributed deployments:
 
 ```bash
 # Set API URL for remote connection
-export ccflare_API_URL=https://ccflare.example.com
-ccflare --list  # Will query the remote server
+export agent-smith_API_URL=https://agent-smith.example.com
+agent-smith --list  # Will query the remote server
 ```
 
 ### TUI Configuration

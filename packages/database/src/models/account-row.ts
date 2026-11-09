@@ -4,7 +4,7 @@ import type {
 	AccountQuotaState,
 	AccountSwitchThreshold,
 	AuthMethod,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export interface AccountRow {
 	id: string;

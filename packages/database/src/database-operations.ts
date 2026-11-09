@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Disposable } from "@ccflare/core";
+import type { Disposable } from "@agent-smith/core";
 import type {
 	Account,
 	AccountProvider,
@@ -12,7 +12,7 @@ import type {
 	Request,
 	RequestSummary,
 	StrategyStore,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { ensureSchema, runMigrations } from "./migrations";
 import type { RequestWithAccountName } from "./models/request-row";
 import { resolveDbPath } from "./paths";

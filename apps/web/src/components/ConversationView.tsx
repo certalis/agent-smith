@@ -1,10 +1,10 @@
-import { ContentBlockType, type MessageData } from "@ccflare/types";
+import { ContentBlockType, type MessageData } from "@agent-smith/types";
 import {
 	cleanLineNumbers,
 	genMessageKey,
 	parseAssistantMessage,
 	parseRequestMessages,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import React, { useMemo } from "react";
 import { Message } from "./conversation";
 

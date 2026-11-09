@@ -1,6 +1,6 @@
-import type { AlertsConfig } from "@ccflare/config";
-import { Logger } from "@ccflare/logger";
-import type { Account, RequestMeta } from "@ccflare/types";
+import type { AlertsConfig } from "@agent-smith/config";
+import { Logger } from "@agent-smith/logger";
+import type { Account, RequestMeta } from "@agent-smith/types";
 import { trackProxyBackgroundTask } from "./background-tasks";
 import {
 	getSoonestQuotaReset,

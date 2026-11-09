@@ -1,5 +1,5 @@
-import { formatCost, getModelShortName } from "@ccflare/core";
-import { formatTokensPerSecond } from "@ccflare/ui";
+import { formatCost, getModelShortName } from "@agent-smith/core";
+import { formatTokensPerSecond } from "@agent-smith/ui";
 import {
 	Area,
 	AreaChart,

@@ -1,5 +1,5 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	type ClaudeCodeProfile,
 	createConfiguredProviderRegistry,
@@ -10,10 +10,10 @@ import {
 	type OAuthTokens,
 	type PKCEChallenge,
 	type ProviderRegistry,
-} from "@ccflare/providers";
-import { type AccountProvider, isRecord } from "@ccflare/types";
+} from "@agent-smith/providers";
+import { type AccountProvider, isRecord } from "@agent-smith/types";
 
-export type { AccountProvider as OAuthFlowProvider } from "@ccflare/types";
+export type { AccountProvider as OAuthFlowProvider } from "@agent-smith/types";
 
 /**
  * Resolves the OAuthProvider implementation via the provider registry

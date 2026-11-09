@@ -7,8 +7,8 @@ import {
 	resolveDashboardManifestPath,
 } from "./dashboard-assets";
 
-const DASHBOARD_DIST_DIR_ENV = "CF_DASHBOARD_DIST_DIR";
-const DASHBOARD_MANIFEST_PATH_ENV = "CF_DASHBOARD_MANIFEST_PATH";
+const DASHBOARD_DIST_DIR_ENV = "AGENT_SMITH_DASHBOARD_DIST_DIR";
+const DASHBOARD_MANIFEST_PATH_ENV = "AGENT_SMITH_DASHBOARD_MANIFEST_PATH";
 const originalDashboardDistDir = process.env[DASHBOARD_DIST_DIR_ENV];
 const originalDashboardManifestPath = process.env[DASHBOARD_MANIFEST_PATH_ENV];
 
@@ -31,7 +31,7 @@ afterEach(async () => {
 describe("dashboard asset path overrides", () => {
 	it("prefers an explicit manifest path when configured", async () => {
 		const tempDir = await mkdtemp(
-			join(process.env.TMPDIR || "/tmp", "ccflare-dashboard-assets-"),
+			join(process.env.TMPDIR || "/tmp", "agent-smith-dashboard-assets-"),
 		);
 		const manifestPath = join(tempDir, "manifest.json");
 
@@ -54,7 +54,7 @@ describe("dashboard asset path overrides", () => {
 
 	it("derives the manifest path from an explicit dashboard dist directory", async () => {
 		const tempDir = await mkdtemp(
-			join(process.env.TMPDIR || "/tmp", "ccflare-dashboard-dist-"),
+			join(process.env.TMPDIR || "/tmp", "agent-smith-dashboard-dist-"),
 		);
 		const distDir = join(tempDir, "dashboard");
 		const manifestPath = join(distDir, "manifest.json");

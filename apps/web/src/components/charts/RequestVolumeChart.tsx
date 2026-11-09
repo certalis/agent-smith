@@ -1,4 +1,4 @@
-import { formatNumber } from "@ccflare/ui";
+import { formatNumber } from "@agent-smith/ui";
 import { formatCompactNumber } from "../../lib/chart-utils";
 import { AnalyticsAreaChart } from "./AnalyticsAreaChart";
 

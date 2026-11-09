@@ -1,10 +1,10 @@
 import type { RequestStep, UpstreamRule } from "./scenario";
 
 export const enrollmentEnvironment = {
-	CF_ADMIN_KEY: "scenario-admin-key",
-	CF_PROXY_KEY: "scenario-proxy-key",
-	CF_TRUST_LOOPBACK: "false",
-	CF_ENROLLMENT_ORIGIN: "https://pool.example.test",
+	AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
+	AGENT_SMITH_PROXY_KEY: "scenario-proxy-key",
+	AGENT_SMITH_TRUST_LOOPBACK: "false",
+	AGENT_SMITH_ENROLLMENT_ORIGIN: "https://pool.example.test",
 };
 export const enrollmentConfig = {
 	team_routing: {

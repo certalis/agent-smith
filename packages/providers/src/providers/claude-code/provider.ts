@@ -1,9 +1,9 @@
-import { Logger } from "@ccflare/logger";
+import { Logger } from "@agent-smith/logger";
 import {
 	type Account,
 	type AccountQuotaState,
 	getProviderDefaultBaseUrl,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import {
 	deleteClientCredentialHeaders,
 	deleteTransportHeaders,

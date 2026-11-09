@@ -1,13 +1,13 @@
 import { isAbsolute } from "node:path";
-import { stopAllOAuthCallbackForwarders } from "@ccflare/api";
-import { NETWORK, shutdown } from "@ccflare/core";
-import { DatabaseFactory } from "@ccflare/database";
-import { Logger, LogLevel } from "@ccflare/logger";
+import { stopAllOAuthCallbackForwarders } from "@agent-smith/api";
+import { NETWORK, shutdown } from "@agent-smith/core";
+import { DatabaseFactory } from "@agent-smith/database";
+import { Logger, LogLevel } from "@agent-smith/logger";
 import {
 	terminateUsageWorker,
 	waitForProxyBackgroundTasks,
 	websocketProxyHandler,
-} from "@ccflare/proxy";
+} from "@agent-smith/proxy";
 import { serve } from "bun";
 import { bootstrapRuntime, logInitialAccountStatus } from "./bootstrap-runtime";
 import { loadDashboardAssets, resetDashboardAssets } from "./dashboard-assets";

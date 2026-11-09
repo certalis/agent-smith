@@ -102,8 +102,10 @@ describe("AccountRepository", () => {
 	});
 
 	it("restores structured quota state after reopening a file-backed database", () => {
-		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-account-repository-"));
-		const databasePath = join(tempDir, "ccflare.db");
+		const tempDir = mkdtempSync(
+			join(tmpdir(), "agent-smith-account-repository-"),
+		);
+		const databasePath = join(tempDir, "agent-smith.db");
 		const quotaState = {
 			windows: {
 				unified7d: {

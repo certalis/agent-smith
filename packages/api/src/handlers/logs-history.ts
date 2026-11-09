@@ -2,8 +2,8 @@ import {
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
-} from "@ccflare/http";
-import { Logger, logFileWriter } from "@ccflare/logger";
+} from "@agent-smith/http";
+import { Logger, logFileWriter } from "@agent-smith/logger";
 
 const log = new Logger("LogsHistoryHandler");
 

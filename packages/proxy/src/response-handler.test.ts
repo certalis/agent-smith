@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Account } from "@ccflare/types";
+import type { Account } from "@agent-smith/types";
 import { waitForProxyBackgroundTasks } from "./background-tasks";
 import type { ResolvedProxyContext } from "./handlers";
 import { forwardToClient } from "./response-handler";

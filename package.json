@@ -1,15 +1,16 @@
 {
 	"private": true,
-	"name": "ccflare",
+	"name": "agent-smith",
 	"workspaces": [
 		"apps/*",
 		"packages/*"
 	],
 	"scripts": {
-		"ccflare": "bun run build:clients && bun run tui",
+		"agent-smith": "bun run build:clients && bun run tui",
 		"tui": "bun run apps/tui/src/main.ts",
 		"dev": "bun run tui",
 		"start": "bun run apps/server/src/server.ts",
+		"start:https": "node apps/tui/dist/https.js",
 		"server": "bun run apps/server/src/server.ts",
 		"dev:server": "bun run --hot apps/server/src/server.ts",
 		"dev:dashboard": "bun run --cwd apps/web dev",

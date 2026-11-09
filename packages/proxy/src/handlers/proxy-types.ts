@@ -1,7 +1,10 @@
-import type { RuntimeConfig } from "@ccflare/config";
-import type { AsyncDbWriter, DatabaseOperations } from "@ccflare/database";
-import type { Provider, ProviderRegistry } from "@ccflare/providers";
-import type { AccountProvider, LoadBalancingStrategy } from "@ccflare/types";
+import type { RuntimeConfig } from "@agent-smith/config";
+import type { AsyncDbWriter, DatabaseOperations } from "@agent-smith/database";
+import type { Provider, ProviderRegistry } from "@agent-smith/providers";
+import type {
+	AccountProvider,
+	LoadBalancingStrategy,
+} from "@agent-smith/types";
 import type { OutsideSpendTracker } from "../outside-spend";
 import type { QuotaHold } from "../quota-hold";
 import type { SeatAlerts } from "../seat-alerts";

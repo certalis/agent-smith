@@ -1,4 +1,4 @@
-import { getProviderDisplayLabel } from "@ccflare/types";
+import { getProviderDisplayLabel } from "@agent-smith/types";
 import { Badge } from "./ui/badge";
 
 function getProviderLabel(provider: string): string {

@@ -1,6 +1,6 @@
-import type { TeamRoutingConfig } from "@ccflare/config";
-import type { ProviderRegistry } from "@ccflare/providers";
-import type { Account, AccountQuotaState } from "@ccflare/types";
+import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { ProviderRegistry } from "@agent-smith/providers";
+import type { Account, AccountQuotaState } from "@agent-smith/types";
 import type { OutsideSpendTracker } from "./outside-spend";
 
 type QuotaStore = {

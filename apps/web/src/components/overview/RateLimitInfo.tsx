@@ -1,4 +1,4 @@
-import type { AccountResponse } from "@ccflare/api";
+import type { AccountResponse } from "@agent-smith/api";
 import { format } from "date-fns";
 import { AlertCircle } from "lucide-react";
 import {

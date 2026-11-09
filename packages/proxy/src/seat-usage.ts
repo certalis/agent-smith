@@ -1,9 +1,9 @@
-import type { Provider } from "@ccflare/providers";
+import type { Provider } from "@agent-smith/providers";
 import {
 	type Account,
 	isOpenQuotaWindow,
 	type QuotaWindow,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 type SeatUsage = {
 	fiveHour: number;

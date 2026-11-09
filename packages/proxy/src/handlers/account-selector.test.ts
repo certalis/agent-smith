@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
-import type { Account, AccountProvider, RequestMeta } from "@ccflare/types";
+import type { Account, AccountProvider, RequestMeta } from "@agent-smith/types";
 import {
 	getSoonestQuotaReset,
 	selectAccountsForRequest,

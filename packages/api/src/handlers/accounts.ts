@@ -1,25 +1,25 @@
-import type { Config } from "@ccflare/config";
+import type { Config } from "@agent-smith/config";
 import {
 	patterns,
 	sanitizers,
 	ValidationError,
 	validateNumber,
 	validateString,
-} from "@ccflare/core";
-import type { DatabaseOperations } from "@ccflare/database";
+} from "@agent-smith/core";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	BadRequest,
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
 	NotFound,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import { assertSeatAllowlisted } from "@ccflare/oauth-flow";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import { assertSeatAllowlisted } from "@agent-smith/oauth-flow";
 import type {
 	OAuthAccountIdentity,
 	ProviderRegistry,
-} from "@ccflare/providers";
+} from "@agent-smith/providers";
 import {
 	type AccountCreateData,
 	type AccountDeleteData,
@@ -30,7 +30,7 @@ import {
 	AUTH_METHODS,
 	isAuthMethod,
 	type MutationResult,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { serializeAccount } from "../serializers/account";
 import type { AccountResponse } from "../types";
 import { parseJsonObject } from "../utils/json";

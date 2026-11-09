@@ -1,10 +1,10 @@
-import type { ProviderRegistry } from "@ccflare/providers";
+import type { ProviderRegistry } from "@agent-smith/providers";
 import {
 	type Account,
 	getAccountRateLimitInfo,
 	getAccountSessionInfo,
 	getAccountTokenStatus,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import type { AccountResponse } from "../types";
 
 export function serializeAccount(

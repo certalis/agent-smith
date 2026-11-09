@@ -17,8 +17,8 @@ import {
 	patterns,
 	TIME_CONSTANTS,
 	ValidationError,
-} from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
+} from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
 import {
 	isFiniteNumber,
 	isLbStrategy,
@@ -27,7 +27,7 @@ import {
 	PROVIDER_WIRES,
 	type ProviderWire,
 	type StrategyName,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { resolveConfigPath } from "./paths";
 
 const log = new Logger("Config");
@@ -113,7 +113,7 @@ export type ProviderConfig = {
 
 export type ProviderPoolsFileConfig = Partial<Record<ProviderWire, string[]>>;
 
-/** How locally installed Claude Code and Codex reach this Agent-smith server. */
+/** How locally installed Claude Code and Codex reach this Agent Smith server. */
 export type ClientRoutingFileConfig = {
 	enabled?: boolean;
 	base_url?: string;
@@ -614,7 +614,7 @@ export class Config extends EventEmitter {
 
 	getStrategy(): StrategyName {
 		// First check environment variable
-		const envStrategy = process.env.LB_STRATEGY;
+		const envStrategy = process.env.AGENT_SMITH_LB_STRATEGY;
 		if (envStrategy && isValidStrategy(envStrategy)) {
 			return envStrategy;
 		}
@@ -640,7 +640,7 @@ export class Config extends EventEmitter {
 	}
 
 	getDataRetentionDays(): number {
-		const fromEnv = process.env.DATA_RETENTION_DAYS;
+		const fromEnv = process.env.AGENT_SMITH_DATA_RETENTION_DAYS;
 		if (fromEnv) {
 			const n = parseInt(fromEnv, 10);
 			if (!Number.isNaN(n)) return this.clamp(n, 1, 365);
@@ -656,7 +656,7 @@ export class Config extends EventEmitter {
 	}
 
 	getRequestRetentionDays(): number {
-		const fromEnv = process.env.REQUEST_RETENTION_DAYS;
+		const fromEnv = process.env.AGENT_SMITH_REQUEST_RETENTION_DAYS;
 		if (fromEnv) {
 			const n = parseInt(fromEnv, 10);
 			if (!Number.isNaN(n)) return this.clamp(n, 1, 3650);
@@ -902,18 +902,18 @@ export class Config extends EventEmitter {
 		};
 
 		// Override with environment variables if present
-		if (process.env.CLIENT_ID) {
-			defaults.clientId = process.env.CLIENT_ID;
+		if (process.env.AGENT_SMITH_CLIENT_ID) {
+			defaults.clientId = process.env.AGENT_SMITH_CLIENT_ID;
 		}
-		const retryAttempts = parseNumber(process.env.RETRY_ATTEMPTS);
+		const retryAttempts = parseNumber(process.env.AGENT_SMITH_RETRY_ATTEMPTS);
 		if (retryAttempts !== undefined) {
 			defaults.retry.attempts = retryAttempts;
 		}
-		const maxBodyBytes = parseNumber(process.env.MAX_BODY_BYTES);
+		const maxBodyBytes = parseNumber(process.env.AGENT_SMITH_MAX_BODY_BYTES);
 		if (maxBodyBytes !== undefined) {
 			defaults.maxBodyBytes = maxBodyBytes;
 		}
-		const quotaThreshold = parseNumber(process.env.QUOTA_THRESHOLD);
+		const quotaThreshold = parseNumber(process.env.AGENT_SMITH_QUOTA_THRESHOLD);
 		if (
 			quotaThreshold !== undefined &&
 			quotaThreshold > 0 &&
@@ -921,21 +921,23 @@ export class Config extends EventEmitter {
 		) {
 			defaults.quotaThreshold = quotaThreshold;
 		}
-		const retryDelayMs = parseNumber(process.env.RETRY_DELAY_MS);
+		const retryDelayMs = parseNumber(process.env.AGENT_SMITH_RETRY_DELAY_MS);
 		if (retryDelayMs !== undefined) {
 			defaults.retry.delayMs = retryDelayMs;
 		}
-		const retryBackoff = parseNumber(process.env.RETRY_BACKOFF);
+		const retryBackoff = parseNumber(process.env.AGENT_SMITH_RETRY_BACKOFF);
 		if (retryBackoff !== undefined) {
 			defaults.retry.backoff = retryBackoff;
 		}
 		const requestScopedRetryDelayMs = parseNumber(
-			process.env.REQUEST_SCOPED_429_RETRY_DELAY_MS,
+			process.env.AGENT_SMITH_REQUEST_SCOPED_429_RETRY_DELAY_MS,
 		);
 		if (requestScopedRetryDelayMs !== undefined) {
 			defaults.requestScopedRetryDelayMs = requestScopedRetryDelayMs;
 		}
-		const sessionDurationMs = parseNumber(process.env.SESSION_DURATION_MS);
+		const sessionDurationMs = parseNumber(
+			process.env.AGENT_SMITH_SESSION_DURATION_MS,
+		);
 		if (sessionDurationMs !== undefined) {
 			defaults.sessionDurationMs = sessionDurationMs;
 		}

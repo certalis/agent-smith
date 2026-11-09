@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/web",
+	"name": "@agent-smith/web",
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
@@ -14,11 +14,11 @@
 		"test": "bun test ./src"
 	},
 	"dependencies": {
-		"@ccflare/core": "workspace:*",
-		"@ccflare/http": "workspace:*",
-		"@ccflare/api": "workspace:*",
-		"@ccflare/types": "workspace:*",
-		"@ccflare/ui": "workspace:*",
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/http": "workspace:*",
+		"@agent-smith/api": "workspace:*",
+		"@agent-smith/types": "workspace:*",
+		"@agent-smith/ui": "workspace:*",
 		"@radix-ui/react-dialog": "^1.1.14",
 		"@radix-ui/react-dropdown-menu": "^2.1.15",
 		"@radix-ui/react-label": "^2.1.0",

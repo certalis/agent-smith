@@ -1,9 +1,12 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
-import { createOAuthFlow } from "@ccflare/oauth-flow";
-import { createConfiguredProviderRegistry } from "@ccflare/providers";
-import { type AccountProvider, getProviderDisplayLabel } from "@ccflare/types";
-import { type AccountDisplay, toAccountDisplay } from "@ccflare/ui";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
+import { createOAuthFlow } from "@agent-smith/oauth-flow";
+import { createConfiguredProviderRegistry } from "@agent-smith/providers";
+import {
+	type AccountProvider,
+	getProviderDisplayLabel,
+} from "@agent-smith/types";
+import { type AccountDisplay, toAccountDisplay } from "@agent-smith/ui";
 import type { PromptAdapter } from "../prompts/adapter";
 import { stdPromptAdapter } from "../prompts/std-adapter";
 import { openBrowser } from "../utils/browser";

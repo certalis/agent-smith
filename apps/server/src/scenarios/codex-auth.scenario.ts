@@ -4,7 +4,7 @@ export default defineScenario({
 	name: "Codex OAuth initialization exposes the native browser authorization flow",
 	upstreamTest: "teamclaude/test/codex-auth.test.js",
 	config: { providers: { codex: { enabled: true } } },
-	environment: { CF_ADMIN_KEY: "scenario-admin" },
+	environment: { AGENT_SMITH_ADMIN_KEY: "scenario-admin" },
 	fleet: [],
 	upstream: [],
 	steps: [

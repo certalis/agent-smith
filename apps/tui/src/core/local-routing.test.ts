@@ -39,7 +39,7 @@ describe("local client routing", () => {
 		const realBin = join(directory, "real-bin");
 		const binDir = join(directory, "client-bin");
 		const shellProfile = join(directory, ".zshrc");
-		const configPath = join(directory, "ccflare.json");
+		const configPath = join(directory, "agent-smith.json");
 		const proxyKeyFile = join(directory, "device.key");
 		const originalProfile = "export EDITOR=vim\n# Keep my shell settings\n";
 		const realClient = '#!/bin/sh\nprintf "%s" "$ANTHROPIC_BASE_URL"\n';
@@ -55,8 +55,8 @@ describe("local client routing", () => {
 			XDG_CONFIG_HOME: directory,
 			SHELL: "/bin/zsh",
 			PATH: `${realBin}:/usr/bin:/bin`,
-			ccflare_CONFIG_PATH: configPath,
-			ccflare_DB_PATH: join(directory, "pool.db"),
+			AGENT_SMITH_CONFIG_PATH: configPath,
+			AGENT_SMITH_DB_PATH: join(directory, "pool.db"),
 		};
 		const apply = async (client?: Record<string, unknown>) => {
 			writeFileSync(configPath, JSON.stringify({ client }), { mode: 0o600 });
@@ -125,11 +125,11 @@ describe("local client routing", () => {
 		const result = Bun.spawnSync([join(directory, "bin", "claude"), "hello"]);
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.toString()).toBe(
-			"http://127.0.0.1:8123/v1/claude-code|agent-smith-local|agent-smith-local|hello\n",
+			"http://127.0.0.1:8123/v1/claude-code|agent-smith-local||hello\n",
 		);
 	});
 
-	it("routes both clients through a configured Agent-smith server and forwarding key", async () => {
+	it("routes both clients through a configured Agent Smith server and forwarding key", async () => {
 		const directory = tempDir();
 		const realClaude = join(directory, "real-claude");
 		const realCodex = join(directory, "real-codex");
@@ -137,7 +137,10 @@ describe("local client routing", () => {
 		writeFileSync(proxyKeyFile, "client-forwarding-key\n", { mode: 0o600 });
 		writeFileSync(
 			realClaude,
-			'#!/bin/sh\nprintf "%s|%s\n" "$ANTHROPIC_BASE_URL" "$ANTHROPIC_AUTH_TOKEN"\n',
+			`#!/bin/sh
+printf "%s|%s|%s|%s|%s\\n" "$ANTHROPIC_BASE_URL" "$ANTHROPIC_API_KEY" "\${ANTHROPIC_AUTH_TOKEN-unset}" "$AGENT_SMITH_ADMIN_KEY" "$AGENT_SMITH_PROXY_KEY"
+printf "%s\\n" "$@"
+`,
 			{ mode: 0o700 },
 		);
 		writeFileSync(
@@ -155,10 +158,24 @@ describe("local client routing", () => {
 			proxyKeyFile,
 		});
 
-		const claude = Bun.spawnSync([join(directory, "bin", "claude")]);
-		const codex = Bun.spawnSync([join(directory, "bin", "codex"), "exec"]);
+		const environment = {
+			PATH: "/usr/bin:/bin",
+			HOME: directory,
+			ANTHROPIC_API_KEY: "synthetic-inherited-api-key",
+			ANTHROPIC_AUTH_TOKEN: "synthetic-inherited-auth-token",
+			AGENT_SMITH_ADMIN_KEY: "synthetic-admin-key",
+			AGENT_SMITH_PROXY_KEY: "synthetic-proxy-key",
+		};
+		const claude = Bun.spawnSync(
+			[join(directory, "bin", "claude"), "hello", "two words"],
+			{ env: environment },
+		);
+		const codex = Bun.spawnSync([join(directory, "bin", "codex"), "exec"], {
+			env: environment,
+		});
+		expect(claude.exitCode).toBe(0);
 		expect(claude.stdout.toString()).toBe(
-			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key\n",
+			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key|unset||\nhello\ntwo words\n",
 		);
 		expect(codex.stdout.toString()).toContain("client-forwarding-key|");
 		expect(codex.stdout.toString()).toContain(" exec\n");
@@ -299,7 +316,7 @@ describe("local client routing", () => {
 		expect(existsSync(join(binDir, "codex"))).toBe(false);
 	});
 
-	it("refuses a configured Agent-smith server without a forwarding key file", async () => {
+	it("refuses a configured Agent Smith server without a forwarding key file", async () => {
 		const directory = tempDir();
 		const realClaude = join(directory, "claude");
 		writeFileSync(realClaude, "#!/bin/sh\n", { mode: 0o700 });

@@ -1,4 +1,5 @@
-import { DatabaseOperations } from "@ccflare/database";
+import { chmodSync } from "node:fs";
+import { DatabaseOperations } from "@agent-smith/database";
 import { durationMs, type FleetAccount } from "./scenario";
 
 type SeedFleetOptions = {
@@ -20,6 +21,7 @@ export function seedFleet({
 	now = Date.now,
 }: SeedFleetOptions): SeededFleet {
 	const db = new DatabaseOperations(dbPath);
+	chmodSync(dbPath, 0o600);
 	const accountIds = new Map<string, string>();
 	const tokenToAccount = new Map<string, string>();
 

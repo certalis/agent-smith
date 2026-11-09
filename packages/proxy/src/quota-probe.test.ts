@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import type { Provider, ProviderRegistry } from "@ccflare/providers";
-import type { Account, AccountQuotaState } from "@ccflare/types";
+import type { Provider, ProviderRegistry } from "@agent-smith/providers";
+import type { Account, AccountQuotaState } from "@agent-smith/types";
 import { OutsideSpendTracker } from "./outside-spend";
 import { QuotaProbe } from "./quota-probe";
 

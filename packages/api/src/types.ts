@@ -1,13 +1,13 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
-import type { ProviderRegistry } from "@ccflare/providers";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
+import type { ProviderRegistry } from "@agent-smith/providers";
 import type {
 	AccountProvider,
 	AccountSwitchThreshold,
 	AuthMethod,
 	PoolStatus,
 	RuntimeHealth,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export interface AccountResponse {
 	id: string;

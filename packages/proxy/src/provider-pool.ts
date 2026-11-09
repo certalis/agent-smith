@@ -1,7 +1,7 @@
-import { requestEvents, ServiceUnavailableError } from "@ccflare/core";
-import { Logger } from "@ccflare/logger";
-import type { ResolvedProviderPool } from "@ccflare/providers";
-import type { Account, RequestMeta } from "@ccflare/types";
+import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
+import { Logger } from "@agent-smith/logger";
+import type { ResolvedProviderPool } from "@agent-smith/providers";
+import type { Account, RequestMeta } from "@agent-smith/types";
 import {
 	createResolvedProxyContext,
 	ERROR_MESSAGES,

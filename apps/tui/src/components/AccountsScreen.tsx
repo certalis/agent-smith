@@ -1,5 +1,5 @@
-import type { BeginResult } from "@ccflare/oauth-flow";
-import type { AccountProvider } from "@ccflare/types";
+import type { BeginResult } from "@agent-smith/oauth-flow";
+import type { AccountProvider } from "@agent-smith/types";
 import { useKeyboard } from "@opentui/react";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "../App.tsx";
@@ -526,13 +526,13 @@ export function AccountsScreen({ refreshKey, port }: AccountsScreenProps) {
 							through this local pool while this tool is running.
 						</text>
 						<text fg={C.dim}>
-							The real clients are not overwritten. Agent-smith adds only its
+							The real clients are not overwritten. Agent Smith adds only its
 							marked PATH block to {paths.shellProfile}.
 						</text>
 					</>
 				) : (
 					<text fg={C.dim}>
-						Remove Agent-smith's wrappers and its marked PATH block. The real
+						Remove Agent Smith's wrappers and its marked PATH block. The real
 						clients remain unchanged.
 					</text>
 				)}

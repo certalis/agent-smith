@@ -1,4 +1,4 @@
-# ccflare Documentation
+# agent-smith Documentation
 
 > [!WARNING]
 > These docs describe **agent-smith, a proof of concept for ideation, not a
@@ -6,7 +6,7 @@
 > sign-ins are off by default; read the README's
 > [provider terms section](../README.md#subscription-sign-ins-and-provider-terms)
 > before enabling one. Marketing-style wording below (such as "never hit rate
-> limits") is inherited from the upstream ccflare project and is not a promise or
+> limits") is inherited from the upstream agent-smith project and is not a promise or
 > a recommendation.
 
 ## Track Every Request. Go Low-Level. Never Hit Rate Limits Again.
@@ -18,11 +18,11 @@
 
 ## Overview
 
-ccflare is the ultimate Claude API proxy with intelligent load balancing across multiple accounts. Built with TypeScript and Bun runtime, it provides full visibility into every request, response, and rate limit, ensuring your AI applications never experience downtime due to rate limiting.
+agent-smith is the ultimate Claude API proxy with intelligent load balancing across multiple accounts. Built with TypeScript and Bun runtime, it provides full visibility into every request, response, and rate limit, ensuring your AI applications never experience downtime due to rate limiting.
 
-### Why ccflare?
+### Why agent-smith?
 
-When working with Claude API at scale, rate limits can become a significant bottleneck. ccflare solves this by:
+When working with Claude API at scale, rate limits can become a significant bottleneck. agent-smith solves this by:
 
 - **🚀 Zero Rate Limit Errors**: Automatically distributes requests across multiple accounts with intelligent failover
 - **📊 Request-Level Analytics**: Track latency, token usage, and costs in real-time with <10ms overhead
@@ -79,29 +79,29 @@ When working with Claude API at scale, rate limits can become a significant bott
 
 ## Quick Start
 
-### 1. Install ccflare
+### 1. Install agent-smith
 
 ```bash
 # Clone the repository
-git clone https://github.com/snipeship/ccflare.git
-cd ccflare
+git clone https://github.com/certalis/agent-smith.git
+cd agent-smith
 
 # Install dependencies
 bun install
 ```
 
-### 2. Start ccflare (TUI + Server)
+### 2. Start agent-smith (TUI + Server)
 
 ```bash
-# Start ccflare with interactive TUI (automatically starts server)
-bun run ccflare
+# Start agent-smith with interactive TUI (automatically starts server)
+bun run agent-smith
 
 # Or start just the server without TUI
 bun run server
 
 # The quota-aware kernel chooses from eligible accounts automatically.
 # Configure a proxy key before serving client traffic.
-CF_PROXY_KEY=replace-with-a-secret bun run server
+AGENT_SMITH_PROXY_KEY=replace-with-a-secret bun run server
 
 # Run TUI directly with Bun (if not using npm scripts)
 bun run apps/tui/src/main.ts
@@ -125,27 +125,27 @@ bun run apps/tui/src/main.ts --add-account personal-account --provider openai
 bun run apps/tui/src/main.ts --add-account claude-work --provider claude-code
 bun run apps/tui/src/main.ts --add-account codex-work --provider codex
 
-# Or if you have ccflare command available globally
-ccflare --add-account work-account
+# Or if you have agent-smith command available globally
+agent-smith --add-account work-account
 ```
 
 ### 4. Configure Your Claude Client
 
 ```bash
-# Set the base URL to use ccflare
+# Set the base URL to use agent-smith
 export ANTHROPIC_BASE_URL=http://localhost:8080
 ```
 
 ### 5. Monitor Your Usage
 
 - **Web Dashboard**: Open [http://localhost:8080](http://localhost:8080) for real-time analytics
-- **Terminal UI**: Use the interactive TUI started with `bun run ccflare`
+- **Terminal UI**: Use the interactive TUI started with `bun run agent-smith`
 - **CLI**: Check status with `bun run apps/tui/src/main.ts --list`
 
 ## Project Structure
 
 ```
-ccflare/
+agent-smith/
 ├── apps/               # Application packages
 │   ├── server/        # Main proxy server
 │   ├── tui/           # Terminal UI with integrated CLI
@@ -171,7 +171,7 @@ ccflare/
 
 ```bash
 # Main commands
-bun run ccflare        # Start TUI (builds dashboard first)
+bun run agent-smith        # Start TUI (builds dashboard first)
 bun run server         # Start server only
 bun run tui            # Start TUI only
 bun run start          # Alias for bun run server
@@ -192,7 +192,7 @@ bun run format         # Format code
 
 ## CLI Commands
 
-The ccflare CLI is integrated into the TUI application. All CLI functionality is accessed through the same executable:
+The agent-smith CLI is integrated into the TUI application. All CLI functionality is accessed through the same executable:
 
 ```bash
 # If running without global install, use the full path:
@@ -229,20 +229,20 @@ For more detailed CLI documentation, see [CLI Commands](./cli.md).
 ```bash
 # Server Configuration
 PORT=8080                        # Server port (default: 8080)
-CF_PROXY_KEY=replace-with-a-secret # Required client credential
-# LB_STRATEGY and SESSION_DURATION_MS are legacy session-strategy settings.
+AGENT_SMITH_PROXY_KEY=replace-with-a-secret # Required client credential
+# AGENT_SMITH_LB_STRATEGY and AGENT_SMITH_SESSION_DURATION_MS are legacy session-strategy settings.
 # They do not control the quota-aware proxy kernel.
 
 # OAuth Configuration
-CLIENT_ID=<your-client-id>      # Custom OAuth client ID (optional)
+AGENT_SMITH_CLIENT_ID=<your-client-id>      # Custom OAuth client ID (optional)
 
 # Retry Configuration
-RETRY_ATTEMPTS=3                # Number of retry attempts (default: 3)
-RETRY_DELAY_MS=1000            # Initial retry delay in ms (default: 1000)
-RETRY_BACKOFF=2                # Exponential backoff multiplier (default: 2)
+AGENT_SMITH_RETRY_ATTEMPTS=3                # Number of retry attempts (default: 3)
+AGENT_SMITH_RETRY_DELAY_MS=1000            # Initial retry delay in ms (default: 1000)
+AGENT_SMITH_RETRY_BACKOFF=2                # Exponential backoff multiplier (default: 2)
 
 # Development
-LOG_LEVEL=info                  # Logging level (debug|info|warn|error)
+AGENT_SMITH_LOG_LEVEL=info                  # Logging level (debug|info|warn|error)
 NODE_ENV=production            # Environment mode
 ```
 
@@ -254,12 +254,12 @@ NODE_ENV=production            # Environment mode
 - [SQLite Documentation](https://www.sqlite.org/docs.html) - SQLite database docs
 
 ### Support
-- [GitHub Repository](https://github.com/snipeship/ccflare) - Source code and issues
-- [Contributing](./contributing.md) - How to contribute to ccflare
+- [GitHub Repository](https://github.com/certalis/agent-smith) - Source code and issues
+- [Contributing](./contributing.md) - How to contribute to agent-smith
 
 ## License
 
-ccflare is open source software licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
+agent-smith is open source software licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
 
 ---
 

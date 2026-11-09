@@ -1,11 +1,11 @@
-import { formatCost, getModelShortName } from "@ccflare/core";
-import type { TimeRange } from "@ccflare/types";
+import { formatCost, getModelShortName } from "@agent-smith/core";
+import type { TimeRange } from "@agent-smith/types";
 import {
 	formatNumber,
 	formatPercentage,
 	getSuccessRateTermColor,
 	getTimeRangeLabel,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { useKeyboard } from "@opentui/react";
 import { useCallback, useEffect, useState } from "react";
 import * as tuiCore from "../core";

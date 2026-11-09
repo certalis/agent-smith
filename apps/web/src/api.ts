@@ -1,5 +1,5 @@
-import type { AccountResponse } from "@ccflare/api";
-import { HttpClient, HttpError, type RequestOptions } from "@ccflare/http";
+import type { AccountResponse } from "@agent-smith/api";
+import { HttpClient, HttpError, type RequestOptions } from "@agent-smith/http";
 import type {
 	AccountCreateData,
 	AccountProvider,
@@ -20,8 +20,8 @@ import type {
 	StrategyName,
 	StrategyResponse,
 	TimeRange,
-} from "@ccflare/types";
-import { isLogEvent, parseLogStreamEvent } from "@ccflare/types";
+} from "@agent-smith/types";
+import { isLogEvent, parseLogStreamEvent } from "@agent-smith/types";
 import { API_LIMITS, API_TIMEOUT } from "./constants";
 
 class API extends HttpClient {

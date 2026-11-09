@@ -6,7 +6,7 @@ function upstreamRequest(clientId: string): RecordedUpstreamRequest {
 	return {
 		account: "a",
 		body: new TextEncoder().encode("{}"),
-		headers: new Headers({ "x-ccflare-scenario-client-id": clientId }),
+		headers: new Headers({ "x-agent-smith-scenario-client-id": clientId }),
 		method: "POST",
 		path: "/v1/messages",
 	};
@@ -17,7 +17,7 @@ test("limits upstream attempts for each concurrent scenario client", () => {
 		id: "at-most-two-attempts",
 		type: "upstream" as const,
 		atMostPerHeader: {
-			name: "x-ccflare-scenario-client-id",
+			name: "x-agent-smith-scenario-client-id",
 			count: 2,
 		},
 	};
@@ -130,4 +130,65 @@ test("response assertions select named requests and reject wrong JSON or leaked 
 			clients,
 		),
 	).toContain("omit");
+});
+
+test.each([
+	{ assertion: { connections: 2 }, message: "upstream connections" },
+	{ assertion: { closed: 0 }, message: "closed upstream requests" },
+	{ assertion: { responsesEnded: 0 }, message: "ended upstream responses" },
+])("rejects mismatched Node wire counts: $message", ({
+	assertion,
+	message,
+}) => {
+	expect(
+		upstreamFailure(
+			{ id: "wire", type: "upstream", ...assertion },
+			[{ ...upstreamRequest("0-0"), closed: true, responseEnded: true }],
+			1,
+		),
+	).toContain(message);
+});
+
+test.each([
+	{
+		assertion: { uploadCompleted: false },
+		observation: { uploadCompleted: true },
+		field: "uploadCompleted",
+	},
+	{
+		assertion: { uploadedBytes: 0 },
+		observation: { uploadedBytes: 1 },
+		field: "uploadedBytes",
+	},
+	{
+		assertion: { cancelled: true },
+		observation: { cancelled: false },
+		field: "cancelled",
+	},
+	{
+		assertion: { uploadBufferedBytes: 0 },
+		observation: { uploadBufferedBytes: 1 },
+		field: "uploadBufferedBytes",
+	},
+	{
+		assertion: { connectionRefused: true },
+		observation: { connectionRefused: false },
+		field: "connectionRefused",
+	},
+])("rejects mismatched Node client observation: $field", ({
+	assertion,
+	observation,
+	field,
+}) => {
+	expect(
+		clientFailure({ id: "wire", type: "client", ...assertion }, [
+			{
+				status: 401,
+				body: "",
+				chunks: [],
+				headers: new Headers(),
+				...observation,
+			},
+		]),
+	).toContain(field);
 });

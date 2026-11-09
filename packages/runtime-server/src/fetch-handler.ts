@@ -1,6 +1,6 @@
-import type { APIRouter } from "@ccflare/api";
-import { HTTP_STATUS } from "@ccflare/core";
-import { BadRequest, errorResponse } from "@ccflare/http";
+import type { APIRouter } from "@agent-smith/api";
+import { HTTP_STATUS } from "@agent-smith/core";
+import { BadRequest, errorResponse } from "@agent-smith/http";
 import {
 	handleProxy,
 	handleWebSocketUpgradeRequest,
@@ -8,7 +8,7 @@ import {
 	type ProxyContext,
 	prepareRequestBody,
 	type WebSocketProxyData,
-} from "@ccflare/proxy";
+} from "@agent-smith/proxy";
 import { serveDashboardRoute } from "./dashboard-assets";
 import { type ExposureConfig, exposureFailure } from "./exposure";
 import { forwardOAuthTokenRequest } from "./oauth-token";

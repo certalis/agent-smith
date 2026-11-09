@@ -12,6 +12,7 @@ export type ProxyEdgeOptions = {
 	socketPath: string;
 	maxBodyBytes?: number;
 	timeoutMs?: number;
+	maxConcurrentRequests?: number;
 };
 
 const REQUEST_HEADERS = [
@@ -84,6 +85,7 @@ export function createProxyEdgeHandler({
 	socketPath,
 	maxBodyBytes = 64 * 1024 * 1024,
 	timeoutMs = 300_000,
+	maxConcurrentRequests = 128,
 }: ProxyEdgeOptions) {
 	const url = new URL(origin);
 	if (
@@ -93,12 +95,15 @@ export function createProxyEdgeHandler({
 		!Number.isSafeInteger(maxBodyBytes) ||
 		maxBodyBytes < 1 ||
 		!Number.isSafeInteger(timeoutMs) ||
-		timeoutMs < 1
+		timeoutMs < 1 ||
+		!Number.isSafeInteger(maxConcurrentRequests) ||
+		maxConcurrentRequests < 1
 	) {
 		throw new Error(
 			"Proxy edge requires an exact HTTPS origin, an absolute socket path and positive limits",
 		);
 	}
+	let activeRequests = 0;
 	return (req: IncomingMessage, res: ServerResponse) => {
 		const finish = (status: number) => {
 			if (res.writableEnded || res.destroyed) return;
@@ -114,6 +119,8 @@ export function createProxyEdgeHandler({
 		};
 		const rejected = requestFailure(req, origin, maxBodyBytes);
 		if (rejected) return finish(rejected);
+		if (activeRequests >= maxConcurrentRequests) return finish(503);
+		activeRequests++;
 		const path =
 			req.method === "GET" && req.url === "/pool-health"
 				? "/health"
@@ -152,6 +159,7 @@ export function createProxyEdgeHandler({
 			finish(504);
 		}, timeoutMs);
 		res.once("close", () => {
+			activeRequests--;
 			clearTimeout(timer);
 			upstreamResponse?.destroy();
 			upstream.destroy();
@@ -168,6 +176,8 @@ export function createProxyEdgeHandler({
 				finish(413);
 			}
 		});
+		// Let the private pool reject bad keys before waiting for upload bytes.
+		upstream.flushHeaders();
 		req.pipe(upstream);
 	};
 }

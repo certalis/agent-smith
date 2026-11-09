@@ -1,12 +1,12 @@
-import type { Config } from "@ccflare/config";
-import type { DatabaseOperations } from "@ccflare/database";
+import type { Config } from "@agent-smith/config";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import type { HealthResponse, RuntimeHealth } from "@ccflare/types";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import type { HealthResponse, RuntimeHealth } from "@agent-smith/types";
 
 const log = new Logger("HealthHandler");
 

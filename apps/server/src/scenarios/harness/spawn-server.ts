@@ -37,6 +37,7 @@ export type ScenarioWorkspace = {
 
 type SpawnServerOptions = {
 	workspace?: ScenarioWorkspace;
+	standalone?: boolean;
 	privateSocket?: boolean;
 	config?: Record<string, unknown>;
 	environment?: Record<string, string>;
@@ -55,6 +56,7 @@ type ChildMessage =
 	| { error: string; id?: string; type: "error" }
 	| { id: string; now: number; type: "advanced" }
 	| { id: string; type: "stopped" }
+	| { id: string; type: "pool-exited" }
 	| { type: "fetch-guard"; url: string };
 
 type ChildOutput = { stderr: string; stdout: string };
@@ -244,6 +246,12 @@ export class SpawnedServer {
 		await this.sendAndWait({ byMs: durationMs(by), id, type: "advance" });
 	}
 
+	async terminatePool(): Promise<void> {
+		if (!this.options.standalone)
+			throw new Error("Pool termination requires a standalone scenario");
+		await this.sendAndWait({ id: crypto.randomUUID(), type: "terminate-pool" });
+	}
+
 	/** Simulate an atomic-config-write failure using only this fixture's temporary path. */
 	blockConfigWrite(): void {
 		renameSync(this.paths.configPath, `${this.paths.configPath}.backup`);
@@ -262,14 +270,14 @@ export class SpawnedServer {
 		this.stopped = true;
 
 		try {
-			await stopChild(this.child);
+			await this.stopProcess();
 		} finally {
 			rmSync(this.paths.directory, { recursive: true, force: true });
 		}
 	}
 
 	async restart(now: number): Promise<SpawnedServer> {
-		await stopChild(this.child);
+		await this.stopProcess();
 		const next = await spawnServer({
 			...this.options,
 			workspace: this.paths,
@@ -282,9 +290,18 @@ export class SpawnedServer {
 		return next;
 	}
 
+	private async stopProcess(): Promise<void> {
+		try {
+			if (this.options.standalone && isRunning(this.child))
+				await this.sendAndWait({ id: crypto.randomUUID(), type: "stop" });
+		} finally {
+			await stopChild(this.child);
+		}
+	}
+
 	private async sendAndWait(message: {
 		id: string;
-		type: "advance" | "stop";
+		type: "advance" | "stop" | "terminate-pool";
 		byMs?: number;
 	}): Promise<void> {
 		const reply = new Promise<void>((resolve, reject) => {
@@ -319,10 +336,10 @@ export async function spawnServer(
 ): Promise<SpawnedServer> {
 	const directory =
 		options.workspace?.directory ??
-		mkdtempSync(join(tmpdir(), "ccflare-scenario-server-"));
+		mkdtempSync(join(tmpdir(), "agent-smith-scenario-server-"));
 	const paths: ScenarioWorkspace = {
 		configPath: join(directory, "config.json"),
-		dbPath: join(directory, "ccflare.db"),
+		dbPath: join(directory, "agent-smith.db"),
 		directory,
 	};
 	let child: ChildProcess | undefined;
@@ -330,26 +347,51 @@ export async function spawnServer(
 
 	try {
 		if (options.config) {
-			writeFileSync(paths.configPath, JSON.stringify(options.config), "utf8");
+			writeFileSync(paths.configPath, JSON.stringify(options.config), {
+				encoding: "utf8",
+				mode: 0o600,
+			});
 		}
 		options.seed?.(paths);
-		const entry = fileURLToPath(new URL("./server-entry.ts", import.meta.url));
+		const poolEntry = fileURLToPath(
+			new URL("./server-entry.ts", import.meta.url),
+		);
+		let entry = poolEntry;
+		if (options.standalone) {
+			const build = await Bun.build({
+				entrypoints: [
+					fileURLToPath(new URL("./standalone-entry.ts", import.meta.url)),
+				],
+				outdir: directory,
+				naming: "standalone.mjs",
+				target: "node",
+			});
+			if (!build.success)
+				throw new Error(
+					`Standalone scenario build failed: ${build.logs.join("\n")}`,
+				);
+			entry = join(directory, "standalone.mjs");
+		}
 		const spawnedChild = fork(entry, [], {
 			execArgv: [],
-			execPath: process.execPath,
+			execPath: options.standalone ? "node" : process.execPath,
 			env: {
 				...withoutProxyVariables(process.env),
-				CF_ENROLLMENT_ORIGIN: undefined,
-				CCFLARE_SCENARIO_CLAUDE_OAUTH_URL: undefined,
+				AGENT_SMITH_ENROLLMENT_ORIGIN: undefined,
+				AGENT_SMITH_SCENARIO_CLAUDE_OAUTH_URL: undefined,
 				...options.environment,
-				CCFLARE_SCENARIO_UNIX_SOCKET: options.privateSocket
+				AGENT_SMITH_STATE_DIR: options.standalone ? directory : undefined,
+				AGENT_SMITH_SCENARIO_POOL_ENTRY: options.standalone
+					? poolEntry
+					: undefined,
+				AGENT_SMITH_SCENARIO_UNIX_SOCKET: options.privateSocket
 					? join(directory, "control.sock")
 					: undefined,
-				CCFLARE_SCENARIO_INITIAL_TIME: String(
+				AGENT_SMITH_SCENARIO_INITIAL_TIME: String(
 					options.initialTime ?? Date.now(),
 				),
-				ccflare_CONFIG_PATH: paths.configPath,
-				ccflare_DB_PATH: paths.dbPath,
+				AGENT_SMITH_CONFIG_PATH: paths.configPath,
+				AGENT_SMITH_DB_PATH: paths.dbPath,
 			},
 			silent: true,
 		});
@@ -391,12 +433,20 @@ export async function spawnServer(
 			output,
 			options,
 		);
-		await withoutProxyEnvironment(() =>
-			waitForHealth(
-				server.url,
-				options.environment?.CF_PROXY_KEY ?? process.env.CF_PROXY_KEY,
-			),
-		);
+		await withoutProxyEnvironment(async () => {
+			if (options.standalone) {
+				const health = await fetch(`${server.url}/readyz`, {
+					headers: { host: "pool.example" },
+				});
+				if (!health.ok)
+					throw new Error(`Standalone readiness failed: ${health.status}`);
+			} else
+				await waitForHealth(
+					server.url,
+					options.environment?.AGENT_SMITH_PROXY_KEY ??
+						process.env.AGENT_SMITH_PROXY_KEY,
+				);
+		});
 		return server;
 	} catch (error) {
 		if (child) {

@@ -10,10 +10,10 @@ it("stops and restarts both listeners and cleans up after a partial bind failure
 		const root = mkdtempSync("/tmp/smith-private-");
 		const socket = join(root, "control.sock");
 		Object.assign(process.env, {
-			ccflare_DB_PATH: join(root, "pool.db"),
-			ccflare_CONFIG_PATH: join(root, "config.json"),
-			CF_HOST: "127.0.0.1", CF_TRUST_LOOPBACK: "false",
-			CF_ADMIN_KEY: "synthetic-admin", CF_PROXY_KEY: "synthetic-proxy"
+			AGENT_SMITH_DB_PATH: join(root, "pool.db"),
+			AGENT_SMITH_CONFIG_PATH: join(root, "config.json"),
+			AGENT_SMITH_HOST: "127.0.0.1", AGENT_SMITH_TRUST_LOOPBACK: "false",
+			AGENT_SMITH_ADMIN_KEY: "synthetic-admin", AGENT_SMITH_PROXY_KEY: "synthetic-proxy"
 		});
 		let server;
 		try {

@@ -2,7 +2,7 @@
  * Consolidated stats repository to eliminate duplication between tui-core and http-api
  */
 import type { Database } from "bun:sqlite";
-import { NO_ACCOUNT_ID } from "@ccflare/types";
+import { NO_ACCOUNT_ID } from "@agent-smith/types";
 import { RequestRepository } from "./request.repository";
 
 export interface AccountStats {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { CLAUDE_CODE_OAUTH_TOKEN_URL } from "@ccflare/providers";
+import { CLAUDE_CODE_OAUTH_TOKEN_URL } from "@agent-smith/providers";
 import { forwardOAuthTokenRequest } from "./oauth-token";
 
 const originalFetch = globalThis.fetch;

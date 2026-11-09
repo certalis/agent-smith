@@ -2,7 +2,7 @@ import {
 	getThemesByFamily,
 	THEME_FAMILIES,
 	type ThemePalette,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { Check, Monitor, Palette } from "lucide-react";
 import { useTheme } from "../contexts/theme-context";
 import { Button } from "./ui/button";

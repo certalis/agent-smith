@@ -1,4 +1,4 @@
-import type { AccountProvider, TimeRange } from "@ccflare/types";
+import type { AccountProvider, TimeRange } from "@agent-smith/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import { REFRESH_INTERVALS } from "../constants";

@@ -1,10 +1,10 @@
-import { formatCost } from "@ccflare/core";
-import type { TimeRange } from "@ccflare/types";
+import { formatCost } from "@agent-smith/core";
+import type { TimeRange } from "@agent-smith/types";
 import {
 	formatNumber,
 	formatPercentage,
 	formatTokensPerSecond,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import { format } from "date-fns";
 import { Activity, CheckCircle, Clock, DollarSign, Zap } from "lucide-react";
 import { useMemo, useState } from "react";

@@ -1,12 +1,12 @@
-import type { DatabaseOperations } from "@ccflare/database";
+import type { DatabaseOperations } from "@agent-smith/database";
 import {
 	errorResponse,
 	InternalServerError,
 	jsonResponse,
 	NotFound,
-} from "@ccflare/http";
-import { Logger } from "@ccflare/logger";
-import { parseRequestPayload } from "@ccflare/types";
+} from "@agent-smith/http";
+import { Logger } from "@agent-smith/logger";
+import { parseRequestPayload } from "@agent-smith/types";
 import {
 	enrichRequestPayload,
 	serializeRequestResponse,

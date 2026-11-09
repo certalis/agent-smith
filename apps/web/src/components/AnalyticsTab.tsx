@@ -1,7 +1,7 @@
-import { formatCost } from "@ccflare/core";
-import type { TimeRange } from "@ccflare/types";
-import { ACCOUNT_PROVIDERS } from "@ccflare/types";
-import { formatPercentage, formatTokens } from "@ccflare/ui";
+import { formatCost } from "@agent-smith/core";
+import type { TimeRange } from "@agent-smith/types";
+import { ACCOUNT_PROVIDERS } from "@agent-smith/types";
+import { formatPercentage, formatTokens } from "@agent-smith/ui";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { useAnalytics } from "../hooks/queries";

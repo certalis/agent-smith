@@ -1,11 +1,11 @@
-import type { Config } from "@ccflare/config";
+import type { Config } from "@agent-smith/config";
 import {
 	NETWORK,
 	TIME_CONSTANTS,
 	ValidationError,
 	validateNumber,
-} from "@ccflare/core";
-import { BadRequest, errorResponse, jsonResponse } from "@ccflare/http";
+} from "@agent-smith/core";
+import { BadRequest, errorResponse, jsonResponse } from "@agent-smith/http";
 import {
 	type ConfigResponse,
 	isLbStrategy,
@@ -13,7 +13,7 @@ import {
 	type MutationResult,
 	type RetentionGetResponse,
 	type StrategyResponse,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import { parseJsonObject } from "../utils/json";
 
 /**

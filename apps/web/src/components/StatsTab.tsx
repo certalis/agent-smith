@@ -1,4 +1,4 @@
-import { formatPercentage, getSuccessRateTextClass } from "@ccflare/ui";
+import { formatPercentage, getSuccessRateTextClass } from "@agent-smith/ui";
 import { RefreshCw } from "lucide-react";
 import { useResetStats, useStats } from "../hooks/queries";
 import { useApiError } from "../hooks/useApiError";

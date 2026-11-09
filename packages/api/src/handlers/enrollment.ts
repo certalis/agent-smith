@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
-import { ValidationError } from "@ccflare/core";
+import { ValidationError } from "@agent-smith/core";
 import {
 	type OAuthAuthorization,
 	OAuthFlow,
 	type VerifiedClaudeSeat,
-} from "@ccflare/oauth-flow";
-import { isRecord } from "@ccflare/types";
+} from "@agent-smith/oauth-flow";
+import { isRecord } from "@agent-smith/types";
 import type { APIContext } from "../types";
 import { enrollmentPage } from "./enrollment-page";
 

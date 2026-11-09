@@ -1,10 +1,10 @@
+import { agentSmithDark, agentSmithLight } from "./agent-smith";
 import {
 	catppuccinFrappe,
 	catppuccinLatte,
 	catppuccinMacchiato,
 	catppuccinMocha,
 } from "./catppuccin";
-import { ccflareDark, ccflareLight } from "./ccflare";
 import { dracula } from "./dracula";
 import { gruvboxDark, gruvboxLight } from "./gruvbox";
 import { nord, nordLight } from "./nord";
@@ -19,8 +19,8 @@ export { themeToTuiColors } from "./tui-adapter";
 export type { ThemePalette } from "./types";
 
 export const THEME_REGISTRY: ThemePalette[] = [
-	ccflareLight,
-	ccflareDark,
+	agentSmithLight,
+	agentSmithDark,
 	tokyoNight,
 	catppuccinMocha,
 	catppuccinMacchiato,
@@ -50,7 +50,7 @@ export function getThemesByFamily(family: string): ThemePalette[] {
 }
 
 export function getDefaultTheme(appearance: "dark" | "light"): ThemePalette {
-	return appearance === "dark" ? ccflareDark : ccflareLight;
+	return appearance === "dark" ? agentSmithDark : agentSmithLight;
 }
 
 /**
@@ -68,12 +68,12 @@ export function getSiblingTheme(
 }
 
 export {
+	agentSmithDark,
+	agentSmithLight,
 	catppuccinFrappe,
 	catppuccinLatte,
 	catppuccinMacchiato,
 	catppuccinMocha,
-	ccflareDark,
-	ccflareLight,
 	dracula,
 	gruvboxDark,
 	gruvboxLight,

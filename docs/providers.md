@@ -2,7 +2,7 @@
 
 ## Overview
 
-ccflare’s provider layer gives the rest of the system a consistent way to deal with multiple upstream APIs without collapsing all provider-specific behavior into the proxy.
+agent-smith’s provider layer gives the rest of the system a consistent way to deal with multiple upstream APIs without collapsing all provider-specific behavior into the proxy.
 
 `packages/providers` owns:
 

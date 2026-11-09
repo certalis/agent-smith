@@ -1,10 +1,10 @@
-import { formatCost } from "@ccflare/core";
+import { formatCost } from "@agent-smith/core";
 import type {
 	Request,
 	RequestSummary,
 	Stats,
 	StatsWithAccounts,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 import {
 	formatAccountRateLimitStatus,
 	formatAccountSessionInfo,
@@ -14,7 +14,7 @@ import { formatDuration, formatPercentage, formatTokens } from "./formatters";
 /**
  * Shape expected by AccountPresenter.
  *
- * This matches AccountResponse from @ccflare/api -- the only shape
+ * This matches AccountResponse from @agent-smith/api -- the only shape
  * callers actually pass in (the dashboard web app).  Earlier revisions
  * accepted a three-way union (Account | AccountResponseLike | AccountDisplay)
  * with runtime "in"-operator narrowing, but all non-AccountResponse branches

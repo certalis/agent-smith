@@ -1,6 +1,6 @@
-import { sseResponse } from "@ccflare/http";
-import { Logger, logBus } from "@ccflare/logger";
-import { isLogEvent, type LogEvent } from "@ccflare/types";
+import { sseResponse } from "@agent-smith/http";
+import { Logger, logBus } from "@agent-smith/logger";
+import { isLogEvent, type LogEvent } from "@agent-smith/types";
 
 const log = new Logger("LogsHandler");
 

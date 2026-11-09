@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import type { TeamRoutingConfig } from "@ccflare/config";
-import type { Provider } from "@ccflare/providers";
-import type { Account, AccountProvider } from "@ccflare/types";
+import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { Provider } from "@agent-smith/providers";
+import type { Account, AccountProvider } from "@agent-smith/types";
 import { compareSeatUsage } from "./seat-usage";
 
 const MAX_OPENING_BYTES = 64 * 1024;

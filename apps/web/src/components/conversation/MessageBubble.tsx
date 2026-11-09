@@ -1,4 +1,4 @@
-import type { Role } from "@ccflare/types";
+import type { Role } from "@agent-smith/types";
 import React from "react";
 import { useCollapsible } from "../../hooks/useCollapsible";
 import { Button } from "../ui/button";

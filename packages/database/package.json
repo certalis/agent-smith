@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/database",
+	"name": "@agent-smith/database",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "./src/index.ts",
@@ -12,9 +12,9 @@
 		"analyze": "bun run ./src/analyze-performance.ts"
 	},
 	"dependencies": {
-		"@ccflare/config": "workspace:*",
-		"@ccflare/core": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/types": "workspace:*"
+		"@agent-smith/config": "workspace:*",
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/types": "workspace:*"
 	}
 }

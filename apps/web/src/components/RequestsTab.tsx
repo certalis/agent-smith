@@ -1,11 +1,11 @@
-import { formatCost } from "@ccflare/core";
-import type { RequestPayload } from "@ccflare/types";
+import { formatCost } from "@agent-smith/core";
+import type { RequestPayload } from "@agent-smith/types";
 import {
 	decodeBase64Body,
 	formatDuration,
 	formatTokens,
 	formatTokensPerSecond,
-} from "@ccflare/ui";
+} from "@agent-smith/ui";
 import {
 	Calendar,
 	ChevronDown,

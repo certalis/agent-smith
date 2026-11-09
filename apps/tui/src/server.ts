@@ -4,4 +4,4 @@ export {
 	default,
 	type ServerHandle,
 	type StartServerOptions,
-} from "@ccflare/runtime-server";
+} from "@agent-smith/runtime-server";

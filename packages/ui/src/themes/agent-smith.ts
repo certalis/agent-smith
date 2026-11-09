@@ -1,9 +1,9 @@
 import type { ThemePalette } from "./types";
 
-export const ccflareLight: ThemePalette = {
-	id: "ccflare-light",
-	name: "ccflare Light",
-	family: "ccflare",
+export const agentSmithLight: ThemePalette = {
+	id: "agent-smith-light",
+	name: "Agent Smith Light",
+	family: "agent-smith",
 	appearance: "light",
 
 	background: "#ffffff",
@@ -40,10 +40,10 @@ export const ccflareLight: ThemePalette = {
 	chart5: "#10b981",
 };
 
-export const ccflareDark: ThemePalette = {
-	id: "ccflare-dark",
-	name: "ccflare Dark",
-	family: "ccflare",
+export const agentSmithDark: ThemePalette = {
+	id: "agent-smith-dark",
+	name: "Agent Smith Dark",
+	family: "agent-smith",
 	appearance: "dark",
 
 	background: "#111318",

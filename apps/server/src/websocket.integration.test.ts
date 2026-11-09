@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { requestEvents } from "@ccflare/core";
+import { requestEvents } from "@agent-smith/core";
 import {
 	handleWebSocketUpgradeRequest,
 	type IncomingWorkerMessage,
 	type WebSocketProxyData,
 	websocketProxyHandler,
-} from "@ccflare/proxy";
-import type { RequestStreamEvent } from "@ccflare/types";
+} from "@agent-smith/proxy";
+import type { RequestStreamEvent } from "@agent-smith/types";
 import {
 	createCodexAccount,
 	createInMemoryProxyContext,

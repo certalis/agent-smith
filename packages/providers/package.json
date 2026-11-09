@@ -1,5 +1,5 @@
 {
-	"name": "@ccflare/providers",
+	"name": "@agent-smith/providers",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "./src/index.ts",
@@ -11,9 +11,9 @@
 		"test": "bun test ./src"
 	},
 	"dependencies": {
-		"@ccflare/core": "workspace:*",
-		"@ccflare/http": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/types": "workspace:*"
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/http": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/types": "workspace:*"
 	}
 }

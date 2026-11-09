@@ -1,6 +1,6 @@
-import { formatCost } from "@ccflare/core";
-import type { TimePoint, TimeRange } from "@ccflare/types";
-import { formatNumber, formatTokens } from "@ccflare/ui";
+import { formatCost } from "@agent-smith/core";
+import type { TimePoint, TimeRange } from "@agent-smith/types";
+import { formatNumber, formatTokens } from "@agent-smith/ui";
 import { useState } from "react";
 import {
 	Area,

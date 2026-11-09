@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	type AssertionFailure,
 	type ClientResult,
 	evaluateAssertions,
 } from "./assertions";
+import { stopAll } from "./cleanup";
 import { startFakeUpstream } from "./fake-upstream";
 import { seedFleet } from "./fleet";
+import { NodeWire } from "./node-wire";
 import { durationMs, type RequestStep, type Scenario } from "./scenario";
 import { startSocketFailureUpstream } from "./socket-failure-upstream";
 import {
@@ -12,6 +17,7 @@ import {
 	spawnServer,
 	withoutProxyEnvironment,
 } from "./spawn-server";
+import { wireAdminKey, wireDeviceKey, wireProxyKey } from "./wire-fixture";
 
 const INITIAL_TIME = 1_700_000_000_000;
 const SCENARIO_TIMEOUT_MS = 20_000;
@@ -78,6 +84,7 @@ async function request(
 	stepIndex: number,
 	values: ReadonlyMap<string, string>,
 	onChunk?: (clientId: string) => void,
+	nodeWire?: NodeWire,
 ): Promise<ClientResult[]> {
 	const unix = step.transport === "unix" ? server.unixSocket : undefined;
 	if (step.transport === "unix" && !unix) {
@@ -103,7 +110,24 @@ async function request(
 			if (step.sessionId) {
 				headers.set("x-claude-code-session-id", step.sessionId);
 			}
-			headers.set("x-ccflare-scenario-client-id", clientId);
+			headers.set("x-agent-smith-scenario-client-id", clientId);
+			if (step.transport === "edge") {
+				if (!nodeWire)
+					throw new Error(
+						"Scenario edge transport requires edge configuration",
+					);
+				if (!headers.has("x-api-key") && !headers.has("authorization"))
+					headers.set("x-api-key", wireDeviceKey);
+				return await nodeWire.request(clientId, step.id, {
+					body: substitute(step.body),
+					headers: Object.fromEntries(headers),
+					method: step.method ?? "POST",
+					path,
+					upload: step.upload,
+				});
+			}
+			if (step.upload)
+				throw new Error("Headers-only uploads require the Node edge transport");
 
 			return await withoutProxyEnvironment(async () => {
 				const response = await fetch(`${baseUrl}${path}`, {
@@ -112,7 +136,27 @@ async function request(
 					headers,
 					body: step.method === "GET" ? undefined : substitute(step.body),
 					signal: AbortSignal.timeout(SCENARIO_TIMEOUT_MS),
+				}).catch((error: unknown) => {
+					if (
+						!step.allowConnectionRefused ||
+						!error ||
+						typeof error !== "object" ||
+						!["ConnectionRefused", "ECONNREFUSED"].includes(
+							String(Reflect.get(error, "code")),
+						)
+					)
+						throw error;
+					return undefined;
 				});
+				if (!response)
+					return {
+						id: step.id,
+						body: "",
+						chunks: [],
+						headers: new Headers(),
+						status: 0,
+						connectionRefused: true,
+					};
 				return {
 					id: step.id,
 					...(await readClientBody(response, () => onChunk?.(clientId))),
@@ -214,7 +258,7 @@ function configForScenario(scenario: Scenario): Record<string, unknown> {
 	);
 	const usesClaudeSignIn =
 		scenario.claudeOAuth ||
-		scenario.environment?.CF_ENROLLMENT_ORIGIN !== undefined;
+		scenario.environment?.AGENT_SMITH_ENROLLMENT_ORIGIN !== undefined;
 	if (usesClaudeSignIn) scenarioProviders.add("claude-code");
 
 	return {
@@ -235,31 +279,78 @@ export async function runScenario(scenario: Scenario): Promise<void> {
 async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 	let now = INITIAL_TIME;
 	const tokenToAccount = new Map<string, string>();
-	const upstream = startFakeUpstream({
-		rules: scenario.upstream,
-		tokenToAccount,
-		now: () => now,
-	});
+	const nodeWire =
+		scenario.edge || scenario.upstreamRuntime === "node"
+			? await NodeWire.start(
+					scenario.upstream,
+					scenario.fleet.map((account) => [
+						account.authMethod === "api_key"
+							? `key-${account.name}`
+							: `tok-${account.name}`,
+						account.name,
+					]),
+				)
+			: undefined;
+	const bunUpstream = nodeWire
+		? undefined
+		: startFakeUpstream({
+				rules: scenario.upstream,
+				tokenToAccount,
+				now: () => now,
+			});
+	const upstream = nodeWire ?? bunUpstream;
+	if (!upstream) throw new Error("Scenario did not start an upstream");
 	const socketFailureUpstream = scenario.fleet.some(
 		(account) => account.transportFailure,
 	)
-		? await startSocketFailureUpstream(tokenToAccount, upstream)
+		? await startSocketFailureUpstream(
+				tokenToAccount,
+				bunUpstream ??
+					(() => {
+						throw new Error("Socket failures require the Bun fake upstream");
+					})(),
+			)
 		: undefined;
 	let server: SpawnedServer | undefined;
+	const edgeEnvironment: Record<string, string> = {
+		...(scenario.edge || scenario.standalone
+			? {
+					AGENT_SMITH_HOST: "127.0.0.1",
+					AGENT_SMITH_TRUST_LOOPBACK: "false",
+					AGENT_SMITH_PROXY_KEY: wireProxyKey,
+					AGENT_SMITH_ADMIN_KEY: wireAdminKey,
+				}
+			: {}),
+		...scenario.environment,
+		AGENT_SMITH_SCENARIO_ALERTS_URL: upstream.url,
+		...(scenario.claudeOAuth
+			? { AGENT_SMITH_SCENARIO_CLAUDE_OAUTH_URL: upstream.url }
+			: {}),
+	};
 
 	try {
 		server = await spawnServer({
+			standalone: scenario.standalone,
 			config: configForScenario(scenario),
-			privateSocket: scenario.privateSocket,
-			environment: {
-				...scenario.environment,
-				CCFLARE_SCENARIO_ALERTS_URL: upstream.url,
-				...(scenario.claudeOAuth
-					? { CCFLARE_SCENARIO_CLAUDE_OAUTH_URL: upstream.url }
-					: {}),
-			},
+			privateSocket:
+				scenario.privateSocket || Boolean(scenario.edge) || scenario.standalone,
+			environment: edgeEnvironment,
 			initialTime: now,
 			seed: (workspace) => {
+				if (scenario.edge || scenario.standalone) {
+					const clientsPath = join(workspace.directory, "clients.json");
+					writeFileSync(
+						clientsPath,
+						JSON.stringify({
+							"synthetic-device": createHash("sha256")
+								.update(wireDeviceKey)
+								.digest("hex"),
+						}),
+						{ mode: 0o600 },
+					);
+					// spawnServer reads this object after seeding, before forking the pool.
+					edgeEnvironment.AGENT_SMITH_CLIENT_KEYS_FILE = clientsPath;
+				}
 				const fleet = seedFleet({
 					accounts: scenario.fleet.map((account) =>
 						account.transportFailure
@@ -275,6 +366,11 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 				}
 			},
 		});
+		if (scenario.edge) {
+			if (!nodeWire || !server.unixSocket)
+				throw new Error("Scenario edge requires its private pool socket");
+			await nodeWire.startEdge(server.unixSocket, scenario.edge);
+		}
 
 		const clients: ClientResult[] = [];
 		const values = new Map<string, string>();
@@ -295,6 +391,12 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 						if (pendingRequests.size > 0)
 							throw new Error("Cannot restart with pending requests");
 						server = await server.restart(now);
+					} else if (step.type === "stop") {
+						if (pendingRequests.size > 0)
+							throw new Error("Cannot stop with pending requests");
+						await server.stop();
+					} else if (step.type === "terminate-pool") {
+						await server.terminatePool();
 					} else if (step.type === "block-config-write") {
 						server.blockConfigWrite();
 					} else if (step.type === "restore-config-write") {
@@ -306,6 +408,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 							stepIndex,
 							values,
 							releaseSseChunk,
+							nodeWire,
 						);
 						if (step.waitForUpstream !== undefined) {
 							await upstream.waitForRequests(step.waitForUpstream);
@@ -323,6 +426,22 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 							clients.push(...completed);
 							captureResponse(step, completed, values);
 						}
+					} else if (
+						step.type === "wait-for-client-chunk" ||
+						step.type === "cancel"
+					) {
+						if (!nodeWire)
+							throw new Error("Client wire barriers require a Node edge");
+						await nodeWire.clientAction(
+							step.type === "cancel" ? "cancel" : "client-chunk",
+							step.id,
+						);
+					} else if (step.type === "wait-for-upstream-close") {
+						if (!nodeWire)
+							throw new Error(
+								"Connection close barriers require a Node upstream",
+							);
+						await nodeWire.waitForClosed(step.count);
 					} else if (step.type === "release") {
 						upstream.releaseHold(step.id);
 					} else if (step.type === "flush") {
@@ -379,8 +498,6 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 			`${error instanceof Error ? error.message : String(error)}${childOutput(server)}`,
 		);
 	} finally {
-		await server?.stop();
-		await socketFailureUpstream?.stop();
-		await upstream.stop();
+		await stopAll([nodeWire, server, socketFailureUpstream, bunUpstream]);
 	}
 }

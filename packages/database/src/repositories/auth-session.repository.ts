@@ -1,4 +1,4 @@
-import type { AccountProvider, AuthMethod } from "@ccflare/types";
+import type { AccountProvider, AuthMethod } from "@agent-smith/types";
 import { BaseRepository } from "./base.repository";
 
 export interface AuthSession {

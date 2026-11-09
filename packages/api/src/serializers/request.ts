@@ -3,7 +3,7 @@ import {
 	type RequestPayload,
 	type RequestSummary,
 	toRequestSummary,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 type RequestWithAccountName = Request & {
 	accountName?: string | null;

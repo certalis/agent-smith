@@ -47,13 +47,14 @@ export function createExposureConfig(config: {
 	get(key: string): string | number | boolean | undefined;
 }): ExposureConfig {
 	const configuredHost =
-		configuredKey(process.env.CF_HOST) ?? configuredKey(config.get("host"));
-	const configuredTrustLoopback = process.env.CF_TRUST_LOOPBACK;
+		configuredKey(process.env.AGENT_SMITH_HOST) ??
+		configuredKey(config.get("host"));
+	const configuredTrustLoopback = process.env.AGENT_SMITH_TRUST_LOOPBACK;
 	return {
-		adminKey: configuredKey(process.env.CF_ADMIN_KEY),
+		adminKey: configuredKey(process.env.AGENT_SMITH_ADMIN_KEY),
 		bindHost: configuredHost ?? "127.0.0.1",
-		proxyKey: configuredKey(process.env.CF_PROXY_KEY),
-		clientKeysFile: configuredKey(process.env.CF_CLIENT_KEYS_FILE),
+		proxyKey: configuredKey(process.env.AGENT_SMITH_PROXY_KEY),
+		clientKeysFile: configuredKey(process.env.AGENT_SMITH_CLIENT_KEYS_FILE),
 		trustLoopback:
 			configuredTrustLoopback === undefined
 				? config.get("trust_loopback") !== false

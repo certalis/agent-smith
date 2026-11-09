@@ -101,12 +101,12 @@ test("starts the real server in its own process and always removes its workspace
 }, 30_000);
 
 test("authenticates the startup health check with an inherited proxy key", async () => {
-	const original = process.env.CF_PROXY_KEY;
-	process.env.CF_PROXY_KEY = "scenario-inherited-proxy-key";
+	const original = process.env.AGENT_SMITH_PROXY_KEY;
+	process.env.AGENT_SMITH_PROXY_KEY = "scenario-inherited-proxy-key";
 
 	try {
 		const server = await spawnServer({
-			environment: { CF_TRUST_LOOPBACK: "false" },
+			environment: { AGENT_SMITH_TRUST_LOOPBACK: "false" },
 			initialTime: 1_700_000_000_000,
 		});
 		try {
@@ -121,9 +121,9 @@ test("authenticates the startup health check with an inherited proxy key", async
 		}
 	} finally {
 		if (original === undefined) {
-			delete process.env.CF_PROXY_KEY;
+			delete process.env.AGENT_SMITH_PROXY_KEY;
 		} else {
-			process.env.CF_PROXY_KEY = original;
+			process.env.AGENT_SMITH_PROXY_KEY = original;
 		}
 	}
 }, 30_000);
@@ -132,8 +132,8 @@ test("binds an optional private socket inside the temporary workspace", async ()
 	const server = await spawnServer({
 		privateSocket: true,
 		environment: {
-			CF_PROXY_KEY: "scenario-private-proxy-key",
-			CF_TRUST_LOOPBACK: "false",
+			AGENT_SMITH_PROXY_KEY: "scenario-private-proxy-key",
+			AGENT_SMITH_TRUST_LOOPBACK: "false",
 		},
 	});
 	const socket = join(server.workspace, "control.sock");

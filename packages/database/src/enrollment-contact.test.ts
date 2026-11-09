@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { DatabaseOperations } from "./database-operations";
 
 it("keeps optional enrollment contacts separate from accounts across reopen and removes them with their seat", () => {
-	const directory = mkdtempSync(join(tmpdir(), "ccflare-enrollment-contacts-"));
+	const directory = mkdtempSync(
+		join(tmpdir(), "agent-smith-enrollment-contacts-"),
+	);
 	const path = join(directory, "pool.db");
 	let database = new DatabaseOperations(path);
 	try {

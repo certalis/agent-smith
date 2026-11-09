@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { type Provider, ProviderRegistry } from "@ccflare/providers";
-import type { Account } from "@ccflare/types";
+import { type Provider, ProviderRegistry } from "@agent-smith/providers";
+import type { Account } from "@agent-smith/types";
 import * as accountSelector from "./handlers/account-selector";
 import type { ProxyContext } from "./handlers/proxy-types";
 import {

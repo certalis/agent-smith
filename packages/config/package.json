@@ -1,17 +1,18 @@
 {
-	"name": "@ccflare/config",
+	"name": "@agent-smith/config",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "./src/index.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./standalone": "./src/standalone.ts"
 	},
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit"
 	},
 	"dependencies": {
-		"@ccflare/core": "workspace:*",
-		"@ccflare/logger": "workspace:*",
-		"@ccflare/types": "workspace:*"
+		"@agent-smith/core": "workspace:*",
+		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/types": "workspace:*"
 	}
 }

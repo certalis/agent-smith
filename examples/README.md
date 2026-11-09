@@ -10,7 +10,7 @@
 > decision and your responsibility.
 
 Nothing in this folder is loaded automatically. Copy one file to your config
-path (`~/.config/ccflare/ccflare.json`, or the path in `ccflare_CONFIG_PATH`)
+path (`~/.config/agent-smith/agent-smith.json`, or the path in `AGENT_SMITH_CONFIG_PATH`)
 and restart agent-smith.
 
 | File | What it does |

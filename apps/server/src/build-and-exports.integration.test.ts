@@ -79,11 +79,11 @@ describe("workspace build and export contracts", () => {
 			.map((file) => readFileSync(join(runtimeServerSrc, file), "utf8"))
 			.join("\n");
 
-		expect(runtimeServerSource).toContain("@ccflare/web/manifest.json");
+		expect(runtimeServerSource).toContain("@agent-smith/web/manifest.json");
 		expect(runtimeServerSource).not.toContain(
-			"@ccflare/web/dist/manifest.json",
+			"@agent-smith/web/dist/manifest.json",
 		);
-		expect(runtimeServerSource).not.toContain("@ccflare/web/dist");
+		expect(runtimeServerSource).not.toContain("@agent-smith/web/dist");
 		expect(runtimeServerSource).not.toContain("apps/web/dist");
 	});
 });

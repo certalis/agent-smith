@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "@ccflare/config";
-import { DatabaseFactory } from "@ccflare/database";
+import { Config } from "@agent-smith/config";
+import { DatabaseFactory } from "@agent-smith/database";
 import { createOAuthFlow } from "./index";
 
 const tempDirs: string[] = [];
@@ -16,7 +16,7 @@ function unsignedJwt(claims: Record<string, unknown>): string {
 }
 
 function createTestContext(configData?: Record<string, unknown>) {
-	const tempDir = mkdtempSync(join(tmpdir(), "ccflare-oauth-flow-"));
+	const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-oauth-flow-"));
 	tempDirs.push(tempDir);
 
 	const configPath = join(tempDir, "config.json");
@@ -40,7 +40,7 @@ function createTestContext(configData?: Record<string, unknown>) {
 	);
 	const config = new Config(configPath);
 	DatabaseFactory.reset();
-	DatabaseFactory.initialize(join(tempDir, "ccflare.db"));
+	DatabaseFactory.initialize(join(tempDir, "agent-smith.db"));
 	const dbOps = DatabaseFactory.getInstance();
 
 	return { config, dbOps };

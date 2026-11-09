@@ -1,5 +1,5 @@
-import type { TimeRange } from "@ccflare/types";
-import { formatTokensPerSecond } from "@ccflare/ui";
+import type { TimeRange } from "@agent-smith/types";
+import { formatTokensPerSecond } from "@agent-smith/ui";
 import { Activity, Zap } from "lucide-react";
 import { ModelTokenSpeedChart } from "../charts/ModelTokenSpeedChart";
 import { TokenSpeedChart } from "../charts/TokenSpeedChart";

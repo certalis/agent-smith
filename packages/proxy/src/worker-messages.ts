@@ -7,7 +7,7 @@ import type {
 	AccountProvider,
 	AsyncWriterHealth,
 	HttpMethod,
-} from "@ccflare/types";
+} from "@agent-smith/types";
 
 export interface StartMessage {
 	type: "start";
@@ -97,12 +97,12 @@ export interface ShutdownCompleteMessage {
 // Worker to main thread messages
 export interface SummaryMessage {
 	type: "summary";
-	summary: import("@ccflare/types").RequestSummary;
+	summary: import("@agent-smith/types").RequestSummary;
 }
 
 export interface PayloadMessage {
 	type: "payload";
-	payload: import("@ccflare/types").RequestPayload;
+	payload: import("@agent-smith/types").RequestPayload;
 }
 
 export type OutgoingWorkerMessage =

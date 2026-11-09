@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { estimateCostUSD, requestEvents } from "@ccflare/core";
-import { DatabaseFactory } from "@ccflare/database";
-import { CodexProvider, ProviderRegistry } from "@ccflare/providers";
+import { estimateCostUSD, requestEvents } from "@agent-smith/core";
+import { DatabaseFactory } from "@agent-smith/database";
+import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import {
 	getUsageWorker,
 	handleWebSocketUpgradeRequest,
@@ -12,8 +12,8 @@ import {
 	terminateUsageWorker,
 	type WebSocketProxyData,
 	websocketProxyHandler,
-} from "@ccflare/proxy";
-import type { Account, Request, RequestStreamEvent } from "@ccflare/types";
+} from "@agent-smith/proxy";
+import type { Account, Request, RequestStreamEvent } from "@agent-smith/types";
 import {
 	createCodexAccount,
 	decodeMessageData,
@@ -37,8 +37,8 @@ afterEach(async () => {
 		tempDir = null;
 	}
 
-	delete process.env.ccflare_DB_PATH;
-	delete process.env.ccflare_CONFIG_PATH;
+	delete process.env.AGENT_SMITH_DB_PATH;
+	delete process.env.AGENT_SMITH_CONFIG_PATH;
 });
 
 function createLargeResponseCompletedMessage(sizeBytes: number): string {
@@ -113,9 +113,9 @@ function createProxyContext(): ProxyContext {
 
 describe("WebSocket request logging integration", () => {
 	it("logs websocket turns to request history and emits real-time request events", async () => {
-		tempDir = mkdtempSync(join(tmpdir(), "ccflare-websocket-logging-"));
-		process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-		process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
+		tempDir = mkdtempSync(join(tmpdir(), "agent-smith-websocket-logging-"));
+		process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+		process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
 		DatabaseFactory.initialize();
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
@@ -283,9 +283,9 @@ describe("WebSocket request logging integration", () => {
 	});
 
 	it("persists websocket token usage even when the model is missing", async () => {
-		tempDir = mkdtempSync(join(tmpdir(), "ccflare-websocket-logging-"));
-		process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-		process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
+		tempDir = mkdtempSync(join(tmpdir(), "agent-smith-websocket-logging-"));
+		process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+		process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
 		DatabaseFactory.initialize();
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
@@ -371,9 +371,9 @@ describe("WebSocket request logging integration", () => {
 	});
 
 	it("persists cached input token discounts and reasoning tokens from websocket usage", async () => {
-		tempDir = mkdtempSync(join(tmpdir(), "ccflare-websocket-logging-"));
-		process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-		process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
+		tempDir = mkdtempSync(join(tmpdir(), "agent-smith-websocket-logging-"));
+		process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+		process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
 		DatabaseFactory.initialize();
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
@@ -467,9 +467,9 @@ describe("WebSocket request logging integration", () => {
 	});
 
 	it("persists websocket token usage when response.completed exceeds the SSE usage buffer", async () => {
-		tempDir = mkdtempSync(join(tmpdir(), "ccflare-websocket-logging-"));
-		process.env.ccflare_DB_PATH = join(tempDir, "ccflare.db");
-		process.env.ccflare_CONFIG_PATH = join(tempDir, "ccflare.json");
+		tempDir = mkdtempSync(join(tmpdir(), "agent-smith-websocket-logging-"));
+		process.env.AGENT_SMITH_DB_PATH = join(tempDir, "agent-smith.db");
+		process.env.AGENT_SMITH_CONFIG_PATH = join(tempDir, "agent-smith.json");
 		DatabaseFactory.initialize();
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
