@@ -164,7 +164,10 @@ export function createProxyEdgeHandler({
 			upstreamResponse?.destroy();
 			upstream.destroy();
 		});
-		upstream.once("error", () => finish(502));
+		upstream.once("error", (error: NodeJS.ErrnoException) => {
+			console.error("Agent Smith private transport failed", error.code);
+			finish(502);
+		});
 		req.once("aborted", () => upstream.destroy());
 		req.once("error", () => upstream.destroy());
 		let bytes = 0;

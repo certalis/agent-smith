@@ -15,7 +15,7 @@ import type {
 	WireEvent,
 	WireRequest,
 } from "./node-wire-protocol";
-import type { UpstreamRule } from "./scenario";
+import { durationMs, type UpstreamRule } from "./scenario";
 
 const servers: Server[] = [];
 const clients = new Map<string, Client>();
@@ -84,9 +84,16 @@ function serve(req: IncomingMessage, res: ServerResponse): void {
 		);
 		if (rule?.sse) headers["content-type"] ??= "text/event-stream";
 		res.writeHead(rule?.status ?? 500, headers);
-		for (const chunk of rule?.sse ?? []) res.write(chunk.body);
-		if (rule?.keepOpen === "after-chunks") return;
-		res.end(rule?.json === undefined ? undefined : JSON.stringify(rule.json));
+		void (async () => {
+			for (const chunk of rule?.sse ?? []) {
+				const gap = chunk.nativeIdleGap ? durationMs(chunk.nativeIdleGap) : 0;
+				if (gap) await new Promise((resolve) => setTimeout(resolve, gap));
+				if (res.destroyed) return;
+				res.write(chunk.body);
+			}
+			if (rule?.keepOpen === "after-chunks") return;
+			res.end(rule?.json === undefined ? undefined : JSON.stringify(rule.json));
+		})().catch((error: Error) => res.destroy(error));
 	};
 	req.on("data", (chunk: Buffer) => chunks.push(chunk));
 	if (rule?.respondAtHeaders) respond();

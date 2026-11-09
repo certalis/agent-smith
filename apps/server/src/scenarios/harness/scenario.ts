@@ -102,6 +102,8 @@ export type ScenarioStep =
 export type SseChunk = {
 	body: string;
 	afterClientChunk?: boolean;
+	/** Native socket-idle regression only; deliberately does not advance the routing clock. */
+	nativeIdleGap?: Duration;
 };
 
 export type UpstreamRule = {

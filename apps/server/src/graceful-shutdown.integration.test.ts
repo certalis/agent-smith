@@ -150,12 +150,13 @@ describe("graceful shutdown integration", () => {
 			env: process.env,
 		});
 
-		const [exitCode, stdout] = await Promise.all([
+		const [exitCode, stdout, stderr] = await Promise.all([
 			subprocess.exited,
 			new Response(subprocess.stdout).text(),
+			new Response(subprocess.stderr).text(),
 		]);
 
-		expect(exitCode).toBe(0);
+		expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
 
 		const resultLine = stdout
 			.trim()

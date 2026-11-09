@@ -99,7 +99,9 @@ It currently owns:
 
 Programmatic `startServer({ additionalUnixSocket })` can also bind an absolute
 Unix socket path. It shares the same runtime and authenticated router as TCP;
-both listeners stop together. The embedding host must place the socket inside
+both listeners use the same 255-second idle timeout and stop together. An idle
+timeout measures silence between bytes, not the total conversation duration.
+The embedding host must place the socket inside
 a directory other Unix users cannot replace or traverse. There is no TCP fallback
 for clients using this private control transport.
 

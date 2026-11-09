@@ -10,7 +10,7 @@ import type {
 	WireEvent,
 	WireRequest,
 } from "./node-wire-protocol";
-import type { Scenario, UpstreamRule } from "./scenario";
+import { durationMs, type Scenario, type UpstreamRule } from "./scenario";
 
 const DEADLINE_MS = 5_000;
 
@@ -30,6 +30,7 @@ export class NodeWire {
 	private constructor(
 		private readonly child: ChildProcess,
 		private readonly directory: string,
+		private readonly requestDeadlineMs: number,
 	) {
 		child.stderr?.on("data", (chunk: Buffer) => {
 			this.stderr += chunk.toString();
@@ -45,6 +46,18 @@ export class NodeWire {
 		rules: UpstreamRule[],
 		tokens: [string, string][],
 	): Promise<NodeWire> {
+		const gaps = rules.map((rule) =>
+			(rule.sse ?? []).reduce(
+				(total, chunk) =>
+					total + (chunk.nativeIdleGap ? durationMs(chunk.nativeIdleGap) : 0),
+				0,
+			),
+		);
+		const nativeIdleMs = Math.max(0, ...gaps);
+		if (nativeIdleMs > 15_000)
+			throw new Error(
+				"Native socket-idle regression gaps must total at most 15 seconds",
+			);
 		const directory = mkdtempSync(join(tmpdir(), "smith-scenario-wire-"));
 		let child: ChildProcess | undefined;
 		try {
@@ -62,7 +75,7 @@ export class NodeWire {
 				env: { PATH: process.env.PATH },
 				silent: true,
 			});
-			const wire = new NodeWire(child, directory);
+			const wire = new NodeWire(child, directory, DEADLINE_MS + nativeIdleMs);
 			const ready = (await wire.command({
 				type: "initialize",
 				rules,
@@ -187,6 +200,7 @@ export class NodeWire {
 				});
 			}),
 			command.type,
+			command.type === "request" ? this.requestDeadlineMs : DEADLINE_MS,
 		).finally(() => this.replies.delete(id));
 	}
 
@@ -210,6 +224,7 @@ export class NodeWire {
 	private async bounded<T>(
 		promise: Promise<T>,
 		description: string,
+		deadlineMs = DEADLINE_MS,
 	): Promise<T> {
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		try {
@@ -221,7 +236,7 @@ export class NodeWire {
 							reject(
 								new Error(`Node wire deadline: ${description}\n${this.stderr}`),
 							),
-						DEADLINE_MS,
+						deadlineMs,
 					);
 				}),
 			]);

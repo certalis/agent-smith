@@ -15,6 +15,15 @@ import { createServerFetchHandler } from "./fetch-handler";
 import { createStartupBanner } from "./startup-banner";
 import { runStartupMaintenance } from "./startup-maintenance";
 
+// Bun honors this listener option for Unix sockets, but its bundled types omit it.
+declare module "bun" {
+	namespace Serve {
+		interface UnixServeOptions<WebSocketData> {
+			idleTimeout?: number;
+		}
+	}
+}
+
 const serverLog = new Logger("Server");
 const lifecycleLog = new Logger("ServerLifecycle", LogLevel.INFO, {
 	silentConsole: false,
@@ -175,6 +184,7 @@ export default function startServer(
 		if (options?.additionalUnixSocket) {
 			unixServerInstance = serve({
 				unix: options.additionalUnixSocket,
+				idleTimeout: NETWORK.IDLE_TIMEOUT_MAX,
 				fetch: fetchHandler,
 				websocket: websocketProxyHandler,
 			});
