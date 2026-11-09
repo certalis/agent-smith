@@ -31,6 +31,7 @@ export default defineScenario({
 		{
 			type: "request",
 			id: "authorized-health",
+			count: 32,
 			method: "GET",
 			path: "/pool-health",
 			body: "",
@@ -52,6 +53,7 @@ export default defineScenario({
 		{
 			...standaloneRequest,
 			id: "unknown-device",
+			count: 32,
 			headers: {
 				...standaloneHeaders,
 				"x-api-key": "synthetic-unknown-device-key-0001",
@@ -70,7 +72,15 @@ export default defineScenario({
 		{
 			id: "public-boundary-statuses",
 			type: "client",
-			statuses: [200, 401, 200, 404, 401, 401, 404],
+			statuses: [
+				200,
+				401,
+				...Array<number>(32).fill(200),
+				404,
+				401,
+				...Array<number>(32).fill(401),
+				404,
+			],
 		},
 		{
 			id: "public-readiness-is-bounded",

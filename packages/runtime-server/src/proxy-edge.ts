@@ -127,6 +127,8 @@ export function createProxyEdgeHandler({
 				: (req.url ?? "");
 		const headers = selectHeaders(req.headers, REQUEST_HEADERS);
 		headers.host = "localhost";
+		// Keep early replies readable while the request finishes; close below.
+		headers.connection = "keep-alive";
 		headers["x-forwarded-for"] = "proxy-edge";
 		let upstreamResponse: IncomingMessage | undefined;
 		const upstream = request(
