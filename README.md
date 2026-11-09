@@ -100,7 +100,8 @@ Copy [`https-client.json`](examples/config/https-client.json) into your private
 Agent-smith config. Put the device key in the owner-only file named by
 `proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
 visible to your machine, not a second pool. The key can spend from the pool, but
-cannot administer it.
+cannot administer it. Remote client routing is off by default: set
+`client.enabled` to `true` when this machine should use the shared pool.
 
 An SSH tunnel remains an option for development. Use
 [`team-client.json`](examples/config/team-client.json) and forward its local port
@@ -110,7 +111,7 @@ to the private server:
 ssh -N -L 18181:127.0.0.1:8080 agent-smith-pool
 ```
 
-Then install the normal `claude` and `codex` wrappers once:
+Then apply the flag with the normal client setup command:
 
 ```bash
 agent-smith install-client
@@ -120,6 +121,10 @@ Open a new terminal and use `claude` or `codex` normally. The wrappers only add
 their own marked `PATH` entry; they do not replace the real binaries or start a
 second proxy. The forwarding key is for inference, not dashboard or management
 access.
+
+To switch back to ordinary local Claude Code/Codex, set `client.enabled` to
+`false` and run `agent-smith install-client` again. It removes only its wrappers
+and marked shell entry; it does not change the real clients or their credentials.
 
 ## Configuration
 
@@ -202,6 +207,7 @@ the pool without SSH.
 ```json
 {
   "client": {
+    "enabled": false,
     "base_url": "http://127.0.0.1:18181",
     "proxy_key_file": "~/.config/ccflare/team-pool.key"
   }

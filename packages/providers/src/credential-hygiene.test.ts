@@ -13,6 +13,25 @@ const clientCredentials = {
 };
 
 describe("provider credential hygiene", () => {
+	it("removes incoming chunk framing before a new upstream request", () => {
+		for (const provider of [
+			new AnthropicProvider(),
+			new ClaudeCodeProvider(),
+			new CodexProvider(),
+			new OpenAIProvider(),
+		]) {
+			const headers = provider.prepareHeaders(
+				new Headers({
+					"transfer-encoding": "chunked",
+					"content-type": "application/json",
+				}),
+				null,
+			);
+			expect(headers.get("transfer-encoding")).toBeNull();
+			expect(headers.get("content-type")).toBe("application/json");
+		}
+	});
+
 	it("never forwards a client credential when the selected account has none", () => {
 		for (const provider of [
 			new AnthropicProvider(),

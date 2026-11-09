@@ -115,11 +115,13 @@ export type ProviderPoolsFileConfig = Partial<Record<ProviderWire, string[]>>;
 
 /** How locally installed Claude Code and Codex reach this Agent-smith server. */
 export type ClientRoutingFileConfig = {
+	enabled?: boolean;
 	base_url?: string;
 	proxy_key_file?: string;
 };
 
 export type ClientRoutingConfig = {
+	enabled: boolean;
 	baseUrl?: string;
 	proxyKeyFile?: string;
 };
@@ -349,6 +351,7 @@ function sanitizeClientRouting(
 ): ClientRoutingFileConfig | undefined {
 	if (!isRecord(value)) return undefined;
 	const client: ClientRoutingFileConfig = {};
+	if (typeof value.enabled === "boolean") client.enabled = value.enabled;
 	if (typeof value.base_url === "string") {
 		try {
 			const url = new URL(value.base_url);
@@ -724,6 +727,7 @@ export class Config extends EventEmitter {
 	getClientRouting(): ClientRoutingConfig {
 		const client = this.data.client;
 		return {
+			enabled: client?.enabled === true,
 			...(client?.base_url && { baseUrl: client.base_url }),
 			...(client?.proxy_key_file && {
 				proxyKeyFile: client.proxy_key_file,

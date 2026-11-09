@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -33,6 +34,78 @@ afterEach(() => {
 });
 
 describe("local client routing", () => {
+	it("applies the install-client opt-in and removes it without changing real clients or unrelated shell settings", async () => {
+		const directory = tempDir();
+		const realBin = join(directory, "real-bin");
+		const binDir = join(directory, "client-bin");
+		const shellProfile = join(directory, ".zshrc");
+		const configPath = join(directory, "ccflare.json");
+		const proxyKeyFile = join(directory, "device.key");
+		const originalProfile = "export EDITOR=vim\n# Keep my shell settings\n";
+		const realClient = '#!/bin/sh\nprintf "%s" "$ANTHROPIC_BASE_URL"\n';
+		mkdirSync(realBin);
+		for (const name of ["claude", "codex"]) {
+			writeFileSync(join(realBin, name), realClient, { mode: 0o700 });
+		}
+		writeFileSync(shellProfile, originalProfile);
+		writeFileSync(proxyKeyFile, "synthetic-device-key\n", { mode: 0o600 });
+		// A whitelist keeps proxy settings, real credentials and profile paths out.
+		const environment = {
+			HOME: directory,
+			XDG_CONFIG_HOME: directory,
+			SHELL: "/bin/zsh",
+			PATH: `${realBin}:/usr/bin:/bin`,
+			ccflare_CONFIG_PATH: configPath,
+			ccflare_DB_PATH: join(directory, "pool.db"),
+		};
+		const apply = async (client?: Record<string, unknown>) => {
+			writeFileSync(configPath, JSON.stringify({ client }), { mode: 0o600 });
+			const child = Bun.spawn(
+				[
+					process.execPath,
+					new URL("../main.ts", import.meta.url).pathname,
+					"install-client",
+				],
+				{ env: environment, stdout: "pipe", stderr: "pipe" },
+			);
+			const [exitCode, stdout, stderr] = await Promise.all([
+				child.exited,
+				new Response(child.stdout).text(),
+				new Response(child.stderr).text(),
+			]);
+			expect({
+				exitCode,
+				error: exitCode === 0 ? "" : stdout + stderr,
+			}).toEqual({ exitCode: 0, error: "" });
+		};
+		const target = {
+			base_url: "https://pool.example.com",
+			proxy_key_file: proxyKeyFile,
+		};
+		for (const client of [undefined, target]) {
+			await apply(client);
+			expect(existsSync(join(binDir, "claude"))).toBe(false);
+			expect(readFileSync(shellProfile, "utf8")).toBe(originalProfile);
+		}
+		await apply({ ...target, enabled: true });
+		expect(existsSync(join(binDir, "codex"))).toBe(true);
+		expect(readFileSync(shellProfile, "utf8")).toContain(ROUTING_MARKER);
+		const routed = Bun.spawnSync([join(binDir, "claude")], {
+			env: environment,
+		});
+		expect(routed.exitCode).toBe(0);
+		expect(routed.stdout.toString()).toBe(
+			"https://pool.example.com/v1/claude-code",
+		);
+		await apply({ ...target, enabled: false });
+		for (const name of ["claude", "codex"]) {
+			expect(existsSync(join(binDir, name))).toBe(false);
+			expect(readFileSync(join(realBin, name), "utf8")).toBe(realClient);
+		}
+		expect(existsSync(join(directory, "client-routing.json"))).toBe(false);
+		expect(readFileSync(shellProfile, "utf8")).toBe(originalProfile);
+	});
+
 	it("routes Claude Code through the local Claude Code endpoint without touching the real client", async () => {
 		const directory = tempDir();
 		const realClaude = join(directory, "real-claude");

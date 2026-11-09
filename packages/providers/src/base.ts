@@ -24,6 +24,7 @@ const TRANSPORT_HEADERS_TO_DELETE = [
 	"host",
 	"accept-encoding",
 	"content-encoding",
+	"transfer-encoding",
 ] as const;
 
 const CLIENT_CREDENTIAL_HEADERS_TO_DELETE = [

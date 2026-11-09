@@ -71,6 +71,7 @@ The configuration file is stored at:
     "codex": { "enabled": false }
   },
   "client": {
+    "enabled": false,
     "base_url": "http://127.0.0.1:18181",
     "proxy_key_file": "~/.config/ccflare/team-pool.key"
   },
@@ -125,8 +126,11 @@ The configuration file is stored at:
 ### Client wrappers
 
 `client` is optional and is only read by `agent-smith install-client`. It has
-two fields:
+three fields:
 
+- `enabled`: `false` by default. Only literal `true` enables shared-pool wrappers.
+  Run `agent-smith install-client` after changing it. When off, that command
+  removes the wrappers and their marked shell entry, restoring ordinary client use.
 - `base_url`: the HTTP(S) origin of the one Agent-smith server this machine can
   reach. It has no path.
 - `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file

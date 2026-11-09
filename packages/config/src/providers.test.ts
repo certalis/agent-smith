@@ -32,6 +32,20 @@ function exampleConfig(name: string): Config {
 }
 
 describe("provider configuration", () => {
+	it.each([
+		["absent client", {}, false],
+		[
+			"missing enabled",
+			{ client: { base_url: "https://pool.example" } },
+			false,
+		],
+		["explicitly disabled", { client: { enabled: false } }, false],
+		["invalid truthy value", { client: { enabled: "true" } }, false],
+		["explicitly enabled", { client: { enabled: true } }, true],
+	])("requires literal true to enable client routing: %s", (_name, data, enabled) => {
+		expect(configFrom(data).getClientRouting().enabled).toBe(enabled);
+	});
+
 	it("reads the Agent-smith endpoint and forwarding-key file used by clients", () => {
 		const config = configFrom({
 			client: {
@@ -41,6 +55,7 @@ describe("provider configuration", () => {
 		});
 
 		expect(config.getClientRouting()).toEqual({
+			enabled: false,
 			baseUrl: "http://127.0.0.1:18181",
 			proxyKeyFile: "/tmp/agent-smith.key",
 		});
@@ -55,6 +70,7 @@ describe("provider configuration", () => {
 		});
 
 		expect(config.getClientRouting()).toEqual({
+			enabled: false,
 			baseUrl: "http://127.0.0.1:18181",
 		});
 	});

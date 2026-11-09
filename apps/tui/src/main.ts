@@ -138,6 +138,11 @@ Examples:
 	if (parsed.installClient) {
 		const config = new Config();
 		const client = config.getClientRouting();
+		if (!client.enabled) {
+			tuiCore.disableLocalClientRouting();
+			console.log("Remote client routing is disabled (client.enabled=false).");
+			return;
+		}
 		if (!client.baseUrl || !client.proxyKeyFile) {
 			throw new Error(
 				"client.base_url and client.proxy_key_file are required before installing client wrappers",
