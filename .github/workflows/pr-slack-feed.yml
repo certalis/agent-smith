@@ -36,5 +36,6 @@ jobs:
           if [ "$EVENT_ACTION" = "closed" ]; then
             ACTION=closed
           fi
-          gh workflow run pr-slack-feed.yml --repo certalis/app --ref main \
-            -f pr_number="$PR_NUMBER" -f action="$ACTION" -f merged="$MERGED" -f repository="$REPOSITORY"
+          gh api repos/certalis/app/dispatches -f event_type=pr-slack-feed \
+            -f "client_payload[repository]=$REPOSITORY" -f "client_payload[pr_number]=$PR_NUMBER" \
+            -f "client_payload[action]=$ACTION" -f "client_payload[merged]=$MERGED"
