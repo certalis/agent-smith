@@ -29,6 +29,7 @@ const REQUEST_HEADERS = [
 	"session-id",
 	"openai-beta",
 	"x-client-request-id",
+	"x-stainless-retry-count",
 	"user-agent",
 ];
 const RESPONSE_HEADERS = [

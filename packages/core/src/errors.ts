@@ -116,6 +116,7 @@ export class ServiceUnavailableError extends AppError {
 	constructor(
 		message: string,
 		public readonly service?: string,
+		public readonly retryAfterSeconds?: number,
 	) {
 		super(message, "SERVICE_UNAVAILABLE", 503, { service });
 	}

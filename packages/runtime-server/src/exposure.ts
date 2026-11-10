@@ -223,7 +223,7 @@ export function exposureFailure(
 			return jsonError(403, "Cross-origin management requests are not allowed");
 		}
 
-		if (MUTATING_METHODS.has(req.method)) {
+		if (url.pathname === "/api/drain" || MUTATING_METHODS.has(req.method)) {
 			if (role !== "admin") {
 				return jsonError(401, "An admin key is required for management writes");
 			}

@@ -1,4 +1,4 @@
-import { APIRouter } from "@agent-smith/api";
+import { type APIContext, APIRouter } from "@agent-smith/api";
 import { Config, type RuntimeConfig } from "@agent-smith/config";
 import {
 	container,
@@ -98,6 +98,7 @@ function wireStrategyHotReload(
 export function bootstrapRuntime(
 	port: number,
 	serverLog: Logger,
+	deploymentDrain?: APIContext["deploymentDrain"],
 ): BootstrappedRuntime {
 	container.registerInstance(SERVICE_KEYS.Config, new Config());
 	container.registerInstance(SERVICE_KEYS.Logger, serverLog);
@@ -126,6 +127,7 @@ export function bootstrapRuntime(
 	setPricingLogger(pricingLogger);
 
 	const apiRouter = new APIRouter({
+		deploymentDrain,
 		enrollmentOrigin: process.env.AGENT_SMITH_ENROLLMENT_ORIGIN,
 		config,
 		dbOps,

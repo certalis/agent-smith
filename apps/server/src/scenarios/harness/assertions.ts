@@ -17,6 +17,7 @@ export type ClientResult = {
 	uploadedBytes?: number;
 	uploadBufferedBytes?: number;
 	connectionRefused?: boolean;
+	responseInterrupted?: boolean;
 	cancelled?: boolean;
 };
 
@@ -202,6 +203,7 @@ export function clientFailure(
 		"uploadedBytes",
 		"uploadBufferedBytes",
 		"connectionRefused",
+		"responseInterrupted",
 		"cancelled",
 	] as const) {
 		if (

@@ -1,5 +1,5 @@
 import type { APIRouter } from "@agent-smith/api";
-import { HTTP_STATUS } from "@agent-smith/core";
+import { HTTP_STATUS, ServiceUnavailableError } from "@agent-smith/core";
 import { BadRequest, errorResponse } from "@agent-smith/http";
 import {
 	handleProxy,
@@ -20,6 +20,7 @@ type ServerFetchHandlerDependencies = {
 	proxyContext: ProxyContext;
 	withDashboard: boolean;
 	exposureConfig?: ExposureConfig;
+	isDeploymentDraining?: () => boolean;
 	handleProxyRequest?: typeof handleProxy;
 	handleWebSocketUpgrade?: typeof handleWebSocketUpgradeRequest;
 	handleOAuthTokenRequest?: typeof forwardOAuthTokenRequest;
@@ -38,6 +39,7 @@ export function createServerFetchHandler({
 	handleWebSocketUpgrade = handleWebSocketUpgradeRequest,
 	handleOAuthTokenRequest = forwardOAuthTokenRequest,
 	serveDashboardAsset = serveDashboardRoute,
+	isDeploymentDraining = () => false,
 }: ServerFetchHandlerDependencies) {
 	return async (
 		req: Request,
@@ -78,6 +80,15 @@ export function createServerFetchHandler({
 			url.pathname.startsWith("/v1/") ||
 			url.pathname.startsWith("/tc-acct/");
 		if (isProviderRoute) {
+			if (isDeploymentDraining()) {
+				return errorResponse(
+					new ServiceUnavailableError(
+						"Pool is draining for deployment",
+						undefined,
+						30,
+					),
+				);
+			}
 			if (server) {
 				const websocketResponse = await handleWebSocketUpgrade(
 					req,

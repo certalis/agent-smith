@@ -9,6 +9,15 @@ import { MAX_INLINE_RATE_LIMIT_RETRY_MS } from "./response-processor";
 
 const log = new Logger("Proxy");
 
+function admissionRetrySeconds(req: Request): number | undefined {
+	if (req.signal.aborted) return undefined;
+	const count = req.headers.get("x-stainless-retry-count") ?? "0";
+	// Untrusted client metadata can only select a bounded delay, never capacity.
+	if (!/^\d+$/.test(count)) return 1;
+	const ordinal = Number(count);
+	return ordinal === 0 ? 1 : ordinal === 1 ? 10 : 30;
+}
+
 function createBodyStream(body: ArrayBuffer | null) {
 	if (!body) return undefined;
 	return new Response(body).body ?? undefined;
@@ -88,6 +97,7 @@ export async function attemptAccount(
 			throw new ServiceUnavailableError(
 				error.message,
 				request.ctx.providerName,
+				admissionRetrySeconds(request.req),
 			);
 		}
 		throw error;

@@ -22,6 +22,7 @@ const clients = new Map<string, Client>();
 let rules: UpstreamRule[] = [];
 let tokens = new Map<string, string>();
 const uses = new Map<UpstreamRule, number>();
+const heldResponses = new Map<string, Set<ServerResponse>>();
 let requests = 0;
 let edgePort: number | undefined;
 
@@ -69,6 +70,7 @@ function serve(req: IncomingMessage, res: ServerResponse): void {
 		});
 	};
 	res.once("close", () => {
+		if (rule?.id) heldResponses.get(rule.id)?.delete(res);
 		record();
 		send({ type: "upstream-closed", index, responseEnded: res.writableEnded });
 	});
@@ -91,7 +93,14 @@ function serve(req: IncomingMessage, res: ServerResponse): void {
 				if (res.destroyed) return;
 				res.write(chunk.body);
 			}
-			if (rule?.keepOpen === "after-chunks") return;
+			if (rule?.keepOpen === "after-chunks") {
+				if (rule.id) {
+					const held = heldResponses.get(rule.id) ?? new Set();
+					held.add(res);
+					heldResponses.set(rule.id, held);
+				}
+				return;
+			}
 			res.end(rule?.json === undefined ? undefined : JSON.stringify(rule.json));
 		})().catch((error: Error) => res.destroy(error));
 	};
@@ -250,6 +259,13 @@ async function execute(command: WireCommand): Promise<unknown> {
 		const client = new Client(command.request);
 		clients.set(command.clientId, client);
 		return await client.done;
+	}
+	if (command.type === "release") {
+		const held = heldResponses.get(command.ruleId);
+		if (!held?.size)
+			throw new Error(`No held Node response is named ${command.ruleId}`);
+		for (const response of held) response.end();
+		return;
 	}
 	if (command.type === "stop") {
 		await Promise.all([...clients.values()].map((client) => client.cancel()));

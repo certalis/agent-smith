@@ -42,6 +42,12 @@ export interface AccountResponse {
 }
 
 export interface APIContext {
+	deploymentDrain?: (action: "start" | "status" | "resume") => {
+		draining: boolean;
+		expiresAt: number | null;
+		activeRequests: number;
+		activeWebSockets: number;
+	};
 	enrollmentOrigin?: string;
 	now?: () => number;
 	config: Config;

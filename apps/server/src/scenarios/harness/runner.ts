@@ -159,7 +159,20 @@ async function request(
 					};
 				return {
 					id: step.id,
-					...(await readClientBody(response, () => onChunk?.(clientId))),
+					...(await readClientBody(response, () => onChunk?.(clientId)).catch(
+						(error: unknown) => {
+							if (
+								!step.allowResponseInterrupted ||
+								!error ||
+								typeof error !== "object" ||
+								!["ConnectionClosed", "ECONNRESET"].includes(
+									String(Reflect.get(error, "code")),
+								)
+							)
+								throw error;
+							return { body: "", chunks: [], responseInterrupted: true };
+						},
+					)),
 					headers: new Headers(response.headers),
 					status: response.status,
 				};
@@ -375,6 +388,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 		const clients: ClientResult[] = [];
 		const values = new Map<string, string>();
 		const pendingRequests = new Map<string, Promise<ClientResult[]>>();
+		const clientChunks = new Map<string, Promise<void>>();
 		const stepFailures: AssertionFailure[] = [];
 		const releaseSseChunk = scenario.upstream.some((rule) =>
 			rule.sse?.some((chunk) => chunk.afterClientChunk),
@@ -395,6 +409,10 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 						if (pendingRequests.size > 0)
 							throw new Error("Cannot stop with pending requests");
 						await server.stop();
+					} else if (step.type === "begin-stop") {
+						await server.beginStop();
+					} else if (step.type === "await-stop") {
+						await server.stop();
 					} else if (step.type === "terminate-pool") {
 						await server.terminatePool();
 					} else if (step.type === "block-config-write") {
@@ -402,12 +420,24 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 					} else if (step.type === "restore-config-write") {
 						server.restoreConfigWrite();
 					} else if (step.type === "request") {
+						let observedChunk = () => {};
+						if (step.id && step.transport !== "edge") {
+							clientChunks.set(
+								step.id,
+								new Promise<void>((resolve) => {
+									observedChunk = resolve;
+								}),
+							);
+						}
 						const responses = request(
 							server,
 							step,
 							stepIndex,
 							values,
-							releaseSseChunk,
+							(clientId) => {
+								observedChunk();
+								releaseSseChunk?.(clientId);
+							},
 							nodeWire,
 						);
 						if (step.waitForUpstream !== undefined) {
@@ -421,6 +451,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 								throw new Error(`Duplicate pending request id ${step.id}`);
 							}
 							pendingRequests.set(step.id, responses);
+							void responses.catch(() => undefined);
 						} else {
 							const completed = await responses;
 							clients.push(...completed);
@@ -430,6 +461,11 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 						step.type === "wait-for-client-chunk" ||
 						step.type === "cancel"
 					) {
+						const chunk = clientChunks.get(step.id);
+						if (step.type === "wait-for-client-chunk" && chunk) {
+							await chunk;
+							continue;
+						}
 						if (!nodeWire)
 							throw new Error("Client wire barriers require a Node edge");
 						await nodeWire.clientAction(
@@ -443,7 +479,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 							);
 						await nodeWire.waitForClosed(step.count);
 					} else if (step.type === "release") {
-						upstream.releaseHold(step.id);
+						await upstream.releaseHold(step.id);
 					} else if (step.type === "flush") {
 						await new Promise<void>((resolve) => setImmediate(resolve));
 					} else if (step.type === "wait-for-upstream") {

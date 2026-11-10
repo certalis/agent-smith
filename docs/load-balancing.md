@@ -72,6 +72,13 @@ that ramp rather than restarting it; an already-serving sibling never has its
 capacity reduced by another arrival. `/tc-acct/<name>/...`
 selects exactly that allowed, eligible seat and never bypasses the cap or gate.
 
+Admission rejections (503 queue-full or wait-timeout, before any provider call)
+include `Retry-After: 1`, then `10`, then `30` seconds, according to the client's
+`x-stainless-retry-count` header (missing or invalid means the first attempt).
+Later retries stay at 30 seconds. Supporting clients decide whether to retry
+within their own retry budget; the proxy never replays a model response or
+changes the configured admission wait to implement this delay.
+
 `quota_probe_seconds` is an opt-in zero-spend read of Anthropic's fixed OAuth
 usage endpoint for direct allowlisted Claude Code seats. It never uses a custom
 upstream. Fresh weekly readings also feed the outside-spend view in

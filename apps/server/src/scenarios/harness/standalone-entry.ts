@@ -38,9 +38,28 @@ try {
 	process.on("SIGTERM", stop);
 	process.on("SIGINT", stop);
 	process.on("disconnect", stop);
+	let stopping: Promise<void> | undefined;
 	process.on("message", (message: { type: string; id: string }) => {
 		void (async () => {
-			if (message.type === "terminate-pool") {
+			if (message.type === "begin-stop") {
+				const poolStopping = new Promise<void>((resolve) => {
+					const onMessage = (reply: { type?: string }) => {
+						if (reply.type !== "stopping") return;
+						service.pool.off("message", onMessage);
+						resolve();
+					};
+					service.pool.on("message", onMessage);
+				});
+				stopping = service.stop();
+				await poolStopping;
+				process.send?.({ type: "stopping", id: message.id });
+			} else if (message.type === "await-stop") {
+				if (!stopping) throw new Error("Standalone shutdown has not begun");
+				await stopping;
+				process.send?.({ type: "stopped", id: message.id }, () =>
+					process.exit(0),
+				);
+			} else if (message.type === "terminate-pool") {
 				service.pool.kill("SIGTERM");
 				await service.exited;
 				process.send?.({ type: "pool-exited", id: message.id });

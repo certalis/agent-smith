@@ -56,6 +56,7 @@ type ChildMessage =
 	| { error: string; id?: string; type: "error" }
 	| { id: string; now: number; type: "advanced" }
 	| { id: string; type: "stopped" }
+	| { id?: string; type: "stopping" }
 	| { id: string; type: "pool-exited" }
 	| { type: "fetch-guard"; url: string };
 
@@ -219,6 +220,7 @@ export class SpawnedServer {
 	readonly workspace: string;
 
 	private stopped = false;
+	private stopStarted = false;
 
 	constructor(
 		private readonly child: ChildProcess,
@@ -250,6 +252,14 @@ export class SpawnedServer {
 		if (!this.options.standalone)
 			throw new Error("Pool termination requires a standalone scenario");
 		await this.sendAndWait({ id: crypto.randomUUID(), type: "terminate-pool" });
+	}
+
+	async beginStop(): Promise<void> {
+		if (!this.options.standalone)
+			throw new Error("Concurrent shutdown requires a standalone scenario");
+		if (this.stopStarted) throw new Error("Standalone shutdown already began");
+		this.stopStarted = true;
+		await this.sendAndWait({ id: crypto.randomUUID(), type: "begin-stop" });
 	}
 
 	/** Simulate an atomic-config-write failure using only this fixture's temporary path. */
@@ -293,7 +303,10 @@ export class SpawnedServer {
 	private async stopProcess(): Promise<void> {
 		try {
 			if (this.options.standalone && isRunning(this.child))
-				await this.sendAndWait({ id: crypto.randomUUID(), type: "stop" });
+				await this.sendAndWait({
+					id: crypto.randomUUID(),
+					type: this.stopStarted ? "await-stop" : "stop",
+				});
 		} finally {
 			await stopChild(this.child);
 		}
@@ -301,7 +314,7 @@ export class SpawnedServer {
 
 	private async sendAndWait(message: {
 		id: string;
-		type: "advance" | "stop" | "terminate-pool";
+		type: "advance" | "stop" | "begin-stop" | "await-stop" | "terminate-pool";
 		byMs?: number;
 	}): Promise<void> {
 		const reply = new Promise<void>((resolve, reject) => {

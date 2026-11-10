@@ -15,8 +15,9 @@ account or pool information. Do not use the raw `bun run start` as public ingres
 
 The launcher runs a Node HTTP entrance behind Render's HTTPS termination and
 one supervised Bun pool. It stops accepting public traffic if the pool exits.
-Deployments of this service still interrupt active streams; deploying a separate
-agents service no longer restarts this pool. Keep one replica: SQLite and OAuth
+Deployments can still interrupt active streams; use the bounded drain procedure
+below to reduce interruptions. Deploying a separate agents service no longer
+restarts this pool. Keep one replica: SQLite and OAuth
 refresh state are not shared across replicas.
 
 | Setting | Value or default |
@@ -57,6 +58,41 @@ secondary port can be reached over the [private network](https://render.com/docs
 An agents scheduler that needs `/api/pool-status` must use that private origin
 and the forwarding key. Device keys deliberately cannot read this endpoint.
 Never publish the private listener or give agents the administrator key.
+
+### Deploy with less interruption
+
+Use the private administrator connection, never the public HTTPS URL or a
+teammate's proxy/device key. Build/check the release before pausing work.
+
+1. Start the pause with `POST /api/drain`. This rejects new inference on both
+   private listeners, including requests forwarded by the public entrance,
+   with 503 and `Retry-After: 30`. It leaves active responses untouched.
+2. Poll `GET /api/drain` until both `activeRequests` and `activeWebSockets`
+   are zero. Renew with POST before the two-minute lease expires, and impose
+   an operator-side wait limit. If work does not finish in that limit, cancel
+   with DELETE and postpone the deploy rather than cutting it off silently.
+3. Keep the lease valid until the old process shuts down. If deployment is
+   cancelled or fails while the old process remains alive, DELETE resumes it;
+   lease expiry also resumes it if the operator disappears. A new process
+   starts unpaused and uses the same one persistent database.
+
+On shutdown the pool allows up to 25 seconds for active requests to finish;
+the standalone supervisor bounds the whole shutdown to 28 seconds. Remaining
+connections are forcibly closed at the deadline. This is not blue/green or a
+promise of uninterrupted streams. Clients still control their own retries;
+an interactive chat that already stopped may need `continue`.
+
+Render disk-backed services stop the old instance before starting the new one,
+so a brief outage remains. Their shutdown grace cannot be extended; see
+[Render's disk limitations](https://render.com/docs/disks#disk-limitations-and-considerations).
+Do not run two pool processes against the SQLite disk to avoid that gap.
+
+**First rollout:** an older running binary has neither these control routes nor
+the new shutdown behavior. Publishing this code cannot change that process in
+place. Use a quiet window for the first installation; subsequent rollouts can
+use the full drain procedure. An ordinary automatic deploy does not call the
+pre-deploy API for you: integrate this procedure into the release operator's
+workflow rather than assuming SIGTERM alone waits indefinitely.
 
 ## Pool and device setup
 

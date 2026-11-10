@@ -27,7 +27,8 @@ function utilization(value: RecordValue): number | null {
 			value.utilization,
 	);
 	if (raw === null) return null;
-	return raw > 1 ? raw / 100 : raw;
+	// The OAuth usage endpoint reports percentages, including values below 1%.
+	return raw / 100;
 }
 
 function resetAt(value: RecordValue): number | null {

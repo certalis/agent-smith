@@ -140,8 +140,8 @@ export class NodeWire {
 	}
 
 	async waitForHolds(): Promise<void> {}
-	releaseHold(_id: string): never {
-		throw new Error("Node wire upstream uses explicit connection barriers");
+	async releaseHold(id: string): Promise<void> {
+		await this.command({ type: "release", ruleId: id });
 	}
 	releaseAfterClientChunk(_id: string): never {
 		throw new Error("Node wire upstream uses explicit client barriers");

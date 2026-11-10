@@ -98,6 +98,9 @@ process.on("disconnect", () => {
 	void stop().finally(() => process.exit(0));
 });
 
+// Runtime's signal listener is registered first; this is only a lifecycle barrier.
+process.on("SIGTERM", () => send({ type: "stopping" }));
+
 try {
 	server = startServer({
 		port: Number(process.env.AGENT_SMITH_POOL_PORT ?? 0),

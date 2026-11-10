@@ -135,19 +135,16 @@ export async function startStandalone(
 	const stop = () =>
 		(stopPromise ??= (async () => {
 			stopping = true;
-			try {
-				await bounded(
-					new Promise<void>((resolve) => server.close(() => resolve())),
-					10_000,
-				);
-			} catch {
-				server.closeAllConnections();
-			}
+			const publicClosed = new Promise<void>((resolve) =>
+				server.close(() => resolve()),
+			);
+			// Both listeners drain together, not 25 seconds each in sequence.
 			if (!exited) child.kill("SIGTERM");
 			try {
-				await bounded(closed, 5_000);
+				await bounded(Promise.all([publicClosed, closed]), 28_000);
 			} catch {
-				child.kill("SIGKILL");
+				server.closeAllConnections();
+				if (!exited) child.kill("SIGKILL");
 				await closed;
 			}
 		})());

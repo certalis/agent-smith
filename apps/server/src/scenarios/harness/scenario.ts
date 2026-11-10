@@ -45,6 +45,8 @@ export type RequestStep = {
 	upload?: "headers-only";
 	/** Capture only an actual refused connection, for shutdown assertions. */
 	allowConnectionRefused?: boolean;
+	/** Capture a response interrupted after headers by an explicit socket-close error. */
+	allowResponseInterrupted?: boolean;
 	/** Capture string fields from the first successful response for later {{name}} references. */
 	capture?: Record<
 		string,
@@ -86,6 +88,8 @@ export type AssertStep = {
 export type ScenarioStep =
 	| { type: "restart" }
 	| { type: "stop" }
+	| { type: "begin-stop" }
+	| { type: "await-stop" }
 	| { type: "terminate-pool" }
 	| { type: "block-config-write" }
 	| { type: "restore-config-write" }
@@ -166,6 +170,7 @@ export type ClientAssertion = {
 	uploadedBytes?: number;
 	uploadBufferedBytes?: number;
 	connectionRefused?: boolean;
+	responseInterrupted?: boolean;
 	cancelled?: boolean;
 	header?: { name: string; value: string };
 	headerAbsent?: string;

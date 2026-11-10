@@ -50,7 +50,19 @@ export function errorResponse(error: unknown): Response {
 			"context" in error && error.context !== undefined
 				? { details: error.context }
 				: {};
-		return jsonResponse({ error: error.message, ...details }, error.statusCode);
+		const retryAfter =
+			error.statusCode === 503 &&
+			"retryAfterSeconds" in error &&
+			typeof error.retryAfterSeconds === "number" &&
+			Number.isSafeInteger(error.retryAfterSeconds) &&
+			error.retryAfterSeconds > 0
+				? { "Retry-After": String(error.retryAfterSeconds) }
+				: undefined;
+		return jsonResponse(
+			{ error: error.message, ...details },
+			error.statusCode,
+			retryAfter,
+		);
 	}
 
 	// Handle generic errors

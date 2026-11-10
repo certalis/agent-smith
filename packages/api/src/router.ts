@@ -1,4 +1,4 @@
-import { validateNumber } from "@agent-smith/core";
+import { ServiceUnavailableError, validateNumber } from "@agent-smith/core";
 import { errorResponse, NotFound } from "@agent-smith/http";
 import { isAccountProvider } from "@agent-smith/types";
 import {
@@ -91,6 +91,20 @@ export class APIRouter {
 	}
 
 	private registerHandlers(): void {
+		if (this.context.deploymentDrain) {
+			const control = this.context.deploymentDrain;
+			for (const [method, action] of [
+				["GET", "status"],
+				["POST", "start"],
+				["DELETE", "resume"],
+			] as const) {
+				this.staticHandlers.set(`${method}:/api/drain`, () =>
+					Response.json(control(action), {
+						headers: { "cache-control": "no-store" },
+					}),
+				);
+			}
+		}
 		if (this.enrollment) {
 			this.staticHandlers.set(
 				"POST:/api/enrollment-invitations",
@@ -165,6 +179,15 @@ export class APIRouter {
 		this.staticHandlers.set("GET:/api/stats", () => statsHandler());
 		this.staticHandlers.set("GET:/api/status", () => fleetStatusHandler());
 		this.staticHandlers.set("GET:/api/pool-status", (_req, url) => {
+			if (this.context.deploymentDrain?.("status").draining) {
+				return errorResponse(
+					new ServiceUnavailableError(
+						"Pool is draining for deployment",
+						undefined,
+						30,
+					),
+				);
+			}
 			const provider = url.searchParams.get("provider") ?? "";
 			const model = url.searchParams.get("model") ?? undefined;
 			if (

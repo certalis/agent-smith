@@ -24,6 +24,7 @@ export type WireCommand =
 	| { type: "edge"; socketPath: string; options: Scenario["edge"] }
 	| { type: "request"; clientId: string; request: WireRequest }
 	| { type: "client-chunk" | "cancel"; clientId: string }
+	| { type: "release"; ruleId: string }
 	| { type: "stop" };
 
 export type WireEvent =

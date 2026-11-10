@@ -11,6 +11,7 @@ import {
 import { serve } from "bun";
 import { bootstrapRuntime, logInitialAccountStatus } from "./bootstrap-runtime";
 import { loadDashboardAssets, resetDashboardAssets } from "./dashboard-assets";
+import { DeploymentDrain } from "./deployment-drain";
 import { createServerFetchHandler } from "./fetch-handler";
 import { createStartupBanner } from "./startup-banner";
 import { runStartupMaintenance } from "./startup-maintenance";
@@ -34,6 +35,8 @@ let serverInstance: ReturnType<typeof serve> | null = null;
 let unixServerInstance: ReturnType<typeof serve> | null = null;
 let stopRetentionJob: (() => void) | null = null;
 let serverStopPromise: Promise<void> | null = null;
+let deploymentDrain: DeploymentDrain | undefined;
+let checkShutdownDrain: (() => void) | undefined;
 
 export interface ServerHandle {
 	port: number;
@@ -77,19 +80,50 @@ async function stopServerRuntime(): Promise<void> {
 		const errors: Error[] = [];
 		const activeServer = serverInstance;
 		const activeUnixServer = unixServerInstance;
-		serverInstance = null;
-		unixServerInstance = null;
-
+		deploymentDrain?.shutdown();
+		const listeners = [activeUnixServer, activeServer].filter(
+			(listener) => listener !== null,
+		);
+		// Leave cleanup time inside Render's fixed 30-second disk-backed grace.
+		const shutdownDeadline = Date.now() + 25_000;
 		try {
-			await activeUnixServer?.stop(true);
-		} catch (error) {
-			errors.push(toError("Failed to stop Unix server", error));
-		}
-
-		try {
-			await activeServer?.stop(true);
-		} catch (error) {
-			errors.push(toError("Failed to stop Bun server", error));
+			await new Promise<void>((resolve) => {
+				let timer: ReturnType<typeof setInterval> | undefined;
+				const finish = () => {
+					clearInterval(timer);
+					resolve();
+				};
+				const check = () => {
+					const pending = listeners.some(
+						(listener) =>
+							listener.pendingRequests > 0 || listener.pendingWebSockets > 0,
+					);
+					if (!pending) finish();
+					else if (Date.now() >= shutdownDeadline) {
+						lifecycleLog.warn(
+							"Shutdown grace expired; closing remaining connections",
+						);
+						finish();
+					}
+				};
+				checkShutdownDrain = check;
+				// Keep both listeners available for retryable rejections while draining.
+				timer = setInterval(check, 50);
+				check();
+			});
+			// Bun 1.3.x cannot reliably force an already-started stop(false).
+			// Call stop exactly once, after the wait or its deadline.
+			const stopped = await Promise.allSettled(
+				listeners.map((listener) => listener.stop(true)),
+			);
+			for (const result of stopped) {
+				if (result.status === "rejected")
+					errors.push(toError("Failed to stop listener", result.reason));
+			}
+		} finally {
+			checkShutdownDrain = undefined;
+			serverInstance = null;
+			unixServerInstance = null;
 		}
 
 		stopRetentionMaintenance();
@@ -160,6 +194,19 @@ export default function startServer(
 	if (withDashboard) {
 		loadDashboardAssets();
 	}
+	const drain = new DeploymentDrain(() => ({
+		// Bun counts each response until it ends, including this control request.
+		activeRequests: Math.max(
+			0,
+			(serverInstance?.pendingRequests ?? 0) +
+				(unixServerInstance?.pendingRequests ?? 0) -
+				1,
+		),
+		activeWebSockets:
+			(serverInstance?.pendingWebSockets ?? 0) +
+			(unixServerInstance?.pendingWebSockets ?? 0),
+	}));
+	deploymentDrain = drain;
 
 	const {
 		config,
@@ -170,7 +217,7 @@ export default function startServer(
 		proxyContext,
 		providerRegistry,
 		runtimeConfig,
-	} = bootstrapRuntime(port, serverLog);
+	} = bootstrapRuntime(port, serverLog, drain.control);
 
 	stopRetentionJob = runStartupMaintenance(config, dbOps);
 
@@ -179,6 +226,7 @@ export default function startServer(
 		exposureConfig,
 		proxyContext,
 		withDashboard,
+		isDeploymentDraining: drain.isDraining,
 	});
 	try {
 		if (options?.additionalUnixSocket) {
@@ -222,6 +270,7 @@ export default function startServer(
 		advanceRoutingClock: () => {
 			proxyContext.teamAdmission?.advance();
 			proxyContext.quotaHold?.advance();
+			checkShutdownDrain?.();
 		},
 	};
 }

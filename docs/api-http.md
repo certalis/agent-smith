@@ -53,6 +53,26 @@ All API responses are in JSON format with `Content-Type: application/json`.
 
 ## Endpoints
 
+### Deployment drain (private, administrator only)
+
+`POST /api/drain` pauses new inference for two minutes; repeating it renews
+that lease. `GET /api/drain` reads the current state without renewing it.
+`DELETE /api/drain` cancels the pause. All three require the administrator key
+in `x-api-key`, including reads; proxy and device keys cannot control a rollout.
+The HTTPS entrance never forwards these paths.
+
+Responses contain `draining`, `expiresAt` (epoch milliseconds or `null`),
+`activeRequests`, and `activeWebSockets`. Activity covers both private listeners
+and includes open response streams; the control request itself is excluded.
+Health checks and management continue to work during the pause. New inference
+receives 503 with `Retry-After: 30` before provider forwarding; current responses
+are not cancelled or replayed. The pause is in memory: cancellation, lease
+expiry or restart restores service without editing accounts or the database.
+`GET /api/pool-status` also returns 503 during the pause so schedulers stop
+starting jobs; ordinary health stays 200.
+
+See the [bounded rollout procedure](https-edge.md#deploy-with-less-interruption).
+
 ### Private Claude seat enrollment (opt-in)
 
 Set `AGENT_SMITH_ENROLLMENT_ORIGIN` to the exact external HTTPS origin (no trailing slash,

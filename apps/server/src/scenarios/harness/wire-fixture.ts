@@ -43,6 +43,14 @@ export const standaloneRequest = {
 	headers: { ...standaloneHeaders, "x-api-key": wireDeviceKey },
 } as const;
 
+export const drainControl = {
+	type: "request",
+	transport: "unix",
+	path: "/api/drain",
+	body: "",
+	headers: { "x-api-key": wireAdminKey },
+} as const;
+
 export const providerChunk =
 	'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_synthetic_cancel","type":"message","role":"assistant","model":"synthetic-model","content":[],"usage":{"input_tokens":1,"output_tokens":0}}}\n\n' +
 	'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n' +
