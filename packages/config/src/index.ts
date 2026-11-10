@@ -118,12 +118,14 @@ export type ClientRoutingFileConfig = {
 	enabled?: boolean;
 	base_url?: string;
 	proxy_key_file?: string;
+	keep_claude_login?: boolean;
 };
 
 export type ClientRoutingConfig = {
 	enabled: boolean;
 	baseUrl?: string;
 	proxyKeyFile?: string;
+	keepClaudeLogin?: boolean;
 };
 
 const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
@@ -376,6 +378,9 @@ function sanitizeClientRouting(
 		value.proxy_key_file.length <= 1024
 	) {
 		client.proxy_key_file = value.proxy_key_file;
+	}
+	if (typeof value.keep_claude_login === "boolean") {
+		client.keep_claude_login = value.keep_claude_login;
 	}
 	return Object.keys(client).length > 0 ? client : undefined;
 }
@@ -732,6 +737,7 @@ export class Config extends EventEmitter {
 			...(client?.proxy_key_file && {
 				proxyKeyFile: client.proxy_key_file,
 			}),
+			...(client?.keep_claude_login === true && { keepClaudeLogin: true }),
 		};
 	}
 

@@ -51,6 +51,7 @@ describe("provider configuration", () => {
 			client: {
 				base_url: "http://127.0.0.1:18181/",
 				proxy_key_file: "/tmp/agent-smith.key",
+				keep_claude_login: true,
 			},
 		});
 
@@ -58,6 +59,7 @@ describe("provider configuration", () => {
 			enabled: false,
 			baseUrl: "http://127.0.0.1:18181",
 			proxyKeyFile: "/tmp/agent-smith.key",
+			keepClaudeLogin: true,
 		});
 	});
 
