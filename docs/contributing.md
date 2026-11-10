@@ -607,37 +607,23 @@ We use semantic versioning (SemVer):
 
 ### Release Workflow
 
-1. **Prepare Release**
-   ```bash
-   # Update version in package.json files
-   # Create/Update CHANGELOG.md (if not exists, create following Keep a Changelog format)
-   git checkout -b release/vX.Y.Z
-   ```
+`@certalis/agent-smith` is published from `apps/tui` by
+[`release.yml`](../.github/workflows/release.yml) through npm trusted
+publishing: no npm token is stored anywhere.
 
-2. **Create Release PR**
-   - Title: `Release vX.Y.Z`
-   - Include changelog in description
-   - Get approval from maintainers
+1. Open a PR that bumps `version` in `apps/tui/package.json`. The Release
+   workflow verifies and packs it on the PR as a rehearsal.
+2. Merge it. On `main` the workflow publishes that tarball with provenance and
+   creates the `v<version>` GitHub release with generated notes. A
+   `package.json` change that keeps the version publishes nothing.
+3. Users update with `bun add -g @certalis/agent-smith@<version>`, then rerun
+   `agent-smith install-client`.
 
-3. **Merge and Tag**
-   ```bash
-   git checkout main
-   git pull upstream main
-   git tag -a vX.Y.Z -m "Release version X.Y.Z"
-   git push upstream vX.Y.Z
-   ```
-
-4. **Create GitHub Release**
-   - Use the tag
-   - Copy changelog entries
-   - Attach built binaries if applicable
-
-5. **Post-Release**
-   - Announce in discussions/Discord
-   - Update documentation site
-   - Monitor for issues
-
-**Note**: There is no CHANGELOG.md file in the repository yet. When implementing releases, create and maintain a CHANGELOG.md file following the [Keep a Changelog](https://keepachangelog.com/) format.
+The publish job runs in the `npm` environment, which only `main` can deploy to,
+and the npm trusted publisher names this repository, `release.yml` and `npm`, so
+no other branch or workflow can publish. A manual run rehearses by default;
+untick `dryRun` on `main` to retry a version whose publish failed. If the publish
+succeeded but the GitHub release did not, create it with `gh release create`.
 
 ### Emergency Patches
 
