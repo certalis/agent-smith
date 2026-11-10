@@ -29,6 +29,23 @@ refresh state are not shared across replicas.
 | `AGENT_SMITH_POOL_PORT` | `8081`, distinct from the public port |
 | `AGENT_SMITH_POOL_HOST` | `127.0.0.1`; use `0.0.0.0` only when a trusted private network needs this secondary port |
 | `AGENT_SMITH_ENROLLMENT_ORIGIN` | Unset (sign-in off); set to the same exact public HTTPS origin to enable the existing seat enrollment flow |
+| `AGENT_SMITH_POOL_DASHBOARD` | Unset (dashboard off); `1` serves the dashboard on the private pool port to callers on the host's loopback, see below |
+
+### Private dashboard over SSH
+
+With `AGENT_SMITH_POOL_DASHBOARD=1`, the private pool serves the dashboard and
+trusts loopback callers without a key. The public entrance still returns 404
+for it: it reaches the pool only through the Unix socket and marks every request
+as forwarded, so loopback TCP means a shell on the host. Anyone who can SSH into
+the service can already read the keys file, so the flag grants them no new
+access. Management writes still require the admin key, which the dashboard asks
+for in its unlock dialog. Open a tunnel and browse `http://localhost:18081`:
+
+```bash
+ssh -N -L 18081:127.0.0.1:8081 <service>@ssh.<region>.render.com
+```
+
+Unset the variable and redeploy to close it.
 
 For [opt-in seat enrollment](api-http.md#private-claude-seat-enrollment-opt-in),
 share `https://pool.example.com/pool-enroll`, not the proxy homepage. The

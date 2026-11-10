@@ -12,6 +12,7 @@ export type StandaloneOptions = {
 	port: number;
 	poolPort: number;
 	poolHost: string;
+	dashboard: boolean;
 	stateDir: string;
 	socketPath: string;
 	configPath: string;
@@ -109,6 +110,7 @@ export function readStandaloneOptions(
 		port,
 		poolPort,
 		poolHost: env.AGENT_SMITH_POOL_HOST ?? "127.0.0.1",
+		dashboard: env.AGENT_SMITH_POOL_DASHBOARD === "1",
 		...paths,
 		adminKey: keys.adminKey as string,
 		proxyKey: keys.proxyKey as string,
@@ -125,7 +127,9 @@ export function poolEnvironment(
 		AGENT_SMITH_POOL_PORT: String(options.poolPort),
 		AGENT_SMITH_HOST: options.poolHost,
 		AGENT_SMITH_STATE_DIR: options.stateDir,
-		AGENT_SMITH_TRUST_LOOPBACK: "false",
+		AGENT_SMITH_POOL_DASHBOARD: options.dashboard ? "1" : "0",
+		// The public entrance reaches the pool only through its Unix socket, so loopback TCP means an SSH session on the host.
+		AGENT_SMITH_TRUST_LOOPBACK: options.dashboard ? "true" : "false",
 		AGENT_SMITH_CONFIG_PATH: options.configPath,
 		AGENT_SMITH_DB_PATH: options.dbPath,
 		AGENT_SMITH_CLIENT_KEYS_FILE: options.clientKeysFile,

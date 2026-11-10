@@ -4,7 +4,7 @@ import startServer from "@agent-smith/runtime-server";
 process.umask(0o077);
 const server = startServer({
 	port: Number(process.env.AGENT_SMITH_POOL_PORT),
-	withDashboard: false,
+	withDashboard: process.env.AGENT_SMITH_POOL_DASHBOARD === "1",
 	additionalUnixSocket: process.env.AGENT_SMITH_STATE_DIR
 		? `${process.env.AGENT_SMITH_STATE_DIR}/control.sock`
 		: "/var/data/agent-smith/state/control.sock",
