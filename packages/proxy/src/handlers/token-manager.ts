@@ -1,4 +1,4 @@
-import { ServiceUnavailableError, TokenRefreshError } from "@agent-smith/core";
+import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import type { TokenRefreshResult } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
@@ -8,7 +8,55 @@ import { ERROR_MESSAGES, type ResolvedProxyContext } from "./proxy-types";
 const log = new Logger("TokenManager");
 
 // Track refresh failures for backoff
-const refreshFailures = new Map<string, number>();
+const refreshFailures = new Map<
+	string,
+	{ at: number; error: TokenRefreshError }
+>();
+
+export function refreshBackoffUntil(
+	accountId: string,
+	now: number = Date.now(),
+): number | null {
+	const failure = refreshFailures.get(accountId);
+	return failure && now - failure.at < TOKEN_REFRESH_BACKOFF_MS
+		? failure.at + TOKEN_REFRESH_BACKOFF_MS
+		: null;
+}
+
+export function quarantineAccount(
+	account: Account,
+	ctx: ResolvedProxyContext,
+	reason: string,
+): void {
+	account.paused = true;
+	account.error_reason = reason;
+	ctx.asyncWriter.enqueue(() => ctx.dbOps.markAccountError(account.id, reason));
+}
+
+function recordRefreshFailure(
+	account: Account,
+	ctx: ResolvedProxyContext,
+	error: unknown,
+): TokenRefreshError {
+	const refreshError = new TokenRefreshError(account.id, error as Error);
+	refreshFailures.set(account.id, { at: Date.now(), error: refreshError });
+	const status = (error as { status?: unknown } | null)?.status;
+	if (
+		typeof status === "number" &&
+		status >= 400 &&
+		status < 500 &&
+		status !== 408 &&
+		status !== 429
+	) {
+		quarantineAccount(
+			account,
+			ctx,
+			"OAuth refresh was rejected by the upstream",
+		);
+	}
+	log.error(`Token refresh failed for account ${account.name}`, error);
+	return refreshError;
+}
 
 /**
  * Safely refreshes an access token with deduplication
@@ -16,7 +64,6 @@ const refreshFailures = new Map<string, number>();
  * @param ctx - The proxy context
  * @returns Promise resolving to the new access token
  * @throws {TokenRefreshError} If token refresh fails
- * @throws {ServiceUnavailableError} If refresh promise is not found
  */
 export async function refreshAccessTokenSafe(
 	account: Account,
@@ -24,11 +71,9 @@ export async function refreshAccessTokenSafe(
 ): Promise<string> {
 	// Check for recent refresh failures and implement backoff
 	const lastFailure = refreshFailures.get(account.id);
-	if (lastFailure && Date.now() - lastFailure < TOKEN_REFRESH_BACKOFF_MS) {
+	if (lastFailure && refreshBackoffUntil(account.id) !== null) {
 		log.warn(`Account ${account.name} is in refresh backoff period`);
-		throw new ServiceUnavailableError(
-			`Token refresh for account ${account.name} is in backoff period after recent failure`,
-		);
+		throw lastFailure.error;
 	}
 
 	// Check if a refresh is already in progress for this account
@@ -72,10 +117,7 @@ export async function refreshAccessTokenSafe(
 				return result.accessToken;
 			})
 			.catch((error) => {
-				// Record the failure timestamp for backoff
-				refreshFailures.set(account.id, Date.now());
-				log.error(`Token refresh failed for account ${account.name}`, error);
-				throw new TokenRefreshError(account.id, error as Error);
+				throw recordRefreshFailure(account, ctx, error);
 			})
 			.finally(() => {
 				// Clean up the map when done (success or failure)
@@ -87,8 +129,9 @@ export async function refreshAccessTokenSafe(
 	// Return the existing or new refresh promise
 	const promise = ctx.refreshInFlight.get(account.id);
 	if (!promise) {
-		throw new ServiceUnavailableError(
-			`${ERROR_MESSAGES.REFRESH_NOT_FOUND} ${account.id}`,
+		throw new TokenRefreshError(
+			account.id,
+			new Error(ERROR_MESSAGES.REFRESH_NOT_FOUND),
 		);
 	}
 	return promise;

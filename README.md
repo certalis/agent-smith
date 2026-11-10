@@ -96,6 +96,11 @@ key; provider tokens and the single database stay on the server.
 Device keys allow independent revocation and cannot read management data.
 This does not add per-client fairness or budgets.
 
+Seat owners join through the server's optional `/pool-enroll` page, not its
+proxy homepage. Enable the existing email-listed sign-in flow with
+`AGENT_SMITH_ENROLLMENT_ORIGIN` as described in the
+[HTTPS deployment guide](docs/https-edge.md#standalone-render-web-service).
+
 Copy [`https-client.json`](examples/config/https-client.json) into your private
 Agent Smith config. Put the device key in the owner-only file named by
 `proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint

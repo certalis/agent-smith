@@ -10,6 +10,8 @@ import { isInferenceRoute } from "./inference-routes";
 export type ProxyEdgeOptions = {
 	origin: string;
 	socketPath: string;
+	/** Opt in to the existing bounded sign-in surface on this exact origin. */
+	enrollmentOrigin?: string;
 	maxBodyBytes?: number;
 	timeoutMs?: number;
 	maxConcurrentRequests?: number;
@@ -41,7 +43,20 @@ const RESPONSE_HEADERS = [
 	"anthropic-ratelimit-tokens-limit",
 	"anthropic-ratelimit-tokens-remaining",
 	"anthropic-ratelimit-tokens-reset",
+	"content-security-policy",
+	"referrer-policy",
+	"x-frame-options",
 ];
+
+function isEnrollmentRoute(method: string, path: string): boolean {
+	return (
+		(method === "GET" && path === "/pool-enroll") ||
+		(method === "POST" &&
+			["request", "start", "verify", "confirm", "disconnect"].some(
+				(action) => path === `/pool-enroll/${action}`,
+			))
+	);
+}
 
 function selectHeaders(
 	headers: IncomingHttpHeaders,
@@ -58,13 +73,20 @@ function requestFailure(
 	req: IncomingMessage,
 	origin: string,
 	maxBodyBytes: number,
+	enrollment: boolean,
 ): number | null {
 	const health = req.method === "GET" && req.url === "/pool-health";
-	if (!health && !isInferenceRoute(req.method ?? "", req.url ?? "")) return 404;
+	if (
+		!enrollment &&
+		!health &&
+		!isInferenceRoute(req.method ?? "", req.url ?? "")
+	)
+		return 404;
 	if (
 		req.headers.host !== new URL(origin).host ||
 		(req.headers.origin !== undefined && req.headers.origin !== origin) ||
 		(req.headers["sec-fetch-site"] !== undefined &&
+			!(enrollment && req.method === "GET") &&
 			!["none", "same-origin"].includes(String(req.headers["sec-fetch-site"])))
 	)
 		return 403;
@@ -75,14 +97,18 @@ function requestFailure(
 			Number(req.headers["content-length"]) > maxBodyBytes)
 	)
 		return 413;
-	if (!req.headers["x-api-key"] && !req.headers.authorization) return 401;
+	if (enrollment) {
+		if (req.method === "POST" && req.headers.origin !== origin) return 403;
+	} else if (!req.headers["x-api-key"] && !req.headers.authorization)
+		return 401;
 	return null;
 }
 
-/** A streaming, inference-only entrance to the existing private pool socket. */
+/** A streaming pool entrance with an optional, bounded enrollment surface. */
 export function createProxyEdgeHandler({
 	origin,
 	socketPath,
+	enrollmentOrigin,
 	maxBodyBytes = 64 * 1024 * 1024,
 	timeoutMs = 300_000,
 	maxConcurrentRequests = 128,
@@ -91,6 +117,7 @@ export function createProxyEdgeHandler({
 	if (
 		url.protocol !== "https:" ||
 		url.origin !== origin ||
+		(enrollmentOrigin !== undefined && enrollmentOrigin !== origin) ||
 		!isAbsolute(socketPath) ||
 		!Number.isSafeInteger(maxBodyBytes) ||
 		maxBodyBytes < 1 ||
@@ -100,7 +127,7 @@ export function createProxyEdgeHandler({
 		maxConcurrentRequests < 1
 	) {
 		throw new Error(
-			"Proxy edge requires an exact HTTPS origin, an absolute socket path and positive limits",
+			"Proxy edge requires an exact HTTPS origin, a matching enrollment origin, an absolute socket path and positive limits",
 		);
 	}
 	let activeRequests = 0;
@@ -117,7 +144,11 @@ export function createProxyEdgeHandler({
 			});
 			res.end();
 		};
-		const rejected = requestFailure(req, origin, maxBodyBytes);
+		const enrollment =
+			enrollmentOrigin !== undefined &&
+			isEnrollmentRoute(req.method ?? "", req.url ?? "");
+		const bodyLimit = enrollment ? Math.min(maxBodyBytes, 8192) : maxBodyBytes;
+		const rejected = requestFailure(req, origin, bodyLimit, enrollment);
 		if (rejected) return finish(rejected);
 		if (activeRequests >= maxConcurrentRequests) return finish(503);
 		activeRequests++;
@@ -126,7 +157,8 @@ export function createProxyEdgeHandler({
 				? "/health"
 				: (req.url ?? "");
 		const headers = selectHeaders(req.headers, REQUEST_HEADERS);
-		headers.host = "localhost";
+		headers.host = enrollment ? url.host : "localhost";
+		if (enrollment && req.headers.origin) headers.origin = req.headers.origin;
 		// Keep early replies readable while the request finishes; close below.
 		headers.connection = "keep-alive";
 		headers["x-forwarded-for"] = "proxy-edge";
@@ -175,7 +207,7 @@ export function createProxyEdgeHandler({
 		let bytes = 0;
 		req.on("data", (chunk: Buffer) => {
 			bytes += chunk.length;
-			if (bytes > maxBodyBytes) {
+			if (bytes > bodyLimit) {
 				req.unpipe(upstream);
 				upstream.destroy();
 				finish(413);

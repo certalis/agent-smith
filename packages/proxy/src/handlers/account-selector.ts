@@ -11,6 +11,7 @@ import {
 import { soonestWeeklyReset } from "../seat-usage";
 import { isAllowlisted, type TeamRoutingRequest } from "../team-router";
 import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
+import { refreshBackoffUntil } from "./token-manager";
 
 type EligibilityContext = Pick<ProxyContext, "runtime" | "dbOps">;
 type PoolStatusContext = Pick<
@@ -113,10 +114,14 @@ function fleetAccounts(
  * `findAvailableForProvider` keeps it only once `rate_limited_until < now`.
  */
 function cooldownEnd(account: Account, now: number): number | null {
-	return account.rate_limited_until !== null &&
-		account.rate_limited_until >= now
-		? account.rate_limited_until + 1
-		: null;
+	const rateLimitEnd =
+		account.rate_limited_until !== null && account.rate_limited_until >= now
+			? account.rate_limited_until + 1
+			: null;
+	const refreshEnd = refreshBackoffUntil(account.id, now);
+	return rateLimitEnd === null
+		? refreshEnd
+		: Math.max(rateLimitEnd, refreshEnd ?? 0);
 }
 
 function blockingResets(
@@ -337,10 +342,10 @@ export function getOrderedAccounts(
 	teamRequest?: TeamRoutingRequest,
 	options: AccountSelectionOptions = {},
 ): Account[] {
-	const providerAccounts = ctx.dbOps.getAvailableAccountsByProvider(
-		ctx.providerName,
-	);
 	const now = Date.now();
+	const providerAccounts = ctx.dbOps
+		.getAvailableAccountsByProvider(ctx.providerName)
+		.filter((account) => refreshBackoffUntil(account.id, now) === null);
 	const eligible = providerAccounts.filter((account) =>
 		isQuotaEligible(
 			ctx.provider,

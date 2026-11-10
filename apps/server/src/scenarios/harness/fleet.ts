@@ -42,7 +42,7 @@ export function seedFleet({
 							provider,
 							accessToken: token,
 							refreshToken: `refresh-${spec.name}`,
-							expiresAt: now() + 60 * 60 * 1_000,
+							expiresAt: now() + durationMs(spec.tokenExpiresIn ?? "1h"),
 							accountUuid: spec.accountUuid,
 							quotaState: spec.quotaState,
 							baseUrl: spec.baseUrl ?? defaultBaseUrl,

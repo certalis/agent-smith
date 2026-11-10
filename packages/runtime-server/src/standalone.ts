@@ -95,7 +95,10 @@ export async function startStandalone(
 ) {
 	process.umask(0o077);
 	await prepareStandaloneState(options);
-	const edge = createProxyEdgeHandler(options);
+	const edge = createProxyEdgeHandler({
+		...options,
+		enrollmentOrigin: env.AGENT_SMITH_ENROLLMENT_ORIGIN,
+	});
 	const server = createServer((req, res) => {
 		if (
 			req.method === "GET" &&

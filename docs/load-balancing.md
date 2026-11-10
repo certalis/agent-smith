@@ -32,6 +32,14 @@ rejection or at or above its hard `max_usage` remains blocked until that window
 resets.
 A rejected family-specific weekly bucket excludes only that model family.
 
+OAuth expiry alone does not exclude an account: the proxy refreshes it before
+use. A rejected refresh (4xx other than 408 or 429) pauses the account with an
+error reason, including when expiry or a background probe triggered it. An
+operator must repair its credentials before resuming it. Transient refresh
+failures instead exclude it for the existing 60-second refresh backoff; capacity
+status uses the same exclusion. Backoff is a credential failure, not a transport
+failure that starts a sibling's admission ramp.
+
 ## Team routing (opt-in)
 
 `team_routing.enabled` is off by default. When enabled, only OAuth seats whose
@@ -59,7 +67,9 @@ request wait only for a reset within that bounded period.
 
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one
-slot, then adds one slot every 250 ms for 30 seconds. `/tc-acct/<name>/...`
+slot, then adds one slot every 250 ms for 30 seconds. Repeated arrivals share
+that ramp rather than restarting it; an already-serving sibling never has its
+capacity reduced by another arrival. `/tc-acct/<name>/...`
 selects exactly that allowed, eligible seat and never bypasses the cap or gate.
 
 `quota_probe_seconds` is an opt-in zero-spend read of Anthropic's fixed OAuth

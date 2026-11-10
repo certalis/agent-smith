@@ -27,6 +27,13 @@ refresh state are not shared across replicas.
 | `AGENT_SMITH_KEYS_FILE` | `/var/data/agent-smith/keys.json`, regular file mode `0600` |
 | `AGENT_SMITH_POOL_PORT` | `8081`, distinct from the public port |
 | `AGENT_SMITH_POOL_HOST` | `127.0.0.1`; use `0.0.0.0` only when a trusted private network needs this secondary port |
+| `AGENT_SMITH_ENROLLMENT_ORIGIN` | Unset (sign-in off); set to the same exact public HTTPS origin to enable the existing seat enrollment flow |
+
+For [opt-in seat enrollment](api-http.md#private-claude-seat-enrollment-opt-in),
+share `https://pool.example.com/pool-enroll`, not the proxy homepage. The
+standalone entrance forwards only that page and its five exact POST actions to
+the same pool. The email allowlist and provider identity check still apply;
+it grants neither a device key nor management access. The homepage remains 404.
 
 Provision the keys file on the server with two different random values of at
 least 32 printable ASCII characters, under `adminKey` and `proxyKey`. Alternatively,
@@ -97,6 +104,8 @@ import { createProxyEdgeHandler } from "@certalis/agent-smith/edge";
 const handlePool = createProxyEdgeHandler({
   origin: "https://agents.example.com",
   socketPath: "/var/lib/agent-smith/control.sock",
+  // Optional: enable only after configuring enrollment in the private pool.
+  // enrollmentOrigin: "https://agents.example.com",
 });
 ```
 
@@ -106,6 +115,11 @@ including `/v1/oauth/token` and encoded traversal. Messages and token counting
 also accept the SDK's exact `?beta=true` query; other queries are refused. Never forward
 `/api`, `/oauth`, the dashboard or the raw Unix socket. The existing host may
 keep its own health, webhook and separately secured enrollment routes.
+To forward the pool's enrollment too, pass `enrollmentOrigin` equal to `origin`,
+set `AGENT_SMITH_ENROLLMENT_ORIGIN` on the pool, and route `/pool-enroll` and
+`/pool-enroll/` actions to this handler. All other methods, subpaths and queries
+remain refused. Enrollment POSTs require the exact Origin and are capped at
+8 KiB; page security headers are preserved. This opt-in does not expose `/api`.
 
 The handler checks the exact Host and any Origin, strips cookies and forwarded
 headers, requires authentication, caps request bytes, preserves body bytes and

@@ -105,7 +105,16 @@ export class TeamAdmission {
 			holdSeconds: 0,
 			quotaProbeSeconds: 0,
 		});
-		account.switchedAt = this.now();
+		// Already-serving siblings are warm; a new arrival must not shrink their cap.
+		if (account.active > 0 || account.queue.length > 0) return;
+		const now = this.now();
+		// A burst of fallback arrivals shares one ramp, rather than postponing it.
+		if (
+			account.switchedAt === undefined ||
+			now - account.switchedAt >= RAMP_WINDOW_MS
+		) {
+			account.switchedAt = now;
+		}
 		this.scheduleRamp(accountId, account);
 	}
 

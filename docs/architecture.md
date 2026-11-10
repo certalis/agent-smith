@@ -82,7 +82,9 @@ agent-smith/
 For managed HTTPS hosts, the Node-compatible `@certalis/agent-smith/edge`
 export forwards only exact inference routes and authenticated health to the
 existing private Unix socket. Runtime exposure checks authorize device keys
-from `AGENT_SMITH_CLIENT_KEYS_FILE` and refuse their management access. The edge creates
+from `AGENT_SMITH_CLIENT_KEYS_FILE` and refuse their management access. Optional
+enrollment forwards only the existing six sign-in routes when its exact origin
+is explicitly configured; it uses the same pool and email allowlist. The edge creates
 no second runtime or database; see [HTTPS deployment](https-edge.md).
 The standalone `start:https` launcher supervises that single Bun runtime from
 a Node HTTP entrance. Only the primary entrance is public; management uses the

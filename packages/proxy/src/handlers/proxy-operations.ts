@@ -20,7 +20,11 @@ import {
 	processProxyResponse,
 } from "./response-processor";
 import { inspectStreamHead } from "./stream-failure";
-import { getValidAccessToken, refreshAccessTokenSafe } from "./token-manager";
+import {
+	getValidAccessToken,
+	quarantineAccount,
+	refreshAccessTokenSafe,
+} from "./token-manager";
 
 const API_KEY_AUTH_COOLDOWN_MS = 5 * 60_000;
 const ORGANIZATION_QUARANTINE_MS = 5 * 60_000;
@@ -84,23 +88,6 @@ export type ProxyAttempt =
 			kind: "upstream-failure";
 	  };
 
-function shouldQuarantineAfterRefreshFailure(error: unknown): boolean {
-	if (!(error instanceof TokenRefreshError)) return false;
-	const status = (error.originalError as { status?: unknown } | undefined)
-		?.status;
-	return typeof status === "number" && status >= 400 && status < 500;
-}
-
-function quarantineAccount(
-	account: Account,
-	ctx: ResolvedProxyContext,
-	reason: string,
-): void {
-	account.paused = true;
-	account.error_reason = reason;
-	ctx.asyncWriter.enqueue(() => ctx.dbOps.markAccountError(account.id, reason));
-}
-
 function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 	const targetUrl = input.ctx.provider.buildUrl(
 		input.ctx.upstreamPath,
@@ -157,14 +144,7 @@ async function sendAuthorizedRequest(
 	try {
 		accessToken = await refreshAccessTokenSafe(input.account, input.ctx);
 		upstream = await send(accessToken);
-	} catch (error) {
-		if (shouldQuarantineAfterRefreshFailure(error)) {
-			quarantineAccount(
-				input.account,
-				input.ctx,
-				"OAuth refresh was rejected by the upstream",
-			);
-		}
+	} catch {
 		return { kind: "failed" };
 	}
 

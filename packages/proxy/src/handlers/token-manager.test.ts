@@ -1,4 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	setSystemTime,
+} from "bun:test";
+import { TokenRefreshError } from "@agent-smith/core";
 import type { Account } from "@agent-smith/types";
 import type { ResolvedProxyContext } from "./proxy-types";
 import { getValidAccessToken } from "./token-manager";
@@ -66,6 +74,35 @@ function context(): ResolvedProxyContext {
 }
 
 describe("getValidAccessToken", () => {
+	beforeEach(() => setSystemTime(new Date(1_700_000_000_000)));
+	afterEach(() => setSystemTime());
+
+	it("keeps a refresh-backoff failure typed as credential failure, not transport", async () => {
+		const selected = { ...account(0), id: "backoff-credential-failure" };
+		const ctx = context();
+		let failed = false;
+		ctx.provider.refreshToken = async () => {
+			if (!failed) {
+				failed = true;
+				throw Object.assign(new Error("temporary refresh outage"), {
+					status: 503,
+				});
+			}
+			return {
+				accessToken: "access-new",
+				expiresAt: Date.now() + 60 * 60_000,
+				refreshToken: "refresh-new",
+			};
+		};
+
+		// The second call takes backoff rather than calling the provider again.
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await expect(getValidAccessToken(selected, ctx)).rejects.toBeInstanceOf(
+				TokenRefreshError,
+			);
+		}
+	});
+
 	it("refreshes five minutes before expiry", async () => {
 		const selected = account(Date.now() + 4 * 60_000 + 59_000);
 

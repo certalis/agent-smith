@@ -23,6 +23,7 @@ export type FleetAccount = {
 	rateLimitedFor?: Duration;
 	transportFailure?: boolean;
 	paused?: boolean;
+	tokenExpiresIn?: Duration;
 };
 
 export type RequestStep = {
