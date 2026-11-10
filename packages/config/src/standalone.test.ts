@@ -35,12 +35,23 @@ describe("standalone HTTPS configuration", () => {
 		expect(child).toMatchObject({
 			PORT: "8081",
 			AGENT_SMITH_HOST: "127.0.0.1",
+			AGENT_SMITH_POOL_DASHBOARD: "0",
 			AGENT_SMITH_TRUST_LOOPBACK: "false",
 			AGENT_SMITH_CONFIG_PATH: "/private/pool/state/config.json",
 			AGENT_SMITH_DB_PATH: "/private/pool/state/pool.db",
 			AGENT_SMITH_CLIENT_KEYS_FILE: "/private/pool/state/clients.json",
 			AGENT_SMITH_ADMIN_KEY: "synthetic-admin-key-at-least-32-characters",
 			AGENT_SMITH_PROXY_KEY: "synthetic-proxy-key-at-least-32-characters",
+		});
+	});
+	test("serves the dashboard to loopback callers only when the operator opts in", () => {
+		const options = readStandaloneOptions({
+			...environment(),
+			AGENT_SMITH_POOL_DASHBOARD: "1",
+		});
+		expect(poolEnvironment(options, {})).toMatchObject({
+			AGENT_SMITH_POOL_DASHBOARD: "1",
+			AGENT_SMITH_TRUST_LOOPBACK: "true",
 		});
 	});
 	test("keeps the public entrance and private pool on distinct ports and protected paths", () => {
