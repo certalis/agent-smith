@@ -126,7 +126,7 @@ The configuration file is stored at:
 ### Client wrappers
 
 `client` is optional and is only read by `agent-smith install-client`. It has
-three fields:
+four fields:
 
 - `enabled`: `false` by default. Only literal `true` enables shared-pool wrappers.
   Run `agent-smith install-client` after changing it. When off, that command
@@ -136,6 +136,14 @@ three fields:
 - `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file
   containing the forwarding key. The key lets Claude Code and Codex send
   requests through the proxy but cannot change accounts or settings.
+- `keep_claude_login`: `false` by default. Only literal `true` makes the Claude
+  Code wrapper send the forwarding key as an `x-api-key` header through
+  `ANTHROPIC_CUSTOM_HEADERS` instead of as `ANTHROPIC_API_KEY`. Claude Code then
+  keeps its own claude.ai login active, so login-only features such as Claude in
+  Chrome and claude.ai connectors stay on while requests still use the pool.
+  Each request also carries that login's token to this Agent Smith server, which
+  removes it before forwarding. Claude Code asks for a login when none is saved.
+  Codex is unchanged.
 
 The agents service and a development caller use the same two values: an origin
 and a forwarding key. On the agents service they are environment settings; on a

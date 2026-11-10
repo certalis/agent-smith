@@ -153,6 +153,7 @@ Examples:
 			port,
 			baseUrl: client.baseUrl,
 			proxyKeyFile: client.proxyKeyFile,
+			keepClaudeLogin: client.keepClaudeLogin,
 		});
 		console.log(`Client wrappers configured for ${client.baseUrl}.`);
 		console.log(

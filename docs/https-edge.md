@@ -202,17 +202,23 @@ and run that command again to restore ordinary local Claude Code/Codex.
 Clients keep no provider token, pool database or local refresher. The server's
 existing agent jobs can keep using their private forwarding key and local route.
 
-The Claude wrapper clears `ANTHROPIC_AUTH_TOKEN` and supplies only the device key
-as `ANTHROPIC_API_KEY`. The key authenticates to Agent Smith, not Anthropic.
+By default the Claude wrapper clears `ANTHROPIC_AUTH_TOKEN` and supplies only the
+device key as `ANTHROPIC_API_KEY`. The key authenticates to Agent Smith, not Anthropic.
 Claude may describe this gateway mode as API usage billing; the server's selected
 provider/account determines the actual upstream authentication and billing.
 An enabled wrapper uses the pool directly, not the local account first.
 
-Claude.ai cloud connectors are a separate feature: Claude Code normally does not
-load them while gateway auth is active, even if a personal login is saved. See
-[Claude's connector authentication rules](https://code.claude.com/docs/en/mcp#use-mcp-servers-from-claudeai).
-Agent Smith does not bypass this restriction or transfer the personal login to
-the server. Separately configured MCP servers are not disabled by this wrapper,
+Claude.ai cloud connectors and Claude in Chrome are separate features: Claude Code
+does not load them while an API key is active, even if a personal login is saved. See
+[Claude's connector authentication rules](https://code.claude.com/docs/en/mcp#use-mcp-servers-from-claudeai)
+and [Chrome's](https://code.claude.com/docs/en/chrome).
+With `client.keep_claude_login: true`, the wrapper unsets `ANTHROPIC_API_KEY` and
+sends the device key as an `x-api-key` header instead, so the saved personal
+login stays active and both features load. That login's token then reaches this
+server with every request; every provider deletes the caller's `authorization`
+and `x-api-key` before adding the pooled account's credential, so it is never
+forwarded upstream. Without that flag, no personal login reaches the server.
+Separately configured MCP servers are not disabled by this wrapper,
 but any tool results included in model context still pass through the pool.
 Conversation affinity is not an owner-only privacy guarantee: failover can move
 context to another eligible seat. Do not assume only the tool's own HTTP call

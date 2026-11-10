@@ -128,8 +128,9 @@ second proxy. The forwarding key is for inference, not dashboard or management
 access.
 
 Claude sends one device credential in the API-key header to the gateway; it is
-not an Anthropic Console key. Claude.ai cloud connectors are not available by default in this
-mode; see the [client behavior and limits](docs/https-edge.md#configure-and-prove).
+not an Anthropic Console key. Claude in Chrome and claude.ai cloud connectors are not available by default in this
+mode; `client.keep_claude_login` keeps them on. See the
+[client behavior and limits](docs/https-edge.md#configure-and-prove).
 
 To switch back to ordinary local Claude Code/Codex, set `client.enabled` to
 `false` and run `agent-smith install-client` again. It removes only its wrappers

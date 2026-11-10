@@ -187,6 +187,43 @@ printf "%s\\n" "$@"
 		).not.toContain("client-forwarding-key");
 	});
 
+	it("keeps Claude Code's own login and sends the forwarding key as a header when asked", async () => {
+		const directory = tempDir();
+		const realClaude = join(directory, "real-claude");
+		const proxyKeyFile = join(directory, "agent-smith.key");
+		writeFileSync(proxyKeyFile, "client-forwarding-key\n", { mode: 0o600 });
+		writeFileSync(
+			realClaude,
+			`#!/bin/sh\nprintf "%s|%s|%s\\n" "$ANTHROPIC_BASE_URL" "\${ANTHROPIC_API_KEY-unset}" "$ANTHROPIC_CUSTOM_HEADERS"\n`,
+			{ mode: 0o700 },
+		);
+
+		await installClientWrappers({
+			binDir: join(directory, "bin"),
+			claudePath: realClaude,
+			port: 8123,
+			baseUrl: "http://127.0.0.1:18181",
+			proxyKeyFile,
+			keepClaudeLogin: true,
+		});
+
+		const run = (customHeaders: Record<string, string>) =>
+			Bun.spawnSync([join(directory, "bin", "claude")], {
+				env: {
+					PATH: "/usr/bin:/bin",
+					HOME: directory,
+					ANTHROPIC_API_KEY: "synthetic-inherited-api-key",
+					...customHeaders,
+				},
+			}).stdout.toString();
+		expect(run({})).toBe(
+			"http://127.0.0.1:18181/v1/claude-code|unset|x-api-key: client-forwarding-key\n",
+		);
+		expect(run({ ANTHROPIC_CUSTOM_HEADERS: "x-team: certalis" })).toBe(
+			"http://127.0.0.1:18181/v1/claude-code|unset|x-team: certalis\nx-api-key: client-forwarding-key\n",
+		);
+	});
+
 	it("gives Codex its own local Responses endpoint and preserves the user's arguments", async () => {
 		const directory = tempDir();
 		const realCodex = join(directory, "real-codex");
