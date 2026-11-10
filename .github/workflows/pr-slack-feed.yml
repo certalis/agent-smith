@@ -1,0 +1,40 @@
+name: PR Slack feed
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.fork == false &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.AUTO_TRANSLATE_APP_ID }}
+          private-key: ${{ secrets.AUTO_TRANSLATE_APP_PRIVATE_KEY }}
+          owner: certalis
+          repositories: app
+
+      - name: Ask certalis/app's PR Slack feed to post this PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          ACTION=opened
+          if [ "$EVENT_ACTION" = "closed" ]; then
+            ACTION=closed
+          fi
+          gh workflow run pr-slack-feed.yml --repo certalis/app --ref main \
+            -f pr_number="$PR_NUMBER" -f action="$ACTION" -f merged="$MERGED" -f repository="$REPOSITORY"
