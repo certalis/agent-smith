@@ -13,6 +13,7 @@ try {
 			port: 0,
 			poolPort: 0,
 			poolHost: "127.0.0.1",
+			dashboard: false,
 			stateDir,
 			socketPath: join(stateDir, "control.sock"),
 			configPath: process.env.AGENT_SMITH_CONFIG_PATH ?? "",
