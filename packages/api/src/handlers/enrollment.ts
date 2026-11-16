@@ -5,7 +5,7 @@ import {
 	OAuthFlow,
 	type VerifiedClaudeSeat,
 } from "@agent-smith/oauth-flow";
-import { isRecord } from "@agent-smith/types";
+import { type Account, isRecord } from "@agent-smith/types";
 import type { APIContext } from "../types";
 import { enrollmentPage } from "./enrollment-page";
 
@@ -16,6 +16,8 @@ const paths = new Set([
 	"/pool-enroll/verify",
 	"/pool-enroll/confirm",
 	"/pool-enroll/disconnect",
+	"/pool-enroll/resume",
+	"/pool-enroll/reset",
 ]);
 const tenMinutes = 600_000;
 const oneDay = 86_400_000;
@@ -24,14 +26,25 @@ type Details = {
 	email?: string;
 	contactEmail?: string;
 	slackUserId?: string;
+	reconnect?: {
+		id: string;
+		accountUuid: string | null;
+		organizationUuid: string | null;
+	};
 };
 type State =
 	| { kind: "invited" }
 	| { kind: "started"; flow: OAuthAuthorization }
 	| { kind: "verified"; seat: VerifiedClaudeSeat }
-	| { kind: "connected"; accountId: string; accountUuid: string }
+	| { kind: "connected"; accountId: string; accountUuid: string; email: string }
 	| { kind: "busy" };
-type Entry = { details: Details; expiresAt: number; state: State };
+type Entry = {
+	details: Details;
+	expiresAt: number;
+	state: State;
+	browserSession?: string;
+};
+const sessionCookie = "agent_smith_enrollment";
 const headers = {
 	"cache-control": "no-store",
 	"referrer-policy": "no-referrer",
@@ -94,11 +107,109 @@ export class EnrollmentHandlers {
 		details: Details,
 		state: State,
 		duration: number,
+		browserSession?: string,
 	): { token: string; expiresAt: number } {
 		const token = randomBytes(32).toString("base64url");
 		const expiresAt = this.now() + duration;
-		this.entries.set(hash(token), { details, state, expiresAt });
+		this.entries.set(hash(token), {
+			details,
+			state,
+			expiresAt,
+			browserSession,
+		});
 		return { token, expiresAt };
+	}
+	private cookieToken(req: Request): string {
+		const cookies = (req.headers.get("cookie") ?? "")
+			.split(";")
+			.map((part) => part.trim())
+			.filter((part) => part.startsWith(`${sessionCookie}=`));
+		const token =
+			cookies.length === 1
+				? (cookies[0]?.slice(sessionCookie.length + 1) ?? "")
+				: "";
+		return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : "";
+	}
+	private cookieHeader(token: string, duration: number): string {
+		return `${sessionCookie}=${token}; Path=/pool-enroll; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(duration / 1000)}${this.origin.protocol === "https:" ? "; Secure" : ""}`;
+	}
+	private browserEntry(req: Request): [string, Entry] | undefined {
+		const token = this.cookieToken(req);
+		if (!token) return;
+		const session = hash(token);
+		return [...this.entries].find(
+			([, entry]) => entry.browserSession === session,
+		);
+	}
+	private mintBrowser(
+		details: Details,
+		state: State,
+		duration: number,
+		extra: Record<string, unknown>,
+		session = randomBytes(32).toString("base64url"),
+	): Response {
+		const response = json({
+			...this.mint(details, state, duration, hash(session)),
+			...extra,
+		});
+		response.headers.set("set-cookie", this.cookieHeader(session, duration));
+		return response;
+	}
+	private next(
+		entry: Entry,
+		state: State,
+		duration: number,
+		req: Request,
+		extra: Record<string, unknown>,
+	): Response {
+		const session = this.cookieToken(req);
+		return this.mintBrowser(
+			entry.details,
+			state,
+			duration,
+			extra,
+			session && entry.browserSession === hash(session) ? session : undefined,
+		);
+	}
+	private resume(req: Request): Response {
+		const found = this.browserEntry(req);
+		if (!found)
+			throw new EnrollmentError(
+				410,
+				"No active sign-in. Enter your email to start again.",
+			);
+		const [, entry] = found;
+		const { state, details, expiresAt } = entry;
+		if (state.kind === "busy")
+			throw new EnrollmentError(
+				409,
+				"Sign-in is being updated in another tab. Try resuming in a moment.",
+			);
+		if (state.kind === "connected") {
+			const account = this.context.dbOps.getAccount(state.accountId);
+			if (!account || account.account_uuid !== state.accountUuid)
+				throw new EnrollmentError(
+					410,
+					"This subscription has changed or was removed. Start again.",
+				);
+		}
+		return json({
+			stage: state.kind,
+			expiresAt,
+			email:
+				state.kind === "verified"
+					? state.seat.identity.email
+					: state.kind === "connected"
+						? state.email
+						: details.email,
+			...(state.kind === "started" ? { authUrl: state.flow.authUrl } : {}),
+			...(state.kind === "connected"
+				? {
+						reconnected: !!details.reconnect,
+						...this.connectionStatus(state.accountId),
+					}
+				: {}),
+		});
 	}
 	private async guarded(action: () => Promise<Response>): Promise<Response> {
 		try {
@@ -125,14 +236,15 @@ export class EnrollmentHandlers {
 			);
 	}
 	/** Frees the seat name for one new sign-in: older pending entries for it are dropped. */
-	private reserve(name: string): void {
-		if (this.context.dbOps.getAccountByName(name))
+	private reserve(name: string, reconnect = false): void {
+		if (!reconnect && this.context.dbOps.getAccountByName(name))
 			throw new EnrollmentError(409, "This seat is already in the pool.");
 		for (const entry of this.entries.values())
 			if (entry.details.name === name && entry.state.kind === "busy")
 				throw new EnrollmentError(409, "Sign-in is already in progress");
 		for (const [key, entry] of this.entries)
-			if (entry.details.name === name) this.entries.delete(key);
+			if (entry.details.name === name && entry.state.kind !== "connected")
+				this.entries.delete(key);
 		if (this.entries.size >= 100)
 			throw new EnrollmentError(429, "Too many pending invitations");
 	}
@@ -156,13 +268,48 @@ export class EnrollmentHandlers {
 			.slice(0, email.indexOf("@"))
 			.replace(/[^a-z0-9._+-]/g, "-")
 			.slice(0, 64);
-		this.reserve(name);
-		const issued = this.mint(
-			{ name, email, contactEmail: email },
-			{ kind: "invited" },
-			tenMinutes,
-		);
-		return json({ ...issued, email });
+		const { dbOps } = this.context;
+		const contacts = dbOps
+			.getAccountsByProvider("claude-code")
+			.filter(
+				(account) =>
+					dbOps.getEnrollmentContact(account.id)?.email?.toLowerCase() ===
+					email,
+			);
+		if (contacts.length > 1)
+			throw new EnrollmentError(
+				409,
+				"This email matches several seats. Ask the operator to check them.",
+			);
+		const existing = contacts[0] ?? dbOps.getAccountByName(name);
+		if (
+			existing &&
+			(existing.provider !== "claude-code" ||
+				existing.auth_method !== "oauth" ||
+				!existing.account_uuid)
+		)
+			throw new EnrollmentError(
+				409,
+				"This seat needs the operator's help to reconnect.",
+			);
+		const details: Details = {
+			name: existing?.name ?? name,
+			email,
+			contactEmail: email,
+			...(existing
+				? {
+						reconnect: {
+							id: existing.id,
+							accountUuid: existing.account_uuid ?? null,
+							organizationUuid: existing.organization_uuid ?? null,
+						},
+					}
+				: {}),
+		};
+		this.reserve(details.name, !!existing);
+		return this.mintBrowser(details, { kind: "invited" }, tenMinutes, {
+			email,
+		});
 	}
 
 	/**
@@ -273,12 +420,27 @@ export class EnrollmentHandlers {
 				throw new EnrollmentError(403, "Untrusted enrollment origin");
 			const body = await readBody(req);
 			if (url.pathname === "/pool-enroll/request") return this.request(body);
+			if (
+				url.pathname === "/pool-enroll/resume" ||
+				url.pathname === "/pool-enroll/reset"
+			) {
+				if (Object.keys(body).length)
+					throw new EnrollmentError(400, "No fields expected");
+				if (url.pathname === "/pool-enroll/resume") return this.resume(req);
+				const found = this.browserEntry(req);
+				if (found) this.entries.delete(found[0]);
+				const response = json({ reset: true });
+				response.headers.set("set-cookie", this.cookieHeader("", 0));
+				return response;
+			}
 			const token =
 				typeof body.token === "string" && /^[A-Za-z0-9_-]{43}$/.test(body.token)
 					? body.token
 					: "";
-			const key = hash(token);
-			const entry = this.entries.get(key);
+			const [key, entry] =
+				body.token === undefined
+					? (this.browserEntry(req) ?? ["", undefined])
+					: [hash(token), this.entries.get(hash(token))];
 			const expected =
 				url.pathname === "/pool-enroll/start"
 					? "invited"
@@ -302,8 +464,7 @@ export class EnrollmentHandlers {
 				if (state.kind === "invited") {
 					const flow = await this.oauth.beginClaudeSeat();
 					this.assertCurrent(key, entry);
-					return json({
-						...this.mint(entry.details, { kind: "started", flow }, tenMinutes),
+					return this.next(entry, { kind: "started", flow }, tenMinutes, req, {
 						authUrl: flow.authUrl,
 					});
 				}
@@ -333,9 +494,8 @@ export class EnrollmentHandlers {
 							400,
 							"This Claude account does not match your email. Start again and sign in with the matching account.",
 						);
-					this.assertNewSeat(entry.details.name, seat);
-					return json({
-						...this.mint(entry.details, { kind: "verified", seat }, tenMinutes),
+					this.assertSeat(entry.details, seat);
+					return this.next(entry, { kind: "verified", seat }, tenMinutes, req, {
 						email,
 					});
 				}
@@ -346,18 +506,23 @@ export class EnrollmentHandlers {
 							"Confirm the displayed account before adding it",
 						);
 					const accountId = this.save(entry.details, state.seat);
-					return json({
-						connected: true,
-						...this.mint(
-							entry.details,
-							{
-								kind: "connected",
-								accountId,
-								accountUuid: state.seat.identity.accountUuid,
-							},
-							oneDay,
-						),
-					});
+					return this.next(
+						entry,
+						{
+							kind: "connected",
+							accountId,
+							accountUuid: state.seat.identity.accountUuid,
+							email: state.seat.identity.email ?? "",
+						},
+						oneDay,
+						req,
+						{
+							connected: true,
+							email: state.seat.identity.email,
+							reconnected: !!entry.details.reconnect,
+							...this.connectionStatus(accountId),
+						},
+					);
 				}
 				if (state.kind === "connected") {
 					try {
@@ -371,10 +536,15 @@ export class EnrollmentHandlers {
 							"Removal could not be saved. Retry here or ask the operator to check this seat.",
 						);
 					}
-					return json({
-						disconnected: true,
-						...this.mint(entry.details, { kind: "invited" }, oneDay),
-					});
+					return this.next(
+						{ ...entry, details: { ...entry.details, reconnect: undefined } },
+						{ kind: "invited" },
+						oneDay,
+						req,
+						{
+							disconnected: true,
+						},
+					);
 				}
 				throw new EnrollmentError(410, "Link already used");
 			} finally {
@@ -387,9 +557,30 @@ export class EnrollmentHandlers {
 		if (this.entries.get(key) !== entry || entry.expiresAt <= this.now())
 			throw new EnrollmentError(410, "Sign-in expired. Start again.");
 	}
-	private assertNewSeat(name: string, seat: VerifiedClaudeSeat): void {
+	private assertSeat(
+		details: Details,
+		seat: VerifiedClaudeSeat,
+	): Account | null {
+		if (details.reconnect) {
+			const account = this.context.dbOps.getAccount(details.reconnect.id);
+			if (
+				!account ||
+				account.provider !== "claude-code" ||
+				account.auth_method !== "oauth" ||
+				account.account_uuid !== details.reconnect.accountUuid ||
+				account.organization_uuid !== details.reconnect.organizationUuid ||
+				account.account_uuid !== seat.identity.accountUuid ||
+				(account.organization_uuid &&
+					account.organization_uuid !== seat.identity.organizationUuid)
+			)
+				throw new EnrollmentError(
+					409,
+					"This is not the saved Claude account, or the seat has changed. Ask the operator to check it.",
+				);
+			return account;
+		}
 		if (
-			this.context.dbOps.getAccountByName(name) ||
+			this.context.dbOps.getAccountByName(details.name) ||
 			this.context.dbOps
 				.getAccountsByProvider("claude-code")
 				.some((account) => account.account_uuid === seat.identity.accountUuid)
@@ -398,12 +589,50 @@ export class EnrollmentHandlers {
 				409,
 				"This seat is already connected. Ask the operator for help.",
 			);
+		return null;
+	}
+	private connectionStatus(accountId: string): {
+		paused: boolean;
+		inPool: boolean;
+	} {
+		const account = this.context.dbOps.getAccount(accountId);
+		return {
+			paused: account?.paused ?? false,
+			inPool:
+				!!account?.account_uuid &&
+				this.context.config
+					.getTeamRouting()
+					.allowlistedAccountUuids.includes(account.account_uuid),
+		};
 	}
 	private save(details: Details, seat: VerifiedClaudeSeat): string {
 		const { dbOps, config } = this.context;
 		// No await inside: a failed config write rolls back the SQLite account/contact.
 		return dbOps.getDatabase().transaction(() => {
-			this.assertNewSeat(details.name, seat);
+			const existing = this.assertSeat(details, seat);
+			if (existing) {
+				dbOps.updateAccountTokens(
+					existing.id,
+					seat.tokens.accessToken,
+					seat.tokens.expiresAt ?? null,
+					seat.tokens.refreshToken ?? undefined,
+				);
+				if (
+					[
+						"OAuth refresh was rejected by the upstream",
+						"missing OAuth refresh token",
+					].includes(existing.error_reason ?? "")
+				)
+					dbOps.resumeAccount(existing.id);
+				// A previous browser must not be able to disconnect this new authorization.
+				for (const [key, entry] of this.entries)
+					if (
+						entry.state.kind === "connected" &&
+						entry.state.accountId === existing.id
+					)
+						this.entries.delete(key);
+				return existing.id;
+			}
 			const account = dbOps.createOAuthAccount({
 				name: details.name,
 				provider: "claude-code",

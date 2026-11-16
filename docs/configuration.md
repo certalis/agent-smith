@@ -236,20 +236,31 @@ provider/model map or use a direct route intentionally.
 ### Team routing
 
 `team_routing` is a single validated policy object. Unknown or invalid fields
-are rejected when changed through the API; `max_usage` must be greater than
-zero and no more than `0.9`.
+are rejected when changed through the API. `max_usage` must be greater than
+zero and no more than `0.9`; weekly limits must be greater than zero and no more
+than `0.95`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `enabled` | `false` | Enables pooled-seat routing; only UUIDs on the allowlist are eligible. |
 | `distribution_enabled` | `true` | Disabling it drains existing conversation pins and stops placing new ones. |
 | `allowlisted_account_uuids` | `[]` | Exact Claude Code OAuth seat UUIDs allowed in the pool. |
-| `max_usage` | `0.9` | Hard 5-hour/weekly utilization ceiling for pooled seats. |
+| `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
+| `weekly_max_usage` | `0.95` | Hard weekly utilization ceiling, including applicable model-family weekly windows. |
+| `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
 | `hold_seconds` | `0` | Wait only this long for a known quota reset; `0` returns 429 immediately. |
 | `quota_probe_seconds` | `0` | Opt-in interval for a zero-spend OAuth quota refresh; `0` disables it. |
+
+Email overrides use private enrollment contacts; set them before inviting future
+members if needed. Keys are trimmed/lowercased. A per-email value never raises
+the global weekly ceiling. The proxy-readable `GET /api/config/team-routing`
+omits this private map. An administrator's POST preserves the map when the field
+is omitted; send an explicit empty object to clear it. These limits do not add
+accounts to the pool or resume manually paused accounts. Revalidation requests
+cannot bypass the hard caps, and stale known usage stays blocking until reset.
 
 ### Alerts
 

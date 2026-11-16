@@ -10,14 +10,27 @@ const log = new Logger("TokenManager");
 // Track refresh failures for backoff
 const refreshFailures = new Map<
 	string,
-	{ at: number; error: TokenRefreshError }
+	{
+		at: number;
+		error: TokenRefreshError;
+		accessToken: string | null;
+		refreshToken: string | null;
+	}
 >();
 
 export function refreshBackoffUntil(
-	accountId: string,
+	account: Account,
 	now: number = Date.now(),
 ): number | null {
-	const failure = refreshFailures.get(accountId);
+	const failure = refreshFailures.get(account.id);
+	if (
+		failure &&
+		(failure.accessToken !== account.access_token ||
+			failure.refreshToken !== account.refresh_token)
+	) {
+		refreshFailures.delete(account.id);
+		return null;
+	}
 	return failure && now - failure.at < TOKEN_REFRESH_BACKOFF_MS
 		? failure.at + TOKEN_REFRESH_BACKOFF_MS
 		: null;
@@ -28,9 +41,18 @@ export function quarantineAccount(
 	ctx: ResolvedProxyContext,
 	reason: string,
 ): void {
+	const { access_token: accessToken, refresh_token: refreshToken } = account;
 	account.paused = true;
 	account.error_reason = reason;
-	ctx.asyncWriter.enqueue(() => ctx.dbOps.markAccountError(account.id, reason));
+	ctx.asyncWriter.enqueue(() => {
+		const saved = ctx.dbOps.getAccount(account.id);
+		if (
+			saved?.access_token === accessToken &&
+			saved.refresh_token === refreshToken &&
+			!(saved.paused && !saved.error_reason)
+		)
+			ctx.dbOps.markAccountError(account.id, reason);
+	});
 }
 
 function recordRefreshFailure(
@@ -39,7 +61,12 @@ function recordRefreshFailure(
 	error: unknown,
 ): TokenRefreshError {
 	const refreshError = new TokenRefreshError(account.id, error as Error);
-	refreshFailures.set(account.id, { at: Date.now(), error: refreshError });
+	refreshFailures.set(account.id, {
+		at: Date.now(),
+		error: refreshError,
+		accessToken: account.access_token,
+		refreshToken: account.refresh_token,
+	});
 	const status = (error as { status?: unknown } | null)?.status;
 	if (
 		typeof status === "number" &&
@@ -71,7 +98,7 @@ export async function refreshAccessTokenSafe(
 ): Promise<string> {
 	// Check for recent refresh failures and implement backoff
 	const lastFailure = refreshFailures.get(account.id);
-	if (lastFailure && refreshBackoffUntil(account.id) !== null) {
+	if (lastFailure && refreshBackoffUntil(account) !== null) {
 		log.warn(`Account ${account.name} is in refresh backoff period`);
 		throw lastFailure.error;
 	}
@@ -88,18 +115,30 @@ export async function refreshAccessTokenSafe(
 		}
 
 		// Create a new refresh promise and store it
+		const { access_token: accessToken, refresh_token: refreshToken } = account;
+		const reconnected = () => {
+			const saved = ctx.dbOps.getAccount(account.id);
+			return saved &&
+				(saved.access_token !== accessToken ||
+					saved.refresh_token !== refreshToken)
+				? saved
+				: null;
+		};
 		const refreshPromise = ctx.provider
 			.refreshToken(account, ctx.runtime.clientId)
 			.then((result: TokenRefreshResult) => {
+				const saved = reconnected();
+				if (saved?.access_token) return saved.access_token;
 				// 1. Persist to database asynchronously
-				ctx.asyncWriter.enqueue(() =>
+				ctx.asyncWriter.enqueue(() => {
+					if (reconnected()) return;
 					ctx.dbOps.updateAccountTokens(
 						account.id,
 						result.accessToken,
 						result.expiresAt,
 						result.refreshToken,
-					),
-				);
+					);
+				});
 
 				// 2. Update the live in-memory account object immediately
 				// This prevents subsequent requests from seeing stale token data
@@ -117,6 +156,8 @@ export async function refreshAccessTokenSafe(
 				return result.accessToken;
 			})
 			.catch((error) => {
+				const saved = reconnected();
+				if (saved?.access_token) return saved.access_token;
 				throw recordRefreshFailure(account, ctx, error);
 			})
 			.finally(() => {

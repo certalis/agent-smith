@@ -6,6 +6,8 @@ const config = {
 	distributionEnabled: true,
 	allowlistedAccountUuids: ["acct-a"],
 	maxUsage: 0.9,
+	weeklyMaxUsage: 0.9,
+	weeklyMaxUsageByEmail: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1_000,

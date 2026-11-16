@@ -99,6 +99,8 @@ export class TeamAdmission {
 			distributionEnabled: true,
 			allowlistedAccountUuids: [],
 			maxUsage: 0.9,
+			weeklyMaxUsage: 0.95,
+			weeklyMaxUsageByEmail: {},
 			admissionCap: 1,
 			admissionQueueLimit: 0,
 			admissionWaitMs: 0,

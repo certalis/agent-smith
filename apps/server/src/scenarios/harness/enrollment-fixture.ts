@@ -29,14 +29,25 @@ export const tokenReply: UpstreamRule = {
 };
 export function profileReply(
 	account = { uuid: "verified-seat", email: "owner@example.test" },
+	organizationUuid = "synthetic-org",
 ): UpstreamRule {
 	return {
 		path: "/api/oauth/profile",
 		status: 200,
-		json: { account, organization: { uuid: "synthetic-org" } },
+		json: { account, organization: { uuid: organizationUuid } },
 	};
 }
 export const oauthReplies = [tokenReply, profileReply()];
+export function requestEmail(id: string, email: string): RequestStep {
+	return {
+		type: "request",
+		id,
+		path: "/pool-enroll/request",
+		headers: publicHeaders,
+		body: JSON.stringify({ email }),
+		capture: { [`${id}Invite`]: { field: "token" } },
+	};
+}
 export function issue(
 	id: string,
 	details: Record<string, string> = {},

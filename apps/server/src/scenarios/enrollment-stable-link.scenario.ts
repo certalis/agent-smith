@@ -89,10 +89,10 @@ export default defineScenario({
 			jsonPath: { path: "0.name", value: "owner" },
 		},
 		{
-			id: "connected-email-cannot-request-twice",
+			id: "connected-email-can-reconnect",
 			type: "client",
 			request: "again",
-			status: 409,
+			status: 200,
 		},
 		{
 			id: "listed-email-still-needs-matching-identity",

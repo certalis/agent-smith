@@ -49,6 +49,8 @@ export interface TeamRoutingConfig {
 	distributionEnabled: boolean;
 	allowlistedAccountUuids: string[];
 	maxUsage: number;
+	weeklyMaxUsage: number;
+	weeklyMaxUsageByEmail: Record<string, number>;
 	admissionCap: number;
 	admissionQueueLimit: number;
 	admissionWaitMs: number;
@@ -61,6 +63,8 @@ export type TeamRoutingFileConfig = {
 	distribution_enabled?: boolean;
 	allowlisted_account_uuids?: string[];
 	max_usage?: number;
+	weekly_max_usage?: number;
+	weekly_max_usage_by_email?: Record<string, number>;
 	admission_cap?: number;
 	admission_queue_limit?: number;
 	admission_wait_ms?: number;
@@ -145,6 +149,8 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	distributionEnabled: true,
 	allowlistedAccountUuids: [],
 	maxUsage: 0.9,
+	weeklyMaxUsage: 0.95,
+	weeklyMaxUsageByEmail: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -490,6 +496,30 @@ function sanitizeTeamRouting(
 	) {
 		result.max_usage = value.max_usage;
 	}
+	if (
+		isFiniteNumber(value.weekly_max_usage) &&
+		value.weekly_max_usage > 0 &&
+		value.weekly_max_usage <= 0.95
+	) {
+		result.weekly_max_usage = value.weekly_max_usage;
+	}
+	if (isRecord(value.weekly_max_usage_by_email)) {
+		const entries = Object.entries(value.weekly_max_usage_by_email);
+		const normalized = entries.map(
+			([email, cap]) => [normalizeEnrollmentEmail(email), cap] as const,
+		);
+		if (
+			normalized.every(
+				([email, cap]) =>
+					email !== undefined && isFiniteNumber(cap) && cap > 0 && cap <= 0.95,
+			) &&
+			new Set(normalized.map(([email]) => email)).size === entries.length
+		) {
+			result.weekly_max_usage_by_email = Object.fromEntries(
+				normalized,
+			) as Record<string, number>;
+		}
+	}
 	if (isNonNegativeFiniteNumber(value.admission_cap)) {
 		result.admission_cap = Math.floor(value.admission_cap);
 	}
@@ -737,6 +767,9 @@ export class Config extends EventEmitter {
 					TEAM_ROUTING_DEFAULTS.allowlistedAccountUuids),
 			],
 			maxUsage: file?.max_usage ?? TEAM_ROUTING_DEFAULTS.maxUsage,
+			weeklyMaxUsage:
+				file?.weekly_max_usage ?? TEAM_ROUTING_DEFAULTS.weeklyMaxUsage,
+			weeklyMaxUsageByEmail: { ...file?.weekly_max_usage_by_email },
 			admissionCap: file?.admission_cap ?? TEAM_ROUTING_DEFAULTS.admissionCap,
 			admissionQueueLimit:
 				file?.admission_queue_limit ??
@@ -830,6 +863,8 @@ export class Config extends EventEmitter {
 			"distribution_enabled",
 			"allowlisted_account_uuids",
 			"max_usage",
+			"weekly_max_usage",
+			"weekly_max_usage_by_email",
 			"admission_cap",
 			"admission_queue_limit",
 			"admission_wait_ms",
@@ -849,6 +884,15 @@ export class Config extends EventEmitter {
 			}
 		}
 		const oldValue = this.data.team_routing;
+		// The public GET omits this private map; routine edits must not erase it.
+		if (
+			!("weekly_max_usage_by_email" in value) &&
+			oldValue?.weekly_max_usage_by_email
+		) {
+			sanitized.weekly_max_usage_by_email = {
+				...oldValue.weekly_max_usage_by_email,
+			};
+		}
 		this.data.team_routing = sanitized;
 		this.saveConfig();
 		this.emit("change", {

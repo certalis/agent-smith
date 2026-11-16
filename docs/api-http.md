@@ -92,13 +92,22 @@ disabled, issuing one returns 400.
 | `POST /pool-enroll/verify` | Exact Host/Origin + login capability | `{token, code}` → new `token`, authenticated `email`, `expiresAt`; no account saved |
 | `POST /pool-enroll/confirm` | Exact Host/Origin + verified capability | `{token, consent: true}` → `connected: true`, seat-specific removal `token`, `expiresAt` |
 | `POST /pool-enroll/disconnect` | Exact Host/Origin + removal capability | `{token}` → `disconnected: true`, fresh invitation `token`, `expiresAt` |
+| `POST /pool-enroll/resume` | Exact Host/Origin + browser session cookie | `{}` → current `stage`, `expiresAt`, email and step-specific display fields; no provider tokens or API capabilities |
+| `POST /pool-enroll/reset` | Exact Host/Origin + browser session cookie | `{}` → `reset: true`; forgets this browser's flow without disconnecting a saved subscription |
 
 **Stable link.** `/pool-enroll` without a fragment asks for an email. When that
 email is on `enrollment_emails`, it returns a 10-minute invitation bound to it: the
 seat is named after the email's local part, the email becomes its reminder contact,
 and verify refuses any Claude account whose email differs. The typed email only
-selects the invitation; the Claude sign-in proves it. An email whose seat already
-exists returns 409. The list is edited live and persisted; removing an email stops
+selects the invitation; the Claude sign-in proves it. If a saved contact email or
+seat name matches an existing Claude OAuth account, this starts a reconnect:
+verification must match the saved account UUID and, when known, organization UUID.
+Confirmation updates that same account's credentials, preserving its ID, usage,
+quota, settings and allowlist membership. Only pauses caused by a rejected OAuth
+refresh or missing refresh token are cleared. Manual pauses, other errors and
+operator exclusions remain; the success page explains when the account is still
+paused or outside the pool. A different identity cannot replace it. The list is
+edited live and persisted; removing an email stops
 new requests at once, without touching seats already connected. It is POST-only
 because the proxy key may read every `GET /api/*` route.
 
@@ -107,25 +116,35 @@ operator delegates seat choice to the private link's holder. The page always sho
 the Claude-authenticated email before confirmation; a missing profile email fails
 closed. Optional reminder contacts neither restrict sign-in nor send messages.
 
-Invitation secrets use URL fragments and are removed from browser history on load.
+Invitation secrets use URL fragments and are removed from browser history after
+the first successful step (an unused invitation survives reload).
 Send them privately; never paste codes/tokens into chat or logs. Invitations expire
 after 24 hours, then each login/confirmation capability lasts 10 minutes. Each is
-one-use, including failed attempts; reload/restart requires a new invitation.
+one-use, including failed attempts. A separate, opaque browser session follows
+the current step across reloads and tabs in the same browser profile. It uses a
+host-only `HttpOnly; Secure; SameSite=Strict` cookie scoped to `/pool-enroll`
+(`Secure` is omitted only for HTTP loopback development). Its lifetime matches
+the current step; it never contains Claude credentials, and does not extend expiry
+when read. No provider tokens or sign-in state enter localStorage/sessionStorage.
+The page resumes through a same-origin POST; cookies grant no management or
+inference access. A restart revokes all flows, so start again afterward.
 Reissuing the same pending label revokes the older link; an in-flight exchange or
-existing account returns 409. At most 100 pending flows are held in process memory.
+ambiguous/conflicting account returns 409. At most 100 flows are held in process memory.
 Invitation PKCE state is also process-local: it never enters the ordinary
 `auth_sessions` table and cannot be completed through a legacy OAuth callback,
 before or after a restart.
 
 After confirmation, the success page offers **Disconnect**. Its
 24-hour removal capability is bound to the created account ID and provider UUID;
-an old capability cannot remove a subsequently re-enrolled seat. Disconnect
+an old capability cannot remove a subsequently re-enrolled seat or a successfully
+reconnected authorization. A reconnect attempt alone does not revoke removal.
+Disconnect
 deletes the account credentials, private contacts, conversation pins and that
 allowlist membership, preserving other seats and routing settings. A failed
 membership-file write rolls back deletion and leaves removal retryable. Success
 returns a fresh one-use invitation with the original restrictions for another
-sign-in. Disconnect needs this page still open: after a reload, expiry or server
-restart, removal is operator cleanup. Removal does not cancel a subscription, log
+sign-in. The browser can restore this removal action for 24 hours. After expiry,
+starting over, or a server restart, removal is operator cleanup. Removal does not cancel a subscription, log
 the browser out of Claude, remotely revoke provider tokens, or stop an in-flight
 request. An interruption between config rename and SQLite deletion commit can
 leave a stored account without membership; the operator must inspect it before
@@ -137,7 +156,7 @@ flag or limits. A membership-file write failure rolls back the account/contact
 transaction; never retry a reported persistence error blindly. An interruption
 between config rename and SQLite commit can leave an allowlisted UUID with no
 account, which cannot serve requests; the operator must inspect before retrying.
-Existing-account reauthentication and reminder delivery are not implemented here.
+Reminder delivery is not implemented here.
 
 ### Health Check
 

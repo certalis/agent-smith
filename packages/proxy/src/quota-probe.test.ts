@@ -9,6 +9,8 @@ const config = {
 	distributionEnabled: true,
 	allowlistedAccountUuids: ["seat"],
 	maxUsage: 0.9,
+	weeklyMaxUsage: 0.9,
+	weeklyMaxUsageByEmail: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1,

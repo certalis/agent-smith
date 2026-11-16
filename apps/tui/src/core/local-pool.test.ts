@@ -5,6 +5,7 @@ import {
 	formatPoolLimits,
 	isPoolEligible,
 	nextTeamRoutingConfig,
+	teamRoutingFileConfig,
 } from "./local-pool";
 
 const routing: TeamRoutingConfig = {
@@ -12,6 +13,8 @@ const routing: TeamRoutingConfig = {
 	distributionEnabled: true,
 	allowlistedAccountUuids: ["existing-seat"],
 	maxUsage: 0.9,
+	weeklyMaxUsage: 0.9,
+	weeklyMaxUsageByEmail: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -49,12 +52,22 @@ function oauthSeat(overrides: Partial<Account> = {}): Account {
 
 describe("local pool policy", () => {
 	it("adds an explicit Claude Code OAuth seat without weakening existing limits", () => {
-		const next = nextTeamRoutingConfig(routing, oauthSeat(), true);
+		const policy = {
+			...routing,
+			weeklyMaxUsage: 0.95,
+			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
+		};
+		const next = nextTeamRoutingConfig(policy, oauthSeat(), true);
 
 		expect(next).toEqual({
-			...routing,
+			...policy,
 			enabled: true,
 			allowlistedAccountUuids: ["existing-seat", "new-seat"],
+		});
+		expect(teamRoutingFileConfig(next)).toMatchObject({
+			allowlisted_account_uuids: ["existing-seat", "new-seat"],
+			weekly_max_usage: 0.95,
+			weekly_max_usage_by_email: { "tech@example.test": 0.3 },
 		});
 	});
 

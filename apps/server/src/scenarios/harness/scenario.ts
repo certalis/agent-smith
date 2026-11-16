@@ -14,6 +14,10 @@ export type FleetAccount = {
 	name: string;
 	provider?: AccountProvider;
 	accountUuid?: string;
+	organizationUuid?: string;
+	enrollmentContact?: { email?: string; slackUserId?: string };
+	errorReason?: string;
+	usageCount?: number;
 	activeSession?: boolean;
 	priority?: number;
 	switchThreshold?: AccountSwitchThreshold;
@@ -50,7 +54,7 @@ export type RequestStep = {
 	/** Capture string fields from the first successful response for later {{name}} references. */
 	capture?: Record<
 		string,
-		{ field: string; fragment?: boolean; query?: string }
+		{ field?: string; header?: string; fragment?: boolean; query?: string }
 	>;
 };
 
@@ -173,6 +177,7 @@ export type ClientAssertion = {
 	responseInterrupted?: boolean;
 	cancelled?: boolean;
 	header?: { name: string; value: string };
+	headerIncludes?: { name: string; value: string };
 	headerAbsent?: string;
 };
 
@@ -211,6 +216,7 @@ export type Scenario = {
 	edge?: {
 		privateTarget?: "pool" | "upstream" | "missing";
 		maxConcurrentRequests?: number;
+		enrollmentOrigin?: string;
 	};
 	upstreamRuntime?: "bun" | "node";
 	config?: Record<string, unknown>;

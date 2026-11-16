@@ -44,6 +44,7 @@ export function seedFleet({
 							refreshToken: `refresh-${spec.name}`,
 							expiresAt: now() + durationMs(spec.tokenExpiresIn ?? "1h"),
 							accountUuid: spec.accountUuid,
+							organizationUuid: spec.organizationUuid,
 							quotaState: spec.quotaState,
 							baseUrl: spec.baseUrl ?? defaultBaseUrl,
 							priority: spec.priority,
@@ -61,7 +62,15 @@ export function seedFleet({
 				db.resetAccountSession(account.id, now());
 			}
 
-			if (spec.paused) {
+			if (spec.enrollmentContact) {
+				db.setEnrollmentContact(account.id, spec.enrollmentContact);
+			}
+			for (let index = 0; index < (spec.usageCount ?? 0); index++) {
+				db.updateAccountUsage(account.id);
+			}
+			if (spec.errorReason) {
+				db.markAccountError(account.id, spec.errorReason);
+			} else if (spec.paused) {
 				db.pauseAccount(account.id);
 			}
 

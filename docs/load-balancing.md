@@ -59,8 +59,12 @@ Moving a running conversation early would discard its prompt cache, so usage
 never moves a pin. Turning `distribution_enabled` off drains pins: existing
 conversations stay put while new ones use normal ordering.
 
-Pooled seats have a hard `max_usage` ceiling (never above `0.9`) across their
-applicable 5-hour and weekly windows. It applies to ordinary selection and the
+Pooled seats keep their `max_usage` ceiling (never above `0.9`) for 5-hour and
+other non-weekly windows. Weekly windows use `weekly_max_usage` (default `0.95`),
+or the lower private `weekly_max_usage_by_email` limit when their enrollment
+contact matches. For example, a `0.3` weekly limit reserves 70% for that owner
+without changing their 5-hour cap. This includes applicable model-family weekly
+windows. The limits apply to ordinary selection, capacity status and the
 once-per-minute revalidation path. If every pooled seat is spent, a request
 normally receives a 429 with the nearest reset; setting `hold_seconds` lets a
 request wait only for a reset within that bounded period.
