@@ -78,7 +78,7 @@ export function enrollmentPage(): Response {
 <section class="card" id="step-email" hidden>
 <div class="avatar">${icon("mail")}</div>
 <h1 tabindex="-1">Connect your Claude subscription</h1>
-<p class="lead">This adds your subscription to the shared agents pool. Start with your work email: if it is on this pool's list, the next step lets you sign in with Claude.</p>
+<p class="lead">Connect or reconnect your subscription to the shared agents pool. Already connected or paused? Use the same email to renew your login without adding a second account.</p>
 <form id="request">
 <p class="notice err" id="email-error" role="alert" hidden></p>
 <label for="email">Work email<input id="email" type="email" autocomplete="email" spellcheck="false" required maxlength="254"></label>
@@ -91,16 +91,16 @@ export function enrollmentPage(): Response {
 <h1 tabindex="-1">Sign in with Claude</h1>
 <p class="lead" id="signin-for" hidden>Use the Claude account of <strong id="signin-email"></strong>. Only connect an account you have permission to share.</p>
 <ul class="facts">
-<li>Claude opens in a new tab. Sign in and pick the account to share.</li>
+<li>Claude opens in a new tab. Sign in with the email shown above.</li>
 <li>Your password stays with Claude. The pool only keeps the authorization it needs to run agents.</li>
-<li>Claude then shows a code: you paste it here in the next step.</li>
+<li>Copy the code Claude shows, then return to this page to paste it. Reopening this link in the same browser brings you back to your current step.</li>
 </ul>
 <button class="button" id="start" type="button">Continue to Claude ${icon("open")}</button>
 </section>
 <section class="card" id="step-code" hidden>
 <div class="avatar">${icon("code")}</div>
 <h1 tabindex="-1">Paste the code from Claude</h1>
-<p class="lead" id="code-lead">Claude opened in a new tab. Once you have signed in, it shows an authorization code: copy it and paste it below.</p>
+<p class="lead" id="code-lead">Finish signing in in the Claude tab, copy its authorization code, then return here to paste it. Reopened this page? Your current step is restored.</p>
 <form id="verify">
 <label for="code">Authorization code<input id="code" type="password" autocomplete="off" spellcheck="false" required maxlength="4096"><span class="hint">The code stays hidden on screen. Never paste it into chat.</span></label>
 <button class="button" type="submit">Verify account</button>
@@ -110,42 +110,47 @@ export function enrollmentPage(): Response {
 <section class="card" id="step-confirm" hidden>
 <div class="avatar">${icon("person")}</div>
 <h1 tabindex="-1">Is this the right account?</h1>
-<p class="lead">Claude verified the account below. Check it before adding it to the pool.</p>
+<p class="lead">Claude verified this account. Confirm to save its login. An existing account is updated, not duplicated; an operator's manual pause stays in place.</p>
 <form id="confirm">
 <div class="account">${icon("check")}<span id="account"></span></div>
 <label class="consent"><input id="consent" type="checkbox" required><span>I authorize the shared agents pool to use this subscription.</span></label>
-<button class="button" type="submit">Add to the pool</button>
+<button class="button" type="submit">Confirm connection</button>
 </form>
-<p class="aside">Wrong account? Do not confirm: start again and sign in with the right one.<a class="button secondary" href="/pool-enroll">Start again</a></p>
+<p class="aside">Wrong account? Do not confirm. Use “Start again” below to choose the right one.</p>
 </section>
 <section class="card" id="step-done" hidden>
 <div class="avatar ok">${icon("check")}</div>
-<h1 tabindex="-1">Subscription connected</h1>
-<p class="lead"><strong id="connected-account"></strong> is now part of the shared agents pool. You can close this page.</p>
-<div class="aside"><strong>Changed your mind?</strong> Disconnect removes this account's saved authorization and pool membership. It stays available for 24 hours while this page is open; it does not sign you out of Claude or cancel your subscription.<button class="button secondary" id="disconnect" type="button">Disconnect</button></div>
+<h1 id="done-title" tabindex="-1">Subscription connected</h1>
+<p class="lead"><strong id="connected-account"></strong><span id="connected-message"></span></p>
+<div class="aside"><strong>Changed your mind?</strong> Disconnect removes this account's saved authorization and pool membership. This browser can disconnect it for 24 hours, unless the server restarts or the account reconnects elsewhere. It does not sign you out of Claude or cancel your subscription.<button class="button secondary" id="disconnect" type="button">Disconnect</button></div>
 </section>
 <section class="card" id="step-error" hidden>
 <div class="avatar err">${icon("alert")}</div>
 <h1 tabindex="-1">This sign-in can't continue</h1>
 <p class="lead" id="error-message"></p>
-<p class="aside">Nothing was added to the pool from this step.<a class="button secondary" href="/pool-enroll">Start again</a></p>
+<p class="aside">Resume to check your progress. Starting again does not disconnect a saved subscription.</p>
+<button class="button" id="recover" type="button">Resume sign-in</button>
 </section>
 <p id="status" class="notice err" role="alert" hidden></p>
+<p id="recovery" class="notice" role="status" hidden></p>
+<button class="button secondary" id="restart" type="button" hidden>Start again</button>
 </main>
-<footer>Each step expires after 10 minutes. Nothing is added to the pool until you confirm.</footer>
+<footer>Sign-in steps expire after 10 minutes and can be resumed in the same browser. Allow cookies for this site. No subscription is added or updated until you confirm.</footer>
 <noscript><p class="notice err">JavaScript is required for this sign-in.</p></noscript>
 <script nonce="${nonce}">
 let token = location.hash.slice(1);
-history.replaceState(null, '', location.pathname);
+if (!/^[A-Za-z0-9_-]{43}$/.test(token)) { token = ''; history.replaceState(null, '', location.pathname); }
 addEventListener('hashchange', () => { if (location.hash) location.reload(); });
 const get = id => document.getElementById(id);
 const steps = ['email', 'signin', 'code', 'confirm', 'done'];
 let current = 'email';
+let pending = 0;
 function show(step) {
   const failed = step === 'error';
   const index = steps.indexOf(failed ? current : step);
   if (!failed) current = step;
   for (const name of [...steps, 'error']) get('step-' + name).hidden = name !== step;
+  get('restart').hidden = step === 'email';
   document.querySelectorAll('#stepper li').forEach((item, position) => {
     item.className = position < index || step === 'done' ? 'done' : position === index ? (failed ? 'failed' : 'active') : '';
     item.querySelector('.dot').innerHTML = item.className === 'done' ? '${icon("check")}' : String(position + 1);
@@ -155,23 +160,78 @@ function show(step) {
   (step === 'email' ? get('email') : get('step-' + step).querySelector('h1')).focus();
 }
 async function send(step, body) {
-  const response = await fetch('/pool-enroll/' + step, {method:'POST', credentials:'omit', cache:'no-store', redirect:'error', headers:{'content-type':'application/json'}, body:JSON.stringify(body)});
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Sign-in failed. Start again.');
-  token = data.token || '';
+  pending++;
+  try {
+    const response = await fetch('/pool-enroll/' + step, {method:'POST', credentials:'same-origin', cache:'no-store', redirect:'error', headers:{'content-type':'application/json'}, body:JSON.stringify(body)});
+    const data = await response.json();
+    if (!response.ok) { const error = new Error(data.error || 'Sign-in failed. Try resuming.'); error.status = response.status; throw error; }
+    return data;
+  } finally { pending--; }
+}
+async function post(step, values) {
+  const data = await send(step, {...(token ? {token} : {}), ...values});
+  token = ''; history.replaceState(null, '', location.pathname);
   return data;
 }
-const post = (step, values) => send(step, {token, ...values});
-function fail(error) {
+function destination(value) {
+  const url = new URL(value);
+  if (url.origin !== 'https://claude.ai' || url.pathname !== '/oauth/authorize') throw new Error('Invalid sign-in destination. Ask for help.');
+  return url.href;
+}
+function connected(data) {
+  get('connected-account').textContent = data.email || '';
+  get('done-title').textContent = data.paused ? 'Login saved — account still paused' : !data.inPool ? 'Login saved — account not in pool' : data.reconnected ? 'Subscription reconnected' : 'Subscription connected';
+  get('connected-message').textContent = data.paused ? ' has a renewed login, but is still paused. Ask the pool operator to resume it.' : !data.inPool ? ' has a renewed login, but the operator has kept it outside the pool.' : ' is connected to the shared agents pool. You can close this page.';
+  get('disconnect').disabled = false;
+  show('done');
+}
+function restore(data) {
+  get('signin-email').textContent = data.email || ''; get('signin-for').hidden = !data.email;
+  get('consent').checked = false;
+  if (data.stage === 'invited') show('signin');
+  else if (data.stage === 'started') { get('reopen').href = destination(data.authUrl); show('code'); }
+  else if (data.stage === 'verified') { get('account').textContent = data.email; show('confirm'); }
+  else if (data.stage === 'connected') connected(data);
+  else throw new Error('Sign-in state could not be restored. Start again.');
+}
+async function recover() {
+  const data = await send('resume', {});
+  token = ''; restore(data);
+  get('recovery').textContent = 'Your progress is restored in this browser. Continue from this step.'; get('recovery').hidden = false;
+  get('status').hidden = true;
+}
+function showError(error) {
   token = ''; get('code').value = '';
-  get('error-message').textContent = error instanceof Error ? error.message : 'Sign-in failed. Start again.';
+  get('recovery').hidden = true;
+  get('error-message').textContent = error instanceof Error ? error.message : 'Sign-in failed. Try resuming.';
   show('error');
 }
-show(/^[A-Za-z0-9_-]{43}$/.test(token) ? 'signin' : 'email');
+async function fail(error) {
+  try { await recover(); } catch { showError(error); }
+}
+if (/^[A-Za-z0-9_-]{43}$/.test(token)) show('signin');
+else { token = ''; recover().catch(error => { if (error.status === 410) show('email'); else showError(error); }); }
+addEventListener('pageshow', event => { if (event.persisted && !pending && !token) recover().catch(showError); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !pending && !token) recover().catch(error => { if (error.status === 410) show('email'); else showError(error); }); });
+get('recover').addEventListener('click', async () => {
+  get('recover').disabled = true;
+  try { await recover(); } catch (error) { showError(error); }
+  finally { get('recover').disabled = false; }
+});
+get('restart').addEventListener('click', async () => {
+  get('restart').disabled = true;
+  try {
+    await send('reset', {}); token = ''; get('code').value = ''; get('consent').checked = false;
+    get('recovery').hidden = true; get('status').hidden = true; get('email-error').hidden = true; get('signin-notice').hidden = true;
+    show('email');
+  } catch (error) { showError(error); }
+  finally { get('restart').disabled = false; }
+});
 get('request').addEventListener('submit', async event => {
   event.preventDefault(); event.submitter.disabled = true; get('email-error').hidden = true;
   try {
     const data = await send('request', {email: get('email').value});
+    token = ''; history.replaceState(null, '', location.pathname); get('recovery').hidden = true;
     get('signin-email').textContent = data.email; get('signin-for').hidden = false;
     show('signin');
   } catch (error) {
@@ -184,24 +244,26 @@ get('start').addEventListener('click', async () => {
   get('start').disabled = true;
   try {
     const data = await post('start', {});
-    const url = new URL(data.authUrl);
-    if (url.origin !== 'https://claude.ai' || url.pathname !== '/oauth/authorize') throw new Error('Invalid sign-in destination. Ask for help.');
-    get('reopen').href = url.href;
-    if (tab) { tab.opener = null; tab.location.href = url.href; }
-    else get('code-lead').textContent = 'Your browser blocked the new tab. Open Claude sign-in with the link below, sign in, then paste the code it shows.';
+    const url = destination(data.authUrl);
+    get('reopen').href = url;
+    if (tab) { tab.opener = null; tab.location.href = url; }
+    else get('code-lead').textContent = 'The new tab was blocked. Use “Open Claude sign-in again” below. Copy the code Claude shows, then come back here to paste it.';
     show('code');
-  } catch (error) { if (tab) tab.close(); fail(error); }
+  } catch (error) { if (tab) tab.close(); await fail(error); }
+  finally { get('start').disabled = false; }
 });
 get('verify').addEventListener('submit', async event => {
   event.preventDefault(); event.submitter.disabled = true;
   const code = get('code').value.trim(); get('code').value = '';
   try { const data = await post('verify', {code}); get('account').textContent = data.email; show('confirm'); }
-  catch (error) { fail(error); }
+  catch (error) { await fail(error); }
+  finally { event.submitter.disabled = false; }
 });
 get('confirm').addEventListener('submit', async event => {
   event.preventDefault(); if (!get('consent').checked) return; event.submitter.disabled = true;
-  try { await post('confirm', {consent:true}); get('connected-account').textContent = get('account').textContent; show('done'); }
-  catch (error) { fail(error); }
+  try { connected(await post('confirm', {consent:true})); }
+  catch (error) { await fail(error); }
+  finally { event.submitter.disabled = false; }
 });
 get('disconnect').addEventListener('click', async () => {
   get('disconnect').disabled = true; get('status').hidden = true;

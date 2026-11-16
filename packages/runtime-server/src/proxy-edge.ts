@@ -53,9 +53,15 @@ function isEnrollmentRoute(method: string, path: string): boolean {
 	return (
 		(method === "GET" && path === "/pool-enroll") ||
 		(method === "POST" &&
-			["request", "start", "verify", "confirm", "disconnect"].some(
-				(action) => path === `/pool-enroll/${action}`,
-			))
+			[
+				"request",
+				"start",
+				"verify",
+				"confirm",
+				"disconnect",
+				"resume",
+				"reset",
+			].some((action) => path === `/pool-enroll/${action}`))
 	);
 }
 
@@ -160,6 +166,7 @@ export function createProxyEdgeHandler({
 		const headers = selectHeaders(req.headers, REQUEST_HEADERS);
 		headers.host = enrollment ? url.host : "localhost";
 		if (enrollment && req.headers.origin) headers.origin = req.headers.origin;
+		if (enrollment && req.headers.cookie) headers.cookie = req.headers.cookie;
 		// Keep early replies readable while the request finishes; close below.
 		headers.connection = "keep-alive";
 		headers["x-forwarded-for"] = "proxy-edge";
@@ -180,6 +187,9 @@ export function createProxyEdgeHandler({
 				}
 				res.writeHead(status, {
 					...selectHeaders(response.headers, RESPONSE_HEADERS),
+					...(enrollment && response.headers["set-cookie"]
+						? { "set-cookie": response.headers["set-cookie"] }
+						: {}),
 					"cache-control": "no-store",
 					"x-content-type-options": "nosniff",
 				});

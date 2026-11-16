@@ -118,7 +118,7 @@ function cooldownEnd(account: Account, now: number): number | null {
 		account.rate_limited_until !== null && account.rate_limited_until >= now
 			? account.rate_limited_until + 1
 			: null;
-	const refreshEnd = refreshBackoffUntil(account.id, now);
+	const refreshEnd = refreshBackoffUntil(account, now);
 	return rateLimitEnd === null
 		? refreshEnd
 		: Math.max(rateLimitEnd, refreshEnd ?? 0);
@@ -345,7 +345,7 @@ export function getOrderedAccounts(
 	const now = Date.now();
 	const providerAccounts = ctx.dbOps
 		.getAvailableAccountsByProvider(ctx.providerName)
-		.filter((account) => refreshBackoffUntil(account.id, now) === null);
+		.filter((account) => refreshBackoffUntil(account, now) === null);
 	const eligible = providerAccounts.filter((account) =>
 		isQuotaEligible(
 			ctx.provider,

@@ -104,6 +104,7 @@ async function request(
 		Array.from({ length: count }, async (_, clientIndex) => {
 			const clientId = `${stepIndex}-${clientIndex}`;
 			const headers = new Headers(step.headers);
+			for (const [name, value] of headers) headers.set(name, substitute(value));
 			if (!headers.has("content-type")) {
 				headers.set("content-type", "application/json");
 			}
@@ -225,19 +226,22 @@ function captureResponse(
 		throw new Error(
 			`Cannot capture response ${step.id ?? "without id"}: ${responses.map((response) => response.status).join(", ")}`,
 		);
-	const body: unknown = JSON.parse(success.body);
 	for (const [name, selector] of Object.entries(step.capture)) {
-		const field = selector.field
-			.split(".")
-			.reduce<unknown>(
-				(value, key) =>
-					value !== null && typeof value === "object"
-						? Reflect.get(value, key)
-						: undefined,
-				body,
-			);
+		const field = selector.header
+			? success.headers.get(selector.header)?.split(";")[0]
+			: selector.field
+					?.split(".")
+					.reduce<unknown>(
+						(value, key) =>
+							value !== null && typeof value === "object"
+								? Reflect.get(value, key)
+								: undefined,
+						JSON.parse(success.body),
+					);
 		if (typeof field !== "string")
-			throw new Error(`Expected response string field ${selector.field}`);
+			throw new Error(
+				`Expected response string ${selector.header ? `header ${selector.header}` : `field ${selector.field}`} in ${step.id ?? "request"}`,
+			);
 		const value = selector.fragment
 			? new URL(field).hash.slice(1)
 			: selector.query

@@ -37,7 +37,7 @@ function account(expiresAt: number): Account {
 	};
 }
 
-function context(): ResolvedProxyContext {
+function context(selected: Account): ResolvedProxyContext {
 	return {
 		provider: {
 			name: "claude-code",
@@ -68,6 +68,7 @@ function context(): ResolvedProxyContext {
 			enqueue: (task) => task(),
 		} as ResolvedProxyContext["asyncWriter"],
 		dbOps: {
+			getAccount: () => selected,
 			updateAccountTokens() {},
 		} as unknown as ResolvedProxyContext["dbOps"],
 	} as unknown as ResolvedProxyContext;
@@ -79,7 +80,7 @@ describe("getValidAccessToken", () => {
 
 	it("keeps a refresh-backoff failure typed as credential failure, not transport", async () => {
 		const selected = { ...account(0), id: "backoff-credential-failure" };
-		const ctx = context();
+		const ctx = context(selected);
 		let failed = false;
 		ctx.provider.refreshToken = async () => {
 			if (!failed) {
@@ -106,7 +107,9 @@ describe("getValidAccessToken", () => {
 	it("refreshes five minutes before expiry", async () => {
 		const selected = account(Date.now() + 4 * 60_000 + 59_000);
 
-		expect(await getValidAccessToken(selected, context())).toBe("access-new");
+		expect(await getValidAccessToken(selected, context(selected))).toBe(
+			"access-new",
+		);
 		expect(selected.refresh_token).toBe("refresh-new");
 	});
 });

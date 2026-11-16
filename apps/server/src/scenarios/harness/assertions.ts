@@ -296,6 +296,15 @@ export function clientFailure(
 	) {
 		return `expected every client response to omit ${absentHeader}`;
 	}
+	if (assertion.headerIncludes) {
+		const { name, value } = assertion.headerIncludes;
+		if (
+			selectedClients.some(
+				(client) => !client.headers.get(name)?.includes(value),
+			)
+		)
+			return `expected every client header ${name} to include ${value}`;
+	}
 
 	return undefined;
 }

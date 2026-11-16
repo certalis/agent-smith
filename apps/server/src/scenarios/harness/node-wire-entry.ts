@@ -35,7 +35,11 @@ function headersOf(
 ): Record<string, string> {
 	return Object.fromEntries(
 		Object.entries(headers).flatMap(([name, value]) =>
-			typeof value === "string" ? [[name, value]] : [],
+			typeof value === "string"
+				? [[name, value]]
+				: Array.isArray(value)
+					? [[name, value.join(", ")]]
+					: [],
 		),
 	);
 }
@@ -163,7 +167,7 @@ class Client {
 				agent: false,
 				headers: {
 					...input.headers,
-					host: "pool.example",
+					host: input.headers.host ?? "pool.example",
 					...(input.upload === "headers-only"
 						? { "content-length": String(Buffer.byteLength(input.body)) }
 						: {}),
@@ -238,7 +242,8 @@ async function execute(command: WireCommand): Promise<unknown> {
 			socketPath += ".missing";
 		const edge = createServer(
 			createProxyEdgeHandler({
-				origin: "https://pool.example",
+				origin: command.options?.enrollmentOrigin ?? "https://pool.example",
+				enrollmentOrigin: command.options?.enrollmentOrigin,
 				socketPath,
 				maxConcurrentRequests: command.options?.maxConcurrentRequests,
 			}),
