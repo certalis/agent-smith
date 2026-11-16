@@ -29,13 +29,15 @@ export function seedFleet({
 		for (const spec of accounts) {
 			const token = `tok-${spec.name}`;
 			const provider = spec.provider ?? "claude-code";
+			const baseUrl =
+				spec.baseUrl === null ? undefined : (spec.baseUrl ?? defaultBaseUrl);
 			const account =
 				spec.authMethod === "api_key"
 					? db.createApiKeyAccount({
 							name: spec.name,
 							provider,
 							apiKey: `key-${spec.name}`,
-							baseUrl: spec.baseUrl ?? defaultBaseUrl,
+							baseUrl,
 						})
 					: db.createOAuthAccount({
 							name: spec.name,
@@ -46,7 +48,7 @@ export function seedFleet({
 							accountUuid: spec.accountUuid,
 							organizationUuid: spec.organizationUuid,
 							quotaState: spec.quotaState,
-							baseUrl: spec.baseUrl ?? defaultBaseUrl,
+							baseUrl,
 							priority: spec.priority,
 							switchThreshold: spec.switchThreshold,
 						});

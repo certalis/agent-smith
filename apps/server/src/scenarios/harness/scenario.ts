@@ -23,7 +23,8 @@ export type FleetAccount = {
 	switchThreshold?: AccountSwitchThreshold;
 	quotaState?: AccountQuotaState;
 	authMethod?: "api_key" | "oauth";
-	baseUrl?: string;
+	/** null preserves the provider's built-in backend instead of the fake inference URL. */
+	baseUrl?: string | null;
 	rateLimitedFor?: Duration;
 	transportFailure?: boolean;
 	paused?: boolean;
@@ -223,6 +224,8 @@ export type Scenario = {
 	environment?: Record<string, string>;
 	/** Remap only Claude OAuth token/profile fetches to this scenario's fake HTTP upstream. */
 	claudeOAuth?: boolean;
+	/** Remap only the fixed Codex reset-credit and usage URLs to the fake upstream. */
+	codexBackend?: boolean;
 	fleet: FleetAccount[];
 	steps: ScenarioStep[];
 	upstream: UpstreamRule[];

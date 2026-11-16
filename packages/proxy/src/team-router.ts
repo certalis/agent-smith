@@ -138,7 +138,12 @@ export class TeamRouter {
 
 		const selected = this.leastUsedPriorityAccount(
 			eligible,
-			compareSeatUsage(provider, request.model, now),
+			compareSeatUsage(
+				provider,
+				request.model,
+				now,
+				config.preferExpiringQuota,
+			),
 			store?.countConversationPinsByAccount(now - PIN_TTL_MS),
 		);
 		this.touchPin(key, selected.id, now, store);

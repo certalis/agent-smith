@@ -31,9 +31,16 @@ const oauthUrls = new Set([
 ]);
 const alertsUpstream = process.env.AGENT_SMITH_SCENARIO_ALERTS_URL;
 const alertHosts = new Set(["hooks.slack.com", "slack.com", "api.resend.com"]);
+const codexUpstream = process.env.AGENT_SMITH_SCENARIO_CODEX_BACKEND_URL;
+const codexUrls = new Set([
+	"https://chatgpt.com/backend-api/wham/rate-limit-reset-credits",
+	"https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume",
+	"https://chatgpt.com/backend-api/wham/usage",
+]);
 
 function fixtureUpstream(url: URL): string | undefined {
 	if (oauthUrls.has(url.href)) return oauthUpstream;
+	if (codexUrls.has(url.href)) return codexUpstream;
 	if (url.protocol === "https:" && alertHosts.has(url.hostname))
 		return alertsUpstream;
 	return undefined;

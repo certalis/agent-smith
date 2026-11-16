@@ -97,6 +97,7 @@ export class TeamAdmission {
 		const account = this.account(accountId, {
 			enabled: true,
 			distributionEnabled: true,
+			preferExpiringQuota: false,
 			allowlistedAccountUuids: [],
 			maxUsage: 0.9,
 			weeklyMaxUsage: 0.95,

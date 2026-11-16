@@ -645,6 +645,7 @@ describe("APIRouter", () => {
 			name: string;
 			provider: string;
 			providerDisabled: boolean;
+			resetCreditsSupported: boolean;
 			auth_method: string;
 			base_url: string | null;
 			requestCount: number;
@@ -675,6 +676,7 @@ describe("APIRouter", () => {
 			{
 				id: createBody.data.accountId,
 				name: "weight-default",
+				resetCreditsSupported: false,
 				provider: "anthropic",
 				providerDisabled: false,
 				auth_method: "api_key",

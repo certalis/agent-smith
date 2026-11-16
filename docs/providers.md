@@ -186,6 +186,9 @@ Heavy stream/websocket aggregation still happens in the proxy worker, but provid
 - OAuth-based provider
 - Codex-specific backend route handling
 - custom headers and rate-limit parsing
+- manual reset-credit inspection and confirmed use for direct subscription
+  accounts only; credentials remain server-side and calls use a fixed OpenAI
+  backend origin with redirects disabled. See the [private reset controls](api-http.md#manual-codex-usage-resets-private-administrator-only).
 
 ## Adding a New Provider
 

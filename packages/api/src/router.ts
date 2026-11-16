@@ -32,6 +32,7 @@ import {
 	createRequestsSummaryHandler,
 } from "./handlers/requests";
 import { createRequestsStreamHandler } from "./handlers/requests-stream";
+import { createResetCreditHandlers } from "./handlers/reset-credits";
 import { createStatsHandler, createStatsResetHandler } from "./handlers/stats";
 import { createFleetStatusHandler } from "./handlers/status";
 import type { APIContext } from "./types";
@@ -133,6 +134,17 @@ export class APIRouter {
 			providerRegistry,
 		);
 		const accountsHandler = createAccountsListHandler(dbOps, providerRegistry);
+		const resetCredits = createResetCreditHandlers(this.context);
+		this.addDynamicRoute(
+			"GET",
+			"/api/accounts/:accountId/reset-credits",
+			(_req, _url, params) => resetCredits.list(params.accountId),
+		);
+		this.addDynamicRoute(
+			"POST",
+			"/api/accounts/:accountId/reset-credits/consume",
+			(req, _url, params) => resetCredits.consume(req, params.accountId),
+		);
 		const accountAddHandler = createAccountAddHandler(
 			dbOps,
 			config,

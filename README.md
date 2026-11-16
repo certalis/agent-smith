@@ -166,6 +166,17 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
 | `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
 
+To use capacity before renewal, enable `team_routing.prefer_expiring_quota`:
+new pinned chats may favor a fresh quota window close to its reset. Existing
+chats and hard caps stay unchanged; this option is off by default. See
+[load balancing](docs/load-balancing.md#team-routing-opt-in).
+
+For direct Codex subscription accounts, the private dashboard's **Accounts →
+Usage resets** lists available reset grants and their expiration. Using one
+requires administrator access and an explicit confirmation. No reset is used
+automatically and no paid credits are bought. See the
+[manual reset API](docs/api-http.md#manual-codex-usage-resets-private-administrator-only).
+
 Every key, the environment variables and the HTTP API are in the
 [configuration guide](docs/configuration.md).
 

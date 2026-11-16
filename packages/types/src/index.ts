@@ -9,5 +9,6 @@ export * from "./provider-metadata";
 export * from "./quota";
 export * from "./request";
 export * from "./request-events";
+export * from "./reset-credits";
 export * from "./stats";
 export * from "./strategy";

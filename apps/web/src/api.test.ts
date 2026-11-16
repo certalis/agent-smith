@@ -9,6 +9,54 @@ afterEach(() => {
 });
 
 describe("dashboard API admin authorization", () => {
+	it("authenticates reset inspection and never automatically retries consuming a grant", async () => {
+		const calls: Array<{
+			path: string;
+			method: string;
+			key: string | null;
+			body: unknown;
+		}> = [];
+		globalThis.fetch = Object.assign(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				calls.push({
+					path: String(input),
+					method: init?.method ?? "GET",
+					key: new Headers(init?.headers).get("x-api-key"),
+					body: init?.body ? JSON.parse(String(init.body)) : null,
+				});
+				return Response.json(
+					init?.method === "POST"
+						? { error: "uncertain reset" }
+						: { availableCount: 0, credits: [] },
+					{ status: init?.method === "POST" ? 502 : 200 },
+				);
+			},
+			{ preconnect: originalFetch.preconnect },
+		);
+		api.setAdminKey("admin-secret");
+		await api.getResetCredits("account-a");
+		const attempt = {
+			creditId: "grant-a",
+			requestId: "d1ee712f-992d-4a86-8fe4-11b1da30fbc4",
+		};
+		await expect(
+			api.consumeResetCredit("account-a", attempt),
+		).rejects.toThrow();
+		expect(calls).toEqual([
+			{
+				path: "/api/accounts/account-a/reset-credits",
+				method: "GET",
+				key: "admin-secret",
+				body: null,
+			},
+			{
+				path: "/api/accounts/account-a/reset-credits/consume",
+				method: "POST",
+				key: "admin-secret",
+				body: { ...attempt, confirmed: true },
+			},
+		]);
+	});
 	it("sends the session-only admin key with management writes", async () => {
 		let sentHeaders: Headers | undefined;
 		const fetchMock = mock((_input: RequestInfo | URL, init?: RequestInit) => {

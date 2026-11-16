@@ -47,6 +47,7 @@ export interface RuntimeConfig {
 export interface TeamRoutingConfig {
 	enabled: boolean;
 	distributionEnabled: boolean;
+	preferExpiringQuota: boolean;
 	allowlistedAccountUuids: string[];
 	maxUsage: number;
 	weeklyMaxUsage: number;
@@ -61,6 +62,7 @@ export interface TeamRoutingConfig {
 export type TeamRoutingFileConfig = {
 	enabled?: boolean;
 	distribution_enabled?: boolean;
+	prefer_expiring_quota?: boolean;
 	allowlisted_account_uuids?: string[];
 	max_usage?: number;
 	weekly_max_usage?: number;
@@ -147,6 +149,7 @@ const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
 const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	enabled: false,
 	distributionEnabled: true,
+	preferExpiringQuota: false,
 	allowlistedAccountUuids: [],
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.95,
@@ -480,6 +483,9 @@ function sanitizeTeamRouting(
 	if (typeof value.distribution_enabled === "boolean") {
 		result.distribution_enabled = value.distribution_enabled;
 	}
+	if (typeof value.prefer_expiring_quota === "boolean") {
+		result.prefer_expiring_quota = value.prefer_expiring_quota;
+	}
 	if (
 		Array.isArray(value.allowlisted_account_uuids) &&
 		value.allowlisted_account_uuids.every(
@@ -762,6 +768,9 @@ export class Config extends EventEmitter {
 			enabled: file?.enabled ?? TEAM_ROUTING_DEFAULTS.enabled,
 			distributionEnabled:
 				file?.distribution_enabled ?? TEAM_ROUTING_DEFAULTS.distributionEnabled,
+			preferExpiringQuota:
+				file?.prefer_expiring_quota ??
+				TEAM_ROUTING_DEFAULTS.preferExpiringQuota,
 			allowlistedAccountUuids: [
 				...(file?.allowlisted_account_uuids ??
 					TEAM_ROUTING_DEFAULTS.allowlistedAccountUuids),
@@ -861,6 +870,7 @@ export class Config extends EventEmitter {
 		const allowed = new Set([
 			"enabled",
 			"distribution_enabled",
+			"prefer_expiring_quota",
 			"allowlisted_account_uuids",
 			"max_usage",
 			"weekly_max_usage",

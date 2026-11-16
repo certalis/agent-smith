@@ -59,6 +59,18 @@ Moving a running conversation early would discard its prompt cache, so usage
 never moves a pin. Turning `distribution_enabled` off drains pins: existing
 conversations stay put while new ones use normal ordering.
 
+`prefer_expiring_quota` is an optional new-chat preference, off by default.
+Within the best priority tier, it first favors the earliest applicable quota
+reset within 1 hour for a 5-hour window, or 24 hours for a weekly window. The
+reading must be fresh (at most 30 minutes old), have a known remaining fraction
+and future reset, and apply to the requested model. Otherwise normal usage
+ordering wins. Equal reset times use the ordinary usage and load tie-breakers.
+This does not predict consumption, borrow capacity or raise a cap. Existing
+conversation pins, manual account selection and message-thread affinity do not
+move. Accounts paused, excluded or at any applicable cap stay ineligible.
+Without a conversation key, or with distribution disabled, this option has no
+effect. The same rule applies to Claude Code and Codex pinned conversations.
+
 Pooled seats keep their `max_usage` ceiling (never above `0.9`) for 5-hour and
 other non-weekly windows. Weekly windows use `weekly_max_usage` (default `0.95`),
 or the lower private `weekly_max_usage_by_email` limit when their enrollment
