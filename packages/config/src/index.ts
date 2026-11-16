@@ -511,6 +511,38 @@ function sanitizeTeamRouting(
 	return result;
 }
 
+export function readClientRouting(
+	configPath = resolveConfigPath(),
+): ClientRoutingConfig {
+	let data: unknown;
+	try {
+		data = JSON.parse(readFileSync(configPath, "utf8"));
+	} catch {
+		throw new Error("Agent Smith client config could not be read");
+	}
+	if (
+		!isRecord(data) ||
+		(data.client !== undefined && !isRecord(data.client)) ||
+		(isRecord(data.client) &&
+			data.client.enabled !== undefined &&
+			typeof data.client.enabled !== "boolean")
+	) {
+		throw new Error("Agent Smith client config is invalid");
+	}
+	return clientRouting(sanitizeClientRouting(data.client));
+}
+
+function clientRouting(
+	client: ClientRoutingFileConfig | undefined,
+): ClientRoutingConfig {
+	return {
+		enabled: client?.enabled === true,
+		...(client?.base_url && { baseUrl: client.base_url }),
+		...(client?.proxy_key_file && { proxyKeyFile: client.proxy_key_file }),
+		...(client?.keep_claude_login === true && { keepClaudeLogin: true }),
+	};
+}
+
 export class Config extends EventEmitter {
 	private configPath: string;
 	private data: ConfigData = {};
@@ -730,15 +762,11 @@ export class Config extends EventEmitter {
 	}
 
 	getClientRouting(): ClientRoutingConfig {
-		const client = this.data.client;
-		return {
-			enabled: client?.enabled === true,
-			...(client?.base_url && { baseUrl: client.base_url }),
-			...(client?.proxy_key_file && {
-				proxyKeyFile: client.proxy_key_file,
-			}),
-			...(client?.keep_claude_login === true && { keepClaudeLogin: true }),
-		};
+		return clientRouting(this.data.client);
+	}
+
+	setClientRoutingEnabled(enabled: boolean): void {
+		this.persistStrictly("client", { ...this.data.client, enabled });
 	}
 
 	/** On unless the file says `false`: a full fleet refuses requests rather than spend extra usage. */
@@ -878,10 +906,9 @@ export class Config extends EventEmitter {
 	}
 
 	/** Atomic write that throws, unlike saveConfig, so a caller can roll back. */
-	private persistStrictly<K extends "team_routing" | "enrollment_emails">(
-		key: K,
-		value: NonNullable<ConfigData[K]>,
-	): void {
+	private persistStrictly<
+		K extends "team_routing" | "enrollment_emails" | "client",
+	>(key: K, value: NonNullable<ConfigData[K]>): void {
 		const next: ConfigData = { ...this.data, [key]: value };
 		this.writePrivately(next);
 		const oldValue = this.data[key];

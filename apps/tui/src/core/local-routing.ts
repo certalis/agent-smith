@@ -11,7 +11,12 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { Config, resolveConfigPath } from "@agent-smith/config";
+import { fileURLToPath } from "node:url";
+import {
+	Config,
+	readClientRouting,
+	resolveConfigPath,
+} from "@agent-smith/config";
 import type { ProviderWire } from "@agent-smith/types";
 
 const ROUTING_BEGIN = "# >>> agent-smith local routing >>>";
@@ -19,9 +24,11 @@ const ROUTING_END = "# <<< agent-smith local routing <<<";
 const LOCAL_CLIENT_KEY = "agent-smith-local";
 
 export const ROUTING_MARKER = ROUTING_BEGIN;
+const CONFIG_CLIENT_MARKER = "# agent-smith config-driven client";
 
 export interface InstallClientWrappersOptions {
 	binDir: string;
+	clientConfigPath?: string;
 	claudePath?: string;
 	codexPath?: string;
 	port: number;
@@ -39,6 +46,7 @@ export interface LocalRoutingPaths {
 
 export interface EnableLocalClientRoutingOptions
 	extends Partial<LocalRoutingPaths> {
+	clientConfigPath?: string;
 	port: number;
 	claudePath?: string;
 	codexPath?: string;
@@ -76,7 +84,7 @@ function proxyBaseUrl(
 	return `${configuredBaseUrl ?? `http://127.0.0.1:${port}`}${route}`;
 }
 
-function validateProxyKeyFile(proxyKeyFile: string): string {
+export function validateProxyKeyFile(proxyKeyFile: string): string {
 	const resolvedPath = proxyKeyFile.startsWith("~/")
 		? join(homedir(), proxyKeyFile.slice(2))
 		: proxyKeyFile;
@@ -172,6 +180,33 @@ ${overrides} \\
 export async function installClientWrappers(
 	options: InstallClientWrappersOptions,
 ): Promise<void> {
+	if (options.clientConfigPath) {
+		const launcher = fileURLToPath(
+			new URL(
+				import.meta.url.endsWith(".ts")
+					? "./client-launcher.ts"
+					: "./client-launcher.js",
+				import.meta.url,
+			),
+		);
+		mkdirSync(options.binDir, { recursive: true, mode: 0o700 });
+		for (const [tool, target] of [
+			["claude", options.claudePath],
+			["codex", options.codexPath],
+		] as const) {
+			if (!target) continue;
+			if (target === join(options.binDir, tool))
+				throw new Error("A client launcher cannot call itself");
+			const wrapper = join(options.binDir, tool);
+			writeFileSync(
+				wrapper,
+				`#!/bin/sh\n${CONFIG_CLIENT_MARKER}\nexec ${[process.execPath, launcher, options.clientConfigPath, tool, target].map(shellQuote).join(" ")} "$@"\n`,
+				{ encoding: "utf8", mode: 0o700 },
+			);
+			chmodSync(wrapper, 0o700);
+		}
+		return;
+	}
 	if (options.baseUrl && !options.proxyKeyFile) {
 		throw new Error(
 			"A configured Agent Smith server requires a forwarding key file",
@@ -297,7 +332,7 @@ function readSavedClientPaths(
 	return null;
 }
 
-export function getLocalRoutingStatus(
+function installedRoutingStatus(
 	paths: Partial<LocalRoutingPaths> = {},
 ): LocalRoutingStatus {
 	const defaults = getLocalRoutingPaths();
@@ -319,6 +354,88 @@ export function getLocalRoutingStatus(
 		binDir,
 		shellProfile,
 	};
+}
+
+export function getLocalRoutingStatus(
+	paths: Partial<LocalRoutingPaths> = {},
+): LocalRoutingStatus {
+	const status = installedRoutingStatus(paths);
+	if (!configClientWrappersInstalled(paths)) return status;
+	try {
+		return { ...status, enabled: readClientRouting().enabled };
+	} catch {
+		return { ...status, enabled: false };
+	}
+}
+
+export function configClientWrappersInstalled(
+	paths: Partial<LocalRoutingPaths> = {},
+): boolean {
+	const binDir = paths.binDir ?? getLocalRoutingPaths().binDir;
+	const files = ["claude", "codex"]
+		.map((name) => join(binDir, name))
+		.filter(existsSync);
+	return (
+		installedRoutingStatus(paths).enabled &&
+		files.length > 0 &&
+		files.every((path) =>
+			readFileSync(path, "utf8").includes(CONFIG_CLIENT_MARKER),
+		)
+	);
+}
+
+export async function launchConfiguredClient(
+	configPath: string,
+	tool: string,
+	target: string,
+	args: string[],
+): Promise<number> {
+	if (tool !== "claude" && tool !== "codex")
+		throw new Error("Unknown Agent Smith client");
+	const client = readClientRouting(configPath);
+	const env = { ...process.env };
+	delete env.AGENT_SMITH_ADMIN_KEY;
+	delete env.AGENT_SMITH_PROXY_KEY;
+	let command = [target, ...args];
+	if (client.enabled) {
+		if (!client.baseUrl || !client.proxyKeyFile)
+			throw new Error("client.base_url and client.proxy_key_file are required");
+		const keyFile = validateProxyKeyFile(client.proxyKeyFile);
+		const wires = Object.keys(
+			new Config(configPath).getProviderPools(),
+		) as ProviderWire[];
+		const base = proxyBaseUrl(
+			8080,
+			client.baseUrl,
+			tool === "claude" ? "claude-code" : "codex",
+			tool === "claude" ? "anthropic-messages" : "openai-responses",
+			wires,
+		);
+		const script =
+			tool === "claude"
+				? claudeWrapper(target, base, keyFile, client.keepClaudeLogin === true)
+				: codexWrapper(target, base, keyFile);
+		command = ["/bin/sh", "-c", script, "--", ...args];
+	}
+	const child = Bun.spawn(command, {
+		env,
+		stdin: "inherit",
+		stdout: "inherit",
+		stderr: "inherit",
+	});
+	const forward = {
+		SIGINT: () => child.kill("SIGINT"),
+		SIGTERM: () => child.kill("SIGTERM"),
+		SIGHUP: () => child.kill("SIGHUP"),
+	};
+	for (const [signal, listener] of Object.entries(forward))
+		process.on(signal, listener);
+	try {
+		return await child.exited;
+	} finally {
+		for (const [signal, listener] of Object.entries(forward))
+			process.off(signal, listener);
+	}
 }
 
 export async function enableLocalClientRouting(
@@ -353,9 +470,12 @@ export async function enableLocalClientRouting(
 		baseUrl: options.baseUrl,
 		proxyKeyFile: options.proxyKeyFile,
 		keepClaudeLogin: options.keepClaudeLogin,
+		clientConfigPath: options.clientConfigPath,
 		providerPoolWires:
 			options.providerPoolWires ??
-			(Object.keys(new Config().getProviderPools()) as ProviderWire[]),
+			(options.clientConfigPath
+				? []
+				: (Object.keys(new Config().getProviderPools()) as ProviderWire[])),
 	});
 
 	const existingProfile = existsSync(shellProfile)

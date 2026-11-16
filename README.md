@@ -105,8 +105,7 @@ Copy [`https-client.json`](examples/config/https-client.json) into your private
 Agent Smith config. Put the device key in the owner-only file named by
 `proxy_key_file`, not in the JSON or a shell profile. `base_url` is the endpoint
 visible to your machine, not a second pool. The key can spend from the pool, but
-cannot administer it. Remote client routing is off by default: set
-`client.enabled` to `true` when this machine should use the shared pool.
+cannot administer it. Remote client routing is off by default.
 
 An SSH tunnel remains an option for development. Use
 [`team-client.json`](examples/config/team-client.json) and forward its local port
@@ -116,10 +115,10 @@ to the private server:
 ssh -N -L 18181:127.0.0.1:8080 agent-smith-pool
 ```
 
-Then apply the flag with the normal client setup command:
+Then turn on shared-pool use with the shipped command:
 
 ```bash
-agent-smith install-client
+agent-smith client on
 ```
 
 Open a new terminal and use `claude` or `codex` normally. The wrappers only add
@@ -132,9 +131,17 @@ not an Anthropic Console key. Claude in Chrome and claude.ai cloud connectors ar
 mode; `client.keep_claude_login` keeps them on. See the
 [client behavior and limits](docs/https-edge.md#configure-and-prove).
 
-To switch back to ordinary local Claude Code/Codex, set `client.enabled` to
-`false` and run `agent-smith install-client` again. It removes only its wrappers
-and marked shell entry; it does not change the real clients or their credentials.
+Use `agent-smith client off` to use ordinary local Claude Code/Codex again;
+`agent-smith client status` shows the switch and launcher setup. Add `--raw` for
+JSON instead of readable text. These commands work outside any repository.
+
+The first `on` installs the launchers (or updates previously generated ones).
+Later switches change only `client.enabled`: each new client process reads the
+current origin, key-file path and flag. Off keeps the launchers installed, reads
+no forwarding key and delegates to the native client without changing its login.
+Restart/resume existing sessions after switching. No proxy restart is needed.
+`install-client` remains the explicit setup/removal command; it is not needed
+between on/off switches.
 
 ## Configuration
 
@@ -154,7 +161,7 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
-| `client` | The Agent Smith origin and forwarding key used by `agent-smith install-client`. It is for this machine only; it does not define providers or a separate pool. |
+| `client` | This machine's shared-pool switch, origin and forwarding-key file. Use `agent-smith client on`, `off` or `status`; it does not define providers or a separate pool. |
 | `team_routing` | Which subscription accounts may share a pool, and their usage caps. See the [configuration guide](docs/configuration.md#team-routing). |
 | `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
 | `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |

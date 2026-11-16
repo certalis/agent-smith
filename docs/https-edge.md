@@ -196,9 +196,11 @@ credentials after a pool crash.
 ## Configure and prove
 
 Use the shipped [HTTPS client config](../examples/config/https-client.json).
-Edit its origin and key-file path, set `client.enabled: true`, then run
-`agent-smith install-client`. Routing is off by default. Set the flag to `false`
-and run that command again to restore ordinary local Claude Code/Codex.
+Edit its origin and key-file path, then run `agent-smith client on`. Routing is
+off by default. `agent-smith client off` restores ordinary local Claude Code/Codex;
+`agent-smith client status` reports the switch. Launchers read the current config
+at each start, so later switches and origin edits need no reinstallation. Open a
+new terminal after first setup; restart/resume existing sessions after switching.
 Clients keep no provider token, pool database or local refresher. The server's
 existing agent jobs can keep using their private forwarding key and local route.
 

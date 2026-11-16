@@ -13,6 +13,10 @@ cleanup. Send control requests through that socket, never by falling back to a
 shared TCP port another user could bind after a crash. Normal Host/Origin and key
 checks still apply. TCP and Unix listeners share one runtime and stop together.
 
+The packaged `dist/client-launcher.js` belongs beside `dist/bin.js`: the CLI's
+shared-client launchers invoke it using the installed Bun executable. Client
+on/off/status changes are local and do not require a pool-server deployment.
+
 ## Overview
 
 agent-smith is a load balancer proxy for Claude API accounts that can be deployed in various configurations, from simple local development to production-grade distributed systems. This document covers all deployment options, from single-instance setups to scalable architectures.
