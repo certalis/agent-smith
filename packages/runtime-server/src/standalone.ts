@@ -175,7 +175,7 @@ export async function startStandalone(
 				child.once("error", failed);
 				child.once("close", failed);
 			}),
-			30_000,
+			120_000,
 		);
 		server.listen(options.port, "0.0.0.0");
 		await once(server, "listening");
