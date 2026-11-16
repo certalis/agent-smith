@@ -1,5 +1,5 @@
-import { Database } from "bun:sqlite";
-import { describe, expect, it } from "bun:test";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
+import { describe, expect, it, spyOn } from "bun:test";
 import { ensureSchema, runMigrations } from "./migrations";
 
 function getTableColumns(db: Database, tableName: string) {
@@ -86,6 +86,48 @@ function encode(value: string): string {
 }
 
 describe("database schema", () => {
+	it("backfills linkage without collecting the full payload history", () => {
+		const db = new Database(":memory:");
+		try {
+			ensureSchema(db);
+			runMigrations(db);
+			db.run(
+				"INSERT INTO requests (id, timestamp, method, path, provider, upstream_path) VALUES ('history', 1, 'POST', '/v1/messages', 'anthropic', '/v1/messages')",
+			);
+			db.run(
+				"INSERT INTO request_payloads (id, json) VALUES ('history', '{}')",
+			);
+			const query = db.query.bind(db);
+			const guard = spyOn(db, "query").mockImplementation(
+				<Row, Params extends SQLQueryBindings | SQLQueryBindings[]>(
+					sql: string,
+				) => {
+					const statement = query<Row, Params>(sql);
+					if (sql.includes("rp.json")) {
+						spyOn(statement, "all").mockImplementation(() => {
+							throw new Error(
+								"Full payload history exceeds the startup memory budget",
+							);
+						});
+					}
+					return statement;
+				},
+			);
+			try {
+				runMigrations(db);
+				expect(
+					db.query("SELECT response_chain_id FROM requests").get(),
+				).toEqual({
+					response_chain_id: "history",
+				});
+			} finally {
+				guard.mockRestore();
+			}
+		} finally {
+			db.close();
+		}
+	});
+
 	it("creates the fresh v2 schema for accounts and requests", () => {
 		const db = new Database(":memory:");
 

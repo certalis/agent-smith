@@ -163,7 +163,7 @@ function backfillRequestLinkageColumns(db: Database): void {
 				ORDER BY r.timestamp ASC
 			`,
 		)
-		.all() as Array<{
+		.iterate() as Iterable<{
 		id: string;
 		timestamp: number;
 		response_id: string | null;
