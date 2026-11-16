@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
-import { Config } from "@agent-smith/config";
+import { Config, resolveConfigPath } from "@agent-smith/config";
 import { container, NETWORK, SERVICE_KEYS, shutdown } from "@agent-smith/core";
 import { DatabaseFactory } from "@agent-smith/database";
 import { Logger } from "@agent-smith/logger";
@@ -8,6 +8,7 @@ import startServer, { type ServerHandle } from "@agent-smith/runtime-server";
 import type { AccountDisplay } from "@agent-smith/ui";
 import * as tuiCore from "./core";
 import { parseArgs } from "./core";
+import { runClientCommand } from "./core/client-command";
 import { POC_NOTICE } from "./poc-notice";
 
 function printPocNotice() {
@@ -67,6 +68,10 @@ function printAccountsTable(accounts: AccountDisplay[]) {
 }
 
 async function main() {
+	if (process.argv[2] === "client") {
+		await runClientCommand(process.argv.slice(3));
+		return;
+	}
 	// Initialize DI container and services
 	container.registerInstance(SERVICE_KEYS.Config, new Config());
 	container.registerInstance(SERVICE_KEYS.Logger, new Logger("TUI"));
@@ -89,6 +94,7 @@ ${POC_NOTICE}
 Usage: agent-smith [options]
        agent-smith run [--port <number>] -- [claude arguments]
        agent-smith install-client
+       agent-smith client on|off|status [--raw]
 
 Options:
   --serve              Start API server with dashboard
@@ -154,6 +160,7 @@ Examples:
 			baseUrl: client.baseUrl,
 			proxyKeyFile: client.proxyKeyFile,
 			keepClaudeLogin: client.keepClaudeLogin,
+			clientConfigPath: resolveConfigPath(),
 		});
 		console.log(`Client wrappers configured for ${client.baseUrl}.`);
 		console.log(

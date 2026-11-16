@@ -125,12 +125,13 @@ The configuration file is stored at:
 
 ### Client wrappers
 
-`client` is optional and is only read by `agent-smith install-client`. It has
-four fields:
+`client` is optional. `agent-smith client on|off|status` controls this machine's
+shared-pool use. The launchers read it each time Claude Code or Codex starts:
 
-- `enabled`: `false` by default. Only literal `true` enables shared-pool wrappers.
-  Run `agent-smith install-client` after changing it. When off, that command
-  removes the wrappers and their marked shell entry, restoring ordinary client use.
+- `enabled`: `false` by default. `client on` and `client off` persist this switch
+  while preserving the other settings. First use installs or updates launchers;
+  later switches need no reinstall or shell edit. Off delegates to the native
+  clients without reading the forwarding key. Restart existing client sessions.
 - `base_url`: the HTTP(S) origin of the one Agent Smith server this machine can
   reach. It has no path.
 - `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file
@@ -151,6 +152,11 @@ laptop the origin lives in the private local config and the key stays in its
 own owner-only file, so generated wrappers can use it without embedding it.
 Agent Smith attempts to tighten its config to `0600` when it reads it; the key
 file must already be `0600`.
+
+`client status` is read-only and prints readable text; `--raw` selects JSON.
+Malformed or unreadable installed client settings stop the launcher rather than
+silently spending from a personal login. `install-client` remains available for
+explicit setup/removal, but is not required after toggles or origin changes.
 
 This is not B2 tenancy. One forwarding key does not identify individual callers
 or provide per-client fairness, so it is for the isolated B1 development path,
@@ -290,7 +296,7 @@ new terminal after enabling it. The status in the screen is the source of truth;
 do not copy proxy credentials into shell profiles for local routing.
 
 For a shared Agent Smith server, use the [`client` configuration](#client-wrappers)
-and `agent-smith install-client` instead. Its wrappers use the configured origin
+and `agent-smith client on` instead. Its wrappers use the configured origin
 and forwarding key, whether the origin is directly reachable or the local side
 of an SSH tunnel.
 

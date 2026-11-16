@@ -7,6 +7,7 @@ The agent-smith CLI provides a command-line interface for managing OAuth account
 - [Installation and Setup](#installation-and-setup)
 - [Global Options and Help](#global-options-and-help)
 - [Command Reference](#command-reference)
+  - [Shared-pool Client Switch](#shared-pool-client-switch)
   - [Account Management](#account-management)
   - [Statistics and History](#statistics-and-history)
   - [System Commands](#system-commands)
@@ -102,6 +103,24 @@ Interactive Mode:
 ```
 
 ## Command Reference
+
+### Shared-pool Client Switch
+
+After setting `client.base_url` and the owner-only `client.proxy_key_file` in
+your [config](configuration.md#client-wrappers), use:
+
+```bash
+agent-smith client on
+agent-smith client off
+agent-smith client status
+```
+
+The pool is off by default. First use sets up the launchers; later switches
+only change the saved flag. Open a new terminal after first setup. Restart
+existing Claude Code/Codex sessions after switching; new launches read the
+current settings without reinstalling anything. Off uses the native client
+login and does not read the pool key. Status prints readable text; add `--raw`
+for JSON. These commands do not start a server or create a pool database.
 
 ### Account Management
 
