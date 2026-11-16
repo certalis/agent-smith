@@ -94,6 +94,8 @@ function createProxyContext(
 				distributionEnabled: true,
 				allowlistedAccountUuids: [],
 				maxUsage: 0.9,
+				weeklyMaxUsage: 0.9,
+				weeklyMaxUsageByEmail: {},
 				admissionCap: 5,
 				admissionQueueLimit: 25,
 				admissionWaitMs: 30_000,

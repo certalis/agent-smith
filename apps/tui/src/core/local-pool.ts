@@ -60,6 +60,8 @@ export function teamRoutingFileConfig(
 		distribution_enabled: routing.distributionEnabled,
 		allowlisted_account_uuids: routing.allowlistedAccountUuids,
 		max_usage: routing.maxUsage,
+		weekly_max_usage: routing.weeklyMaxUsage,
+		weekly_max_usage_by_email: routing.weeklyMaxUsageByEmail,
 		admission_cap: routing.admissionCap,
 		admission_queue_limit: routing.admissionQueueLimit,
 		admission_wait_ms: routing.admissionWaitMs,

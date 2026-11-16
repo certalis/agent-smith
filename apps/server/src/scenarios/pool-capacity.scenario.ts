@@ -39,6 +39,7 @@ export default defineScenario({
 				"other",
 			],
 			max_usage: 0.9,
+			weekly_max_usage: 0.9,
 			hold_seconds: 0,
 			admission_wait_ms: 1000,
 		},

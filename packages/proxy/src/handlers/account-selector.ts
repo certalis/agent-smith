@@ -51,13 +51,24 @@ function isQuotaBlocking(
 }
 
 function pooledMaxUsage(
+	provider: Provider,
 	account: Account,
+	bucket: string,
 	ctx: EligibilityContext,
 ): number | undefined {
 	const teamRouting = ctx.runtime.teamRouting;
-	return teamRouting?.enabled === true && isAllowlisted(account, teamRouting)
-		? teamRouting.maxUsage
-		: undefined;
+	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
+		return undefined;
+	if (!provider.isWeeklyBucket(bucket)) return teamRouting.maxUsage;
+	const email = ctx.dbOps
+		.getEnrollmentContact(account.id)
+		?.email?.trim()
+		.toLowerCase();
+	const override = email ? teamRouting.weeklyMaxUsageByEmail[email] : undefined;
+	return Math.min(
+		teamRouting.weeklyMaxUsage,
+		override ?? teamRouting.weeklyMaxUsage,
+	);
 }
 
 function isQuotaEligible(
@@ -81,7 +92,7 @@ function isQuotaEligible(
 				fleetThreshold,
 				now,
 				model,
-				pooledMaxUsage(account, ctx),
+				pooledMaxUsage(provider, account, name, ctx),
 			)
 		) {
 			return false;
@@ -144,7 +155,7 @@ function blockingResets(
 					ctx.runtime.quotaThreshold,
 					now,
 					model,
-					pooledMaxUsage(account, ctx),
+					pooledMaxUsage(provider, account, bucket, ctx),
 				),
 		)
 		.map(([, window]) => window.resetAt as number);
@@ -292,6 +303,7 @@ function selectRevalidationProbe(
 	accounts: Account[],
 	ctx: ResolvedProxyContext,
 	now: number,
+	model: string | undefined,
 ): Account[] {
 	const probes = ctx.quotaProbeAt;
 	const lastProbeAt = probes?.get(ctx.providerName);
@@ -305,16 +317,17 @@ function selectRevalidationProbe(
 	const [probe] = accounts
 		.filter((account) => {
 			// W2's real-client revalidation remains available for ordinary
-			// accounts. A pooled seat's 90% owner reserve is stricter: it is
+			// accounts. A pooled seat's configured owner reserve is stricter: it is
 			// never consumed by a probe.
 			return (
-				pooledMaxUsage(account, ctx) === undefined ||
+				ctx.runtime.teamRouting?.enabled !== true ||
+				!isAllowlisted(account, ctx.runtime.teamRouting) ||
 				isQuotaEligible(
 					ctx.provider,
 					account,
 					ctx.runtime.quotaThreshold,
 					now,
-					undefined,
+					model,
 					ctx,
 				)
 			);
@@ -361,7 +374,7 @@ export function getOrderedAccounts(
 			? eligible
 			: options.allowRevalidationProbe === false || ctx.runtime.blockWhenAllFull
 				? []
-				: selectRevalidationProbe(providerAccounts, ctx, now);
+				: selectRevalidationProbe(providerAccounts, ctx, now, meta.model);
 	const prioritized = [...candidates].sort((left, right) => {
 		const priority = (left.priority ?? 0) - (right.priority ?? 0);
 		return priority !== 0

@@ -13,6 +13,8 @@ const config: TeamRoutingConfig = {
 	enabled: true,
 	holdSeconds: 0,
 	maxUsage: 0.9,
+	weeklyMaxUsage: 0.9,
+	weeklyMaxUsageByEmail: {},
 	quotaProbeSeconds: 0,
 };
 

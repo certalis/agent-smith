@@ -78,7 +78,11 @@ export function createConfigHandlers(config: Config) {
 			return jsonResponse(LB_STRATEGIES);
 		},
 
-		getTeamRouting: (): Response => jsonResponse(config.getTeamRouting()),
+		getTeamRouting: (): Response => {
+			const { weeklyMaxUsageByEmail: _privateLimits, ...routing } =
+				config.getTeamRouting();
+			return jsonResponse(routing);
+		},
 
 		setTeamRouting: async (req: Request): Promise<Response> => {
 			try {
