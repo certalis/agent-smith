@@ -11,7 +11,7 @@ export {
 	terminateUsageWorker,
 } from "./proxy";
 export { QuotaHold } from "./quota-hold";
-export { QuotaProbe } from "./quota-probe";
+export { QuotaProbe, type SeatTokenReader } from "./quota-probe";
 export {
 	forwardToClient,
 	type ResponseHandlerOptions,
@@ -33,6 +33,7 @@ export {
 	type WebSocketProxySession,
 	websocketProxyHandler,
 } from "./websocket-proxy";
+export { WindowWarmup } from "./window-warmup";
 export type {
 	AckMessage,
 	ChunkMessage,

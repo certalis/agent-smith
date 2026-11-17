@@ -85,7 +85,13 @@ The configuration file is stored at:
     "admission_queue_limit": 25,
     "admission_wait_ms": 30000,
     "hold_seconds": 0,
-    "quota_probe_seconds": 0
+    "quota_probe_seconds": 0,
+    "window_warmup": {
+      "enabled": false,
+      "times": ["06:00"],
+      "time_zone": "Europe/Paris",
+      "weekdays_only": true
+    }
   },
   "block_when_all_full": true,
   "alerts": {
@@ -255,6 +261,7 @@ than `0.95`.
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
 | `hold_seconds` | `0` | Wait only this long for a known quota reset; `0` returns 429 immediately. |
 | `quota_probe_seconds` | `0` | Opt-in interval for a zero-spend OAuth quota refresh; `0` disables it. |
+| `window_warmup` | off | Opt-in daily start of idle seats' five-hour windows; see below. |
 
 Email overrides use private enrollment contacts; set them before inviting future
 members if needed. Keys are trimmed/lowercased. A per-email value never raises
@@ -263,6 +270,32 @@ omits this private map. An administrator's POST preserves the map when the field
 is omitted; send an explicit empty object to clear it. These limits do not add
 accounts to the pool or resume manually paused accounts. Revalidation requests
 cannot bypass the hard caps, and stale known usage stays blocking until reset.
+
+#### Window warm-up
+
+`window_warmup` sends requests nobody typed, so it ships off. Turned on, at each
+configured local time it sends one minimal billed message on each allowlisted,
+unpaused seat's own credentials, so that seat's five-hour window starts then
+and resets five hours later, inside the working day. Like the quota probe, it
+only reaches seats with no custom upstream. A seat whose five-hour window
+already runs, or that any window holds at its hard cap (`max_usage`, or the
+weekly ceiling), is skipped. A refused request is logged and not retried; the
+reply's quota headers become the seat's reading, booked as proxy activity
+rather than outside spend. A restart misses a time that passed while it was
+down. `GET /api/status` reports the next run as `nextWindowWarmupAt` (epoch
+milliseconds, `null` while off).
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `false` | Turns the warm-up on; team routing must be on as well. |
+| `times` | `["06:00"]` | Local `HH:MM` times, 24-hour. |
+| `time_zone` | `"Europe/Paris"` | IANA time zone the times are read in, daylight saving included. |
+| `weekdays_only` | `true` | Skips Saturday and Sunday. |
+| `model` | the provider's cheapest | Model of the warm-up message; Claude Code uses `claude-haiku-5-5`. |
+
+One unknown or invalid field rejects the whole `window_warmup` object through
+the API, and drops it (warm-up off) from a hand-edited file. A team-routing
+`POST` that omits `window_warmup` turns the warm-up off.
 
 ### Alerts
 

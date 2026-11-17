@@ -20,6 +20,8 @@ import { fetchClaudeCodeUsage } from "./usage";
 const log = new Logger("ClaudeCodeProvider");
 const PROVIDER_NAME = "claude-code" as const;
 const DEFAULT_BASE_URL = getProviderDefaultBaseUrl(PROVIDER_NAME);
+const CHEAPEST_MODEL = "claude-haiku-5-5";
+const WINDOW_WARMUP_TIMEOUT_MS = 30_000;
 
 const CLAUDE_CODE_REFRESH_CONFIG: RefreshRequestConfig = {
 	tokenUrl: CLAUDE_CODE_OAUTH_TOKEN_URL,
@@ -68,6 +70,31 @@ export class ClaudeCodeProvider extends AnthropicProvider {
 		accessToken: string,
 	): Promise<AccountQuotaState | null> {
 		return await fetchClaudeCodeUsage(accessToken);
+	}
+
+	async startQuotaWindow(
+		account: Account,
+		accessToken: string,
+		model: string | null,
+	): Promise<AccountQuotaState | null> {
+		const response = await fetch(this.buildUrl("/v1/messages", "", account), {
+			method: "POST",
+			headers: {
+				authorization: `Bearer ${accessToken}`,
+				"anthropic-beta": "oauth-2025-04-20",
+				"anthropic-version": "2023-06-01",
+				"content-type": "application/json",
+			},
+			body: JSON.stringify({
+				model: model ?? CHEAPEST_MODEL,
+				max_tokens: 1,
+				messages: [{ role: "user", content: "hi" }],
+			}),
+			signal: AbortSignal.timeout(WINDOW_WARMUP_TIMEOUT_MS),
+		});
+		await response.body?.cancel();
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		return this.parseRateLimit(response).quotaState ?? null;
 	}
 
 	async refreshToken(

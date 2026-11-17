@@ -95,6 +95,17 @@ export interface Provider {
 	): Promise<AccountQuotaState | null>;
 
 	/**
+	 * Starts this seat's five-hour window with one minimal billed request on its
+	 * own credentials, on `model` or the provider's cheapest. Resolves to the
+	 * quota the reply carried; throws when the provider refuses it.
+	 */
+	startQuotaWindow?(
+		account: Account,
+		accessToken: string,
+		model: string | null,
+	): Promise<AccountQuotaState | null>;
+
+	/**
 	 * Process the response before returning to client
 	 */
 	processResponse(

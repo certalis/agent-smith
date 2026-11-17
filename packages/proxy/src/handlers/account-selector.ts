@@ -14,6 +14,10 @@ import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 import { refreshBackoffUntil } from "./token-manager";
 
 type EligibilityContext = Pick<ProxyContext, "runtime" | "dbOps">;
+type QuotaPolicyContext = {
+	runtime: Pick<ProxyContext["runtime"], "teamRouting">;
+	dbOps: Pick<ProxyContext["dbOps"], "getEnrollmentContact">;
+};
 type PoolStatusContext = Pick<
 	ProxyContext,
 	"runtime" | "dbOps" | "providerRegistry"
@@ -54,7 +58,7 @@ function pooledMaxUsage(
 	provider: Provider,
 	account: Account,
 	bucket: string,
-	ctx: EligibilityContext,
+	ctx: QuotaPolicyContext,
 ): number | undefined {
 	const teamRouting = ctx.runtime.teamRouting;
 	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
@@ -71,13 +75,13 @@ function pooledMaxUsage(
 	);
 }
 
-function isQuotaEligible(
+export function isQuotaEligible(
 	provider: Provider,
 	account: Account,
 	fleetThreshold: number,
 	now: number,
 	model: string | undefined,
-	ctx: EligibilityContext,
+	ctx: QuotaPolicyContext,
 ): boolean {
 	const quota = account.quota_state;
 	if (!quota) return true;

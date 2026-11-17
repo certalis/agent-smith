@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import type { TeamRoutingConfig } from "@agent-smith/config";
+import {
+	type TeamRoutingConfig,
+	WINDOW_WARMUP_DEFAULTS,
+} from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import { TeamRouter, type TeamRoutingRequest } from "./team-router";
@@ -17,6 +20,7 @@ const config: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	quotaProbeSeconds: 0,
+	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 
 const provider = {

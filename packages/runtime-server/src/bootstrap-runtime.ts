@@ -24,9 +24,11 @@ import {
 	QuotaHold,
 	QuotaProbe,
 	SeatAlerts,
+	type SeatTokenReader,
 	SessionStrategy,
 	TeamAdmission,
 	TeamRouter,
+	WindowWarmup,
 } from "@agent-smith/proxy";
 import { createExposureConfig, type ExposureConfig } from "./exposure";
 
@@ -76,6 +78,7 @@ function wireStrategyHotReload(
 	proxyContext: ProxyContext,
 	runtimeConfig: RuntimeConfig,
 	quotaProbe: QuotaProbe,
+	windowWarmup: WindowWarmup,
 ): void {
 	config.on("change", (change: { key?: string }) => {
 		if (change.key === "lb_strategy") {
@@ -90,9 +93,48 @@ function wireStrategyHotReload(
 		if (change.key === "team_routing") {
 			runtimeConfig.teamRouting = config.getTeamRouting();
 			quotaProbe.reschedule();
+			windowWarmup.reschedule();
 			log.info("Team routing configuration changed");
 		}
 	});
+}
+
+/** The seat jobs that read or start quota windows on no client's request. */
+function startSeatSchedulers(
+	config: Config,
+	proxyContext: ProxyContext,
+	outsideSpendTracker: OutsideSpendTracker,
+): { quotaProbe: QuotaProbe; windowWarmup: WindowWarmup } {
+	const { dbOps, providerRegistry, runtime } = proxyContext;
+	const readSeatToken: SeatTokenReader = async (account) => {
+		const provider = providerRegistry.getProvider(account.provider);
+		if (!provider) return null;
+		return await getValidAccessToken(account, {
+			...proxyContext,
+			provider,
+			providerName: account.provider,
+			upstreamPath: "/",
+		});
+	};
+	const quotaProbe = new QuotaProbe(
+		() => config.getTeamRouting(),
+		dbOps,
+		outsideSpendTracker,
+		providerRegistry,
+		readSeatToken,
+	);
+	const windowWarmup = new WindowWarmup(
+		() => runtime,
+		dbOps,
+		outsideSpendTracker,
+		providerRegistry,
+		readSeatToken,
+	);
+	for (const scheduler of [quotaProbe, windowWarmup]) {
+		scheduler.start();
+		registerDisposable(scheduler);
+	}
+	return { quotaProbe, windowWarmup };
 }
 
 export function bootstrapRuntime(
@@ -184,24 +226,11 @@ export function bootstrapRuntime(
 		asyncWriter,
 		usageWorker: getUsageWorker(),
 	};
-	const quotaProbe = new QuotaProbe(
-		() => config.getTeamRouting(),
-		dbOps,
+	const { quotaProbe, windowWarmup } = startSeatSchedulers(
+		config,
+		proxyContext,
 		outsideSpendTracker,
-		providerRegistry,
-		async (account) => {
-			const provider = providerRegistry.getProvider(account.provider);
-			if (!provider) return null;
-			return await getValidAccessToken(account, {
-				...proxyContext,
-				provider,
-				providerName: account.provider,
-				upstreamPath: "/",
-			});
-		},
 	);
-	quotaProbe.start();
-	registerDisposable(quotaProbe);
 
 	wireStrategyHotReload(
 		config,
@@ -210,6 +239,7 @@ export function bootstrapRuntime(
 		proxyContext,
 		runtimeConfig,
 		quotaProbe,
+		windowWarmup,
 	);
 
 	return {

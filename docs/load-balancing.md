@@ -101,6 +101,13 @@ upstream. Fresh weekly readings also feed the outside-spend view in
 `GET /api/status`; an interval that overlapped proxy traffic is reported as
 `not_measurable`, never as a misleading zero.
 
+`window_warmup` is opt-in too: at configured local times it starts the
+five-hour window of each direct allowlisted seat whose window is not running
+and that is under its cap, with one minimal message on that seat's own
+credentials. It moves no conversation and changes no account order; it only
+shifts when each idle seat's window resets. Options:
+[configuration](configuration.md#window-warm-up).
+
 ## Provider pools
 
 `provider_pools` is an ordered list of enabled providers for one wire protocol:

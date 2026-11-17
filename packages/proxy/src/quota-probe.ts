@@ -1,9 +1,9 @@
 import type { TeamRoutingConfig } from "@agent-smith/config";
-import type { ProviderRegistry } from "@agent-smith/providers";
+import type { Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account, AccountQuotaState } from "@agent-smith/types";
 import type { OutsideSpendTracker } from "./outside-spend";
 
-type QuotaStore = {
+export type QuotaStore = {
 	getAllAccounts(): Account[];
 	updateAccountQuotaState(
 		accountId: string,
@@ -11,8 +11,21 @@ type QuotaStore = {
 	): void;
 };
 
-type TokenReader = (account: Account) => Promise<string | null>;
+export type SeatTokenReader = (account: Account) => Promise<string | null>;
 const MAX_INTERVAL_MS = 7 * 24 * 60 * 60 * 1_000;
+
+/** Saves a reading taken outside proxy traffic, after outside spend has judged it. */
+export function recordSeatQuota(
+	store: QuotaStore,
+	outsideSpend: OutsideSpendTracker,
+	provider: Provider,
+	account: Account,
+	quota: AccountQuotaState,
+): void {
+	const observed = outsideSpend.observe(account, quota, provider);
+	account.quota_state = observed;
+	store.updateAccountQuotaState(account.id, observed);
+}
 
 /** Opt-in zero-spend quota refresh for direct subscription seats. */
 export class QuotaProbe {
@@ -25,7 +38,7 @@ export class QuotaProbe {
 		private readonly store: QuotaStore,
 		private readonly outsideSpend: OutsideSpendTracker,
 		private readonly providers: Pick<ProviderRegistry, "getProvider">,
-		private readonly readToken: TokenReader = async (account) =>
+		private readonly readToken: SeatTokenReader = async (account) =>
 			account.access_token,
 	) {}
 
@@ -87,9 +100,7 @@ export class QuotaProbe {
 			if (!accessToken) return;
 			const quota = await provider.probeQuota(account, accessToken);
 			if (!quota) return;
-			const observed = this.outsideSpend.observe(account, quota, provider);
-			account.quota_state = observed;
-			this.store.updateAccountQuotaState(account.id, observed);
+			recordSeatQuota(this.store, this.outsideSpend, provider, account, quota);
 		} catch {
 			// A failed read is not evidence: retain the last trusted quota reading.
 		}

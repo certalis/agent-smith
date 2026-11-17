@@ -1,4 +1,4 @@
-import type { Config } from "@agent-smith/config";
+import { type Config, nextWindowWarmupAt } from "@agent-smith/config";
 import type { DatabaseOperations } from "@agent-smith/database";
 import { jsonResponse } from "@agent-smith/http";
 import type { ProviderRegistry } from "@agent-smith/providers";
@@ -42,7 +42,7 @@ export function createFleetStatusHandler(
 ) {
 	return (): Response => {
 		const now = Date.now();
-		const quotaThreshold = config.getRuntime().quotaThreshold;
+		const { quotaThreshold, teamRouting } = config.getRuntime();
 		const accounts = dbOps.getAllAccounts().map((account) => ({
 			...serializeAccount(account, providerRegistry, now),
 			blockedReason: blockedReason(account, quotaThreshold, now),
@@ -50,6 +50,10 @@ export function createFleetStatusHandler(
 			outsideSpend: account.quota_state?.outsideSpend ?? {},
 		}));
 
-		return jsonResponse({ accounts, quotaThreshold });
+		return jsonResponse({
+			accounts,
+			quotaThreshold,
+			nextWindowWarmupAt: nextWindowWarmupAt(teamRouting, now),
+		});
 	};
 }
