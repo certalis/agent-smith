@@ -67,6 +67,7 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 			TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 		) as number,
 		port,
+		storeRequestPayloads: config.storesRequestPayloads(),
 		teamRouting: config.getTeamRouting(),
 	};
 }
@@ -89,6 +90,9 @@ function wireStrategyHotReload(
 				strategy.initialize(dbOps);
 				proxyContext.strategy = strategy;
 			}
+		}
+		if (change.key === "data_retention_days") {
+			runtimeConfig.storeRequestPayloads = config.storesRequestPayloads();
 		}
 		if (change.key === "team_routing") {
 			runtimeConfig.teamRouting = config.getTeamRouting();

@@ -880,7 +880,8 @@ curl -X POST http://localhost:8080/api/maintenance/cleanup
 
 #### POST /api/maintenance/compact
 
-Compact the database to reclaim disk space.
+Compact the database to reclaim disk space. `VACUUM` needs up to twice the live data free on disk, so with less the
+call returns `503` with `freeBytes` and `requiredBytes` and leaves the database as it is.
 
 **Example:**
 ```bash
@@ -910,7 +911,8 @@ curl http://localhost:8080/api/config/retention
 
 #### POST /api/config/retention
 
-Update data retention settings.
+Update data retention settings. `payloadDays` takes 0–365 (`0` stores no request metadata payloads); `requestDays`
+takes 1–3650.
 
 **Request:**
 ```json

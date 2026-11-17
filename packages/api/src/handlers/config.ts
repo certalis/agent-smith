@@ -121,7 +121,7 @@ export function createConfigHandlers(config: Config) {
 				let updated = false;
 				if (body.payloadDays !== undefined) {
 					const payloadDays = validateNumber(body.payloadDays, "payloadDays", {
-						min: 1,
+						min: 0,
 						max: 365,
 						integer: true,
 					});

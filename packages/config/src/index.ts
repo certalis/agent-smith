@@ -48,6 +48,7 @@ export interface RuntimeConfig {
 	retry: { attempts: number; delayMs: number; backoff: number };
 	sessionDurationMs: number;
 	port: number;
+	storeRequestPayloads: boolean;
 	teamRouting: TeamRoutingConfig;
 }
 
@@ -740,16 +741,20 @@ export class Config extends EventEmitter {
 		const fromEnv = process.env.AGENT_SMITH_DATA_RETENTION_DAYS;
 		if (fromEnv) {
 			const n = parseInt(fromEnv, 10);
-			if (!Number.isNaN(n)) return this.clamp(n, 1, 365);
+			if (!Number.isNaN(n)) return this.clamp(n, 0, 365);
 		}
 		const fromFile = this.data.data_retention_days;
-		if (typeof fromFile === "number") return this.clamp(fromFile, 1, 365);
+		if (typeof fromFile === "number") return this.clamp(fromFile, 0, 365);
 		return 7;
 	}
 
 	setDataRetentionDays(days: number): void {
-		const clamped = this.clamp(days, 1, 365);
+		const clamped = this.clamp(days, 0, 365);
 		this.set("data_retention_days", clamped);
+	}
+
+	storesRequestPayloads(): boolean {
+		return this.getDataRetentionDays() > 0;
 	}
 
 	getRequestRetentionDays(): number {
@@ -1020,6 +1025,7 @@ export class Config extends EventEmitter {
 			},
 			sessionDurationMs: TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 			port: NETWORK.DEFAULT_PORT,
+			storeRequestPayloads: this.storesRequestPayloads(),
 			teamRouting: this.getTeamRouting(),
 		};
 

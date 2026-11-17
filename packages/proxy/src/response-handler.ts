@@ -94,6 +94,7 @@ export async function forwardToClient(
 		providerName: ctx.providerName,
 		retryAttempt,
 		failoverAttempts,
+		storePayload: ctx.runtime.storeRequestPayloads,
 	};
 	ctx.usageWorker.postMessage(startMessage);
 

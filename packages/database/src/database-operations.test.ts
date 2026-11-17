@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseOperations } from "./database-operations";
@@ -299,5 +299,60 @@ describe("DatabaseOperations", () => {
 		} finally {
 			dbOps.close();
 		}
+	});
+
+	describe("compact", () => {
+		function databaseWithFreedPages() {
+			const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
+			tempDirs.push(tempDir);
+			const path = join(tempDir, "agent-smith.db");
+			const dbOps = new DatabaseOperations(path);
+			for (let index = 0; index < 200; index++) {
+				dbOps.saveRequest(
+					`request-${index}`,
+					"POST",
+					"/v1/openai/responses",
+					"openai",
+					"/responses",
+					null,
+					200,
+					true,
+					null,
+					1,
+					0,
+					undefined,
+					{ payload: { id: `request-${index}`, padding: "x".repeat(4096) } },
+				);
+			}
+			dbOps.clearRequestHistory();
+			dbOps.cleanupOldRequests(0);
+			dbOps.checkpointWal();
+			return { dbOps, path };
+		}
+
+		it("vacuums when the disk has twice the live data free", () => {
+			const { dbOps, path } = databaseWithFreedPages();
+			try {
+				const sizeBefore = statSync(path).size;
+				const result = dbOps.compact();
+				expect(result.vacuumed).toBe(true);
+				expect(statSync(path).size).toBeLessThan(sizeBefore);
+			} finally {
+				dbOps.close();
+			}
+		});
+
+		it("skips VACUUM and leaves the file when the disk is short", () => {
+			const { dbOps, path } = databaseWithFreedPages();
+			try {
+				const sizeBefore = statSync(path).size;
+				const result = dbOps.compact(0);
+				expect(result).toMatchObject({ vacuumed: false, freeBytes: 0 });
+				expect(result.requiredBytes).toBeGreaterThan(0);
+				expect(statSync(path).size).toBe(sizeBefore);
+			} finally {
+				dbOps.close();
+			}
+		});
 	});
 });

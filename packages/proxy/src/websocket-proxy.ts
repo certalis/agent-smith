@@ -307,6 +307,7 @@ function startActiveTurn(
 		providerName: session.providerName,
 		retryAttempt: 0,
 		failoverAttempts: Math.max(0, session.nextAccountIndex - 1),
+		storePayload: session.requestContext.runtime.storeRequestPayloads,
 	};
 
 	session.activeTurn = {

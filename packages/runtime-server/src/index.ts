@@ -13,8 +13,8 @@ import { bootstrapRuntime, logInitialAccountStatus } from "./bootstrap-runtime";
 import { loadDashboardAssets, resetDashboardAssets } from "./dashboard-assets";
 import { DeploymentDrain } from "./deployment-drain";
 import { createServerFetchHandler } from "./fetch-handler";
+import { startRetentionMaintenance } from "./retention-maintenance";
 import { createStartupBanner } from "./startup-banner";
-import { runStartupMaintenance } from "./startup-maintenance";
 
 // Bun honors this listener option for Unix sockets, but its bundled types omit it.
 declare module "bun" {
@@ -219,7 +219,7 @@ export default function startServer(
 		runtimeConfig,
 	} = bootstrapRuntime(port, serverLog, drain.control);
 
-	stopRetentionJob = runStartupMaintenance(config, dbOps);
+	stopRetentionJob = startRetentionMaintenance(config, dbOps);
 
 	const fetchHandler = createServerFetchHandler({
 		apiRouter,

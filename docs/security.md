@@ -311,7 +311,7 @@ The worker reads the bodies in memory to take the response-chain IDs and usage, 
 1. **Plaintext Metadata**: Request metadata payloads are JSON in SQLite and not encrypted
 2. **Database File Access**: SQLite database file can be read by any process with file system access
 3. **No Data Sanitization**: Sensitive patterns (API keys, passwords, PII) are not redacted
-4. **Unlimited Retention**: No automatic cleanup of old request payloads
+4. **Retention**: Request metadata payloads are kept `data_retention_days` (default 7, `0` stores none) and deleted hourly
 
 ### PII Considerations
 
@@ -323,7 +323,7 @@ The worker reads the bodies in memory to take the response-chain IDs and usage, 
 
 #### Current State
 - No automatic log rotation or cleanup
-- Request metadata payloads (no bodies) stored indefinitely in SQLite database
+- Request metadata payloads (no bodies) stored in SQLite for `data_retention_days`, request rows for `request_retention_days`
 - File logs written to disk without rotation
 
 #### Recommended Practices

@@ -292,10 +292,13 @@ The most important normal write paths are:
 
 ## Maintenance
 
-The runtime performs one-shot startup maintenance:
+At startup the runtime:
 
-- cleanup of old requests/payloads based on retention settings
-- database compaction
+- deletes old requests/payloads based on retention settings
+- compacts the database, unless the disk lacks the free space `VACUUM` needs (up to twice the live data)
+
+While it runs, it deletes expired requests/payloads every hour and then truncates the WAL. Deleted pages are reused,
+so the file stops growing without a `VACUUM`. A payload retention of `0` stores no payloads at all.
 
 Manual maintenance is also available through the HTTP API and dashboard:
 
