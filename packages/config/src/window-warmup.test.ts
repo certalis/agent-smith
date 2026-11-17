@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Config } from "./index";
@@ -59,6 +59,41 @@ describe("window warm-up configuration", () => {
 			).toThrow("Invalid team routing field: window_warmup");
 		}
 		expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+	});
+
+	it("survives a restart once switched on", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
+		tempDirs.push(directory);
+		const path = join(directory, "config.json");
+		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+
+		new Config(path).setTeamRouting({
+			enabled: true,
+			window_warmup: { enabled: true },
+		});
+
+		expect(new Config(path).getTeamRouting().windowWarmup.enabled).toBe(true);
+	});
+
+	it("refuses the change and keeps the running policy when the file cannot be written", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
+		tempDirs.push(directory);
+		const path = join(directory, "config.json");
+		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+		const config = new Config(path);
+		chmodSync(directory, 0o500);
+
+		try {
+			expect(() =>
+				config.setTeamRouting({
+					enabled: true,
+					window_warmup: { enabled: true },
+				}),
+			).toThrow();
+			expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+		} finally {
+			chmodSync(directory, 0o700);
+		}
 	});
 });
 

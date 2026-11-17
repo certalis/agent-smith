@@ -929,13 +929,7 @@ export class Config extends EventEmitter {
 				...oldValue.weekly_max_usage_by_email,
 			};
 		}
-		this.data.team_routing = sanitized;
-		this.saveConfig();
-		this.emit("change", {
-			key: "team_routing",
-			oldValue,
-			newValue: sanitized,
-		});
+		this.persistStrictly("team_routing", sanitized);
 	}
 
 	/** Persist a consented seat without changing routing enablement or limits. */
