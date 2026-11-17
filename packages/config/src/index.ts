@@ -211,10 +211,22 @@ function normalizeEnrollmentEmail(value: unknown): string | undefined {
 	return email.length <= 254 && patterns.email.test(email) ? email : undefined;
 }
 
+/** A domain rule replaces the whole local part, never a domain label or suffix. */
+function normalizeEnrollmentRule(value: unknown): string | undefined {
+	const rule = normalizeEnrollmentEmail(value);
+	if (!rule?.includes("*")) return rule;
+	if (!rule.startsWith("*@")) return undefined;
+	const labels = rule.slice(2).split(".");
+	const label = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+	return labels.length >= 2 && labels.every((part) => label.test(part))
+		? rule
+		: undefined;
+}
+
 function sanitizeEnrollmentEmails(value: unknown): string[] | undefined {
 	if (!Array.isArray(value)) return undefined;
 	const emails = value
-		.map(normalizeEnrollmentEmail)
+		.map(normalizeEnrollmentRule)
 		.filter((email): email is string => email !== undefined);
 	return [...new Set(emails)].slice(0, MAX_ENROLLMENT_EMAILS);
 }
@@ -939,12 +951,21 @@ export class Config extends EventEmitter {
 		return [...(this.data.enrollment_emails ?? [])];
 	}
 
-	/** Replaces the stable-link email list live; one invalid entry refuses the whole list. */
+	/** Admission only: OAuth must still prove this exact email, not just its domain. */
+	isEnrollmentEmailAllowed(value: unknown): boolean {
+		const email = normalizeEnrollmentEmail(value);
+		if (!email || email.includes("*")) return false;
+		const rules = this.data.enrollment_emails ?? [];
+		const domainRule = `*${email.slice(email.indexOf("@"))}`;
+		return rules.includes(email) || rules.includes(domainRule);
+	}
+
+	/** Replaces stable-link email/domain rules live; one invalid rule refuses the whole list. */
 	setEnrollmentEmails(emails: readonly string[]): string[] {
-		const normalized = emails.map(normalizeEnrollmentEmail);
+		const normalized = emails.map(normalizeEnrollmentRule);
 		if (normalized.some((email) => email === undefined)) {
 			throw new ValidationError(
-				"Invalid enrollment email",
+				"Invalid enrollment email or exact-domain rule (use *@example.com)",
 				"enrollment_emails",
 			);
 		}

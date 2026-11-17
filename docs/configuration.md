@@ -119,7 +119,7 @@ The configuration file is stored at:
 | `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
 | `block_when_all_full` | boolean | `true` | When every account is full, refuse every request with a 429 until the soonest reset. `false` lets one request a minute through to revalidate, and that request may spend extra usage. |
 | `alerts` | object | every channel off | Where seat alerts go; see [Alerts](#alerts). |
-| `enrollment_emails` | string[] | `[]` | Emails the stable `/pool-enroll` link admits (lowercased, at most 200). Edit it through `POST /api/enrollment-emails`, which applies live. |
+| `enrollment_emails` | string[] | `[]` | Addresses or exact-domain rules (`*@example.test`) the stable `/pool-enroll` link admits (lowercased, at most 200 entries). Domain rules do not include subdomains. Edit through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
 | `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
 | `client` | object | absent | The endpoint and forwarding key for wrappers installed on this machine. It does not configure providers or change the server's pool. |

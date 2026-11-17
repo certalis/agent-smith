@@ -129,9 +129,9 @@ disabled, issuing one returns 400.
 | Method / path | Authorization | Body / result |
 |---|---|---|
 | `POST /api/enrollment-invitations` | Existing admin key | Optional `name`, `email` (expected Claude email), `contactEmail`, `slackUserId`; returns `url`, `expiresAt` |
-| `POST /api/enrollment-emails` | Existing admin key | Optional `add`, `remove` email lists; returns the whole `emails` list. `{}` only reads it |
+| `POST /api/enrollment-emails` | Existing admin key | Optional `add`, `remove` address or exact-domain rule lists; returns the whole `emails` list. `{}` only reads it |
 | `GET /pool-enroll` | Configured Host | Static page: the stable link; does not consume an invite |
-| `POST /pool-enroll/request` | Exact Host/Origin + listed email | `{email}` → invitation `token`, normalized `email`, `expiresAt`; 403 when the email is not listed |
+| `POST /pool-enroll/request` | Exact Host/Origin + allowed email | `{email}` → invitation `token`, normalized `email`, `expiresAt`; 403 when no address/domain rule matches |
 | `POST /pool-enroll/start` | Exact Host/Origin + invitation | `{token}` → `token`, `authUrl`, `expiresAt` |
 | `POST /pool-enroll/verify` | Exact Host/Origin + login capability | `{token, code}` → new `token`, authenticated `email`, `expiresAt`; no account saved |
 | `POST /pool-enroll/confirm` | Exact Host/Origin + verified capability | `{token, consent: true}` → `connected: true`, seat-specific removal `token`, `expiresAt` |
@@ -140,7 +140,7 @@ disabled, issuing one returns 400.
 | `POST /pool-enroll/reset` | Exact Host/Origin + browser session cookie | `{}` → `reset: true`; forgets this browser's flow without disconnecting a saved subscription |
 
 **Stable link.** `/pool-enroll` without a fragment asks for an email. When that
-email is on `enrollment_emails`, it returns a 10-minute invitation bound to it: the
+email matches `enrollment_emails`, it returns a 10-minute invitation bound to it: the
 seat is named after the email's local part, the email becomes its reminder contact,
 and verify refuses any Claude account whose email differs. The typed email only
 selects the invitation; the Claude sign-in proves it. If a saved contact email or
@@ -150,9 +150,16 @@ Confirmation updates that same account's credentials, preserving its ID, usage,
 quota, settings and allowlist membership. Only pauses caused by a rejected OAuth
 refresh or missing refresh token are cleared. Manual pauses, other errors and
 operator exclusions remain; the success page explains when the account is still
-paused or outside the pool. A different identity cannot replace it. The list is
-edited live and persisted; removing an email stops
-new requests at once, without touching seats already connected. It is POST-only
+paused or outside the pool. A different identity cannot replace it.
+
+The list accepts individual addresses and exact-domain rules. For example,
+`{"add":["*@example.test"]}` on `POST /api/enrollment-emails` admits every address
+at `example.test`, but not `sub.example.test` or lookalike domains. Rules are
+trimmed and lowercased; wildcards are allowed only as the whole local part. The
+Claude sign-in must still prove the exact requested email, not merely the domain.
+The list is edited live and persisted; removing a matching rule stops new
+invitations at once, without removing connected seats or revoking already-issued
+invitations/capabilities (which expire normally). It is POST-only
 because the proxy key may read every `GET /api/*` route.
 
 JSON POST bodies are streaming-capped at 8 KiB. Issuing `{}` is supported: the

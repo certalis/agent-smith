@@ -250,7 +250,7 @@ export class EnrollmentHandlers {
 	}
 
 	/**
-	 * Stable-link entry: a listed email selects an invitation; it proves nothing.
+	 * Stable-link entry: an email/domain rule admits an invitation; it proves nothing.
 	 * verify still requires the Claude sign-in to return this same email.
 	 */
 	private request(body: Record<string, unknown>): Response {
@@ -259,10 +259,10 @@ export class EnrollmentHandlers {
 			throw new EnrollmentError(400, "Unknown request field");
 		const email =
 			typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-		if (!this.context.config.getEnrollmentEmails().includes(email))
+		if (!this.context.config.isEnrollmentEmailAllowed(email))
 			throw new EnrollmentError(
 				403,
-				"This email is not on the list. Ask the operator to add it.",
+				"This email is not allowed. Ask the operator to add its address or domain.",
 			);
 		const name = email
 			.slice(0, email.indexOf("@"))
