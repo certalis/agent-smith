@@ -7,14 +7,13 @@ import {
 	type AccountQuotaState,
 	isOpenQuotaWindow,
 } from "@agent-smith/types";
-import { isQuotaEligible } from "./handlers/account-selector";
+import { isServableSeat } from "./handlers/account-selector";
 import type { OutsideSpendTracker } from "./outside-spend";
 import {
 	type QuotaStore,
 	recordSeatQuota,
 	type SeatTokenReader,
 } from "./quota-probe";
-import { isAllowlisted } from "./team-router";
 
 const log = new Logger("WindowWarmup");
 
@@ -115,16 +114,13 @@ export class WindowWarmup {
 		return (
 			provider.startQuotaWindow !== undefined &&
 			provider.supportsQuotaProbe(account) &&
-			!account.paused &&
-			isAllowlisted(account, runtime.teamRouting) &&
 			!fiveHourWindowRuns(provider, account, now) &&
-			isQuotaEligible(
+			isServableSeat(
 				provider,
 				account,
-				runtime.quotaThreshold,
-				now,
 				runtime.teamRouting.windowWarmup.model ?? undefined,
 				{ runtime, dbOps: this.store },
+				now,
 			)
 		);
 	}

@@ -23,6 +23,7 @@ const routing: TeamRoutingConfig = {
 		"full",
 		"failing",
 		"relayed",
+		"cooling",
 	],
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
@@ -127,9 +128,10 @@ const fleet = () => [
 	}),
 	seat("failing"),
 	seat("relayed", { base_url: "https://relay.example" }),
+	seat("cooling", { rate_limited_until: NOW + HOUR }),
 ];
 
-test("sends one request per idle, direct, allowlisted, unpaused seat under its cap", async () => {
+test("sends one request per idle, direct, allowlisted, unpaused, uncooled seat under its cap", async () => {
 	const { sent, stored, subject } = warmup(fleet());
 
 	await subject.run();
