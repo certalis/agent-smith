@@ -140,6 +140,7 @@ describe("local client routing", () => {
 			`#!/bin/sh
 printf "%s|%s|%s|%s|%s\\n" "$ANTHROPIC_BASE_URL" "$ANTHROPIC_API_KEY" "\${ANTHROPIC_AUTH_TOKEN-unset}" "$AGENT_SMITH_ADMIN_KEY" "$AGENT_SMITH_PROXY_KEY"
 printf "%s\\n" "$@"
+printf 'headers=%s\\n' "\${ANTHROPIC_CUSTOM_HEADERS-unset}"
 `,
 			{ mode: 0o700 },
 		);
@@ -156,6 +157,7 @@ printf "%s\\n" "$@"
 			port: 8123,
 			baseUrl: "http://127.0.0.1:18181",
 			proxyKeyFile,
+			usageLabel: "build-runner",
 		});
 
 		const environment = {
@@ -165,6 +167,7 @@ printf "%s\\n" "$@"
 			ANTHROPIC_AUTH_TOKEN: "synthetic-inherited-auth-token",
 			AGENT_SMITH_ADMIN_KEY: "synthetic-admin-key",
 			AGENT_SMITH_PROXY_KEY: "synthetic-proxy-key",
+			ANTHROPIC_CUSTOM_HEADERS: "x-client: preserved",
 		};
 		const claude = Bun.spawnSync(
 			[join(directory, "bin", "claude"), "hello", "two words"],
@@ -175,12 +178,15 @@ printf "%s\\n" "$@"
 		});
 		expect(claude.exitCode).toBe(0);
 		expect(claude.stdout.toString()).toBe(
-			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key|unset||\nhello\ntwo words\n",
+			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key|unset||\nhello\ntwo words\nheaders=x-client: preserved\nx-agent-smith-caller: build-runner\n",
 		);
 		expect(codex.stdout.toString()).toContain("client-forwarding-key|");
 		expect(codex.stdout.toString()).toContain(" exec\n");
 		expect(codex.stdout.toString()).toContain(
 			'model_providers.agent_smith.base_url="http://127.0.0.1:18181/v1/codex"',
+		);
+		expect(codex.stdout.toString()).toContain(
+			'model_providers.agent_smith.http_headers.x-agent-smith-caller="build-runner"',
 		);
 		expect(
 			readFileSync(join(directory, "bin", "claude"), "utf8"),
@@ -205,6 +211,7 @@ printf "%s\\n" "$@"
 			baseUrl: "http://127.0.0.1:18181",
 			proxyKeyFile,
 			keepClaudeLogin: true,
+			usageLabel: "build-runner",
 		});
 
 		const run = (customHeaders: Record<string, string>) =>
@@ -217,11 +224,33 @@ printf "%s\\n" "$@"
 				},
 			}).stdout.toString();
 		expect(run({})).toBe(
-			"http://127.0.0.1:18181/v1/claude-code|unset|x-api-key: client-forwarding-key\n",
+			"http://127.0.0.1:18181/v1/claude-code|unset|x-api-key: client-forwarding-key\nx-agent-smith-caller: build-runner\n",
 		);
-		expect(run({ ANTHROPIC_CUSTOM_HEADERS: "x-team: certalis" })).toBe(
-			"http://127.0.0.1:18181/v1/claude-code|unset|x-team: certalis\nx-api-key: client-forwarding-key\n",
+		expect(run({ ANTHROPIC_CUSTOM_HEADERS: "x-team: preserved" })).toBe(
+			"http://127.0.0.1:18181/v1/claude-code|unset|x-team: preserved\nx-api-key: client-forwarding-key\nx-agent-smith-caller: build-runner\n",
 		);
+	});
+
+	it("refuses unsafe direct usage labels before writing wrappers", async () => {
+		for (const usageLabel of [
+			"",
+			"team space",
+			"bad\nheader: injected",
+			'bad"quote',
+			"x".repeat(65),
+		]) {
+			const directory = tempDir();
+			const binDir = join(directory, "bin");
+			await expect(
+				installClientWrappers({
+					binDir,
+					claudePath: join(directory, "real-claude"),
+					port: 8123,
+					usageLabel,
+				}),
+			).rejects.toThrow(/usage.label/i);
+			expect(existsSync(binDir)).toBe(false);
+		}
 	});
 
 	it("gives Codex its own local Responses endpoint and preserves the user's arguments", async () => {

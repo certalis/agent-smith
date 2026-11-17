@@ -9,6 +9,11 @@ import {
 	prepareRequestBody,
 	type WebSocketProxyData,
 } from "@agent-smith/proxy";
+import {
+	CALLER_LABEL_HEADER,
+	CALLER_LABEL_PREFIX,
+	isCallerLabel,
+} from "@agent-smith/types";
 import { serveDashboardRoute } from "./dashboard-assets";
 import {
 	authenticateRequest,
@@ -91,9 +96,12 @@ export function createServerFetchHandler({
 			url.pathname.startsWith("/v1/") ||
 			url.pathname.startsWith("/tc-acct/");
 		if (isProviderRoute) {
+			const label = req.headers.get(CALLER_LABEL_HEADER);
 			const requestContext = {
 				...proxyContext,
-				callerId: authentication?.callerId ?? null,
+				callerId:
+					authentication?.callerId ??
+					(isCallerLabel(label) ? `${CALLER_LABEL_PREFIX}${label}` : null),
 			};
 			if (isDeploymentDraining()) {
 				return errorResponse(

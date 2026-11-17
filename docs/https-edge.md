@@ -156,14 +156,43 @@ Device keys allow only health, Messages, token counting and Responses. They
 cannot read management data or change accounts, including the private usage
 report. This does not add per-device fairness or spending quotas.
 
-For separate service totals, give that service its own device key and caller ID;
-do not label a key that teammates also share as one service. The private dashboard's
+For verified service totals, give that service its own device key and caller ID;
+do not map a key that teammates also share to one service. The private dashboard's
 **User usage** page and [caller usage API](api-http.md#caller-token-usage-private-administrator-only)
 show input, output and cache-token totals by caller. Both require the admin key.
-Shared proxy/admin keys and unkeyed loopback requests are **Unattributed**; their
-history cannot be reliably split afterward. Attribution begins with the updated
-server and the distinct caller keys. Mapping an existing device key needs no
+Without a usage label, shared proxy/admin keys and unkeyed loopback requests are
+**Unattributed**; their history cannot be reliably split afterward. Attribution
+begins with the updated server and caller metadata. Mapping an existing device key needs no
 client restart; switching a service to a different key affects new client sessions.
+
+### Usage labels without new keys
+
+For internal statistics, keep the existing forwarding key and add the optional
+`X-Agent-Smith-Caller: build-runner` header to inference requests. With the shipped
+launchers, set `client.usage_label` to `build-runner` in the editable client JSON;
+both Claude Code and Codex add the header on each new client process. It works in
+both Claude login modes. The shipped
+[labeled service config](../examples/config/labeled-service-client.json) shows
+the optional setting; change its origin and point it at the existing key file.
+No new key, copied provider token or local proxy is needed.
+Services that launch clients themselves must explicitly pass the header through
+their own HTTP/client configuration; filtered child environments may discard a
+parent's custom-header variable. Authentication stays unchanged.
+
+Use 1–64 letters, digits, `_` or `-`. Missing, malformed and comma-combined duplicate
+headers are ignored without rejecting otherwise valid inference. Registered device
+ownership wins over a supplied label. Header-based totals are stored as
+`label:build-runner`, separately from a verified caller named `build-runner`, and
+shown as **Self-reported label** in the private report. Existing historical requests
+remain unattributed. The header is removed before provider forwarding and ordinary
+request-metadata storage.
+
+Anyone with pool access can claim another label, so use this only for statistics,
+not billing, permissions or quotas. Source IPs can be shared or change; the current
+HTTPS entrance intentionally discards forwarded-IP headers and connects through a
+Unix socket, so it does not claim origin-IP verification or produce IP warnings.
+MAC addresses are not observable over the internet. No key change or IP check is
+required for usage labels.
 
 ## Attach the narrow HTTPS entrance to an existing service
 

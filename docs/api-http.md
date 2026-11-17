@@ -125,16 +125,21 @@ entrance. Normal Origin checks apply and responses use `Cache-Control: no-store`
 
 `range` accepts `1h`, `6h`, `24h` (default), `7d` or `30d`. Optional `model` and
 `caller` select exact values. The response contains inclusive `startMs`/`endMs`,
-`rows` grouped by authenticated `callerId`, and `models` observed over that time
+`rows` grouped by `callerId`, and `models` observed over that time
 window. Each row gives `requests`, `pendingRequests`, `unreportedRequests`,
 `inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`
 and `totalTokens`. Pending requests do not contribute tokens yet; completed rows
 missing a total are counted under `unreportedRequests`, with known token parts
 included in totals. Interrupted replies may still have incomplete usage.
 
-A null `callerId` means unattributed old/shared-key access, not the pooled
-subscription owner. Caller names come only from the protected device registry,
-never client-supplied headers, body fields, sessions or provider account names.
+A null `callerId` means unattributed old or unlabeled shared-key access, not the
+pooled subscription owner. Plain caller IDs come from the protected device registry.
+An accepted inference request without a known device owner may instead supply
+`X-Agent-Smith-Caller`; its ID is `label:<value>`, explicitly self-reported and
+separate from verified names. Filter it with `caller=label%3Abuild-runner`.
+Labels cannot override device ownership or authentication. Body fields, sessions
+and provider account names never select caller ownership. See
+[usage-label limits](https-edge.md#usage-labels-without-new-keys).
 The report returns no keys, digests, prompts or subscription identities; ordinary
 request summaries and payloads do not gain caller identity fields. Existing
 request retention also applies to these totals. No spending cap or provider quota

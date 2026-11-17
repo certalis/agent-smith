@@ -111,11 +111,16 @@ erDiagram
 
 ### Caller usage
 
-`requests.caller_id` is a nullable, server-authenticated consumer ID, separate
+`requests.caller_id` is a nullable consumer ID, separate
 from `account_used` (the subscription that served the request). It is captured
 on insert and is not reassigned when completion data arrives. An additive,
 idempotent migration leaves existing rows null. A rollback can ignore the extra
 column; no second database or historical identity backfill is created.
+
+Plain IDs are authenticated device owners. `label:<value>` IDs are optional
+self-reported usage labels; the colon is forbidden in registry owner names, so
+the two cannot collide. A known device owner takes priority over a header label.
+Labels use the same column and retention, with no additional schema or IP store.
 
 Only the [private admin report](api-http.md#caller-token-usage-private-administrator-only)
 groups token totals by this field. Generic request serializers omit it. Counts

@@ -5,6 +5,7 @@ import {
 	type ServerResponse,
 } from "node:http";
 import { isAbsolute } from "node:path";
+import { CALLER_LABEL_HEADER } from "@agent-smith/types";
 import { isInferenceRoute } from "./inference-routes";
 
 export type ProxyEdgeOptions = {
@@ -31,6 +32,7 @@ const REQUEST_HEADERS = [
 	"x-client-request-id",
 	"x-stainless-retry-count",
 	"user-agent",
+	CALLER_LABEL_HEADER,
 ];
 const RESPONSE_HEADERS = [
 	"content-type",

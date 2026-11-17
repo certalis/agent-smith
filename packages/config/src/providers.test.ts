@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "./index";
+import { Config, readClientRouting } from "./index";
 
 const tempDirs: string[] = [];
 
@@ -52,6 +52,7 @@ describe("provider configuration", () => {
 				base_url: "http://127.0.0.1:18181/",
 				proxy_key_file: "/tmp/agent-smith.key",
 				keep_claude_login: true,
+				usage_label: "build-runner",
 			},
 		});
 
@@ -60,7 +61,33 @@ describe("provider configuration", () => {
 			baseUrl: "http://127.0.0.1:18181",
 			proxyKeyFile: "/tmp/agent-smith.key",
 			keepClaudeLogin: true,
+			usageLabel: "build-runner",
 		});
+	});
+
+	it("ignores malformed optional usage labels without blocking client routing or its off switch", () => {
+		const directory = mkdtempSync(join(tmpdir(), "agent-smith-label-"));
+		tempDirs.push(directory);
+		const path = join(directory, "config.json");
+		for (const label of [
+			"",
+			"two words",
+			"one,two",
+			"bad\nheader",
+			"x".repeat(65),
+			42,
+		]) {
+			writeFileSync(
+				path,
+				JSON.stringify({ client: { enabled: true, usage_label: label } }),
+			);
+			expect(readClientRouting(path)).toEqual({ enabled: true });
+			writeFileSync(
+				path,
+				JSON.stringify({ client: { enabled: false, usage_label: label } }),
+			);
+			expect(readClientRouting(path)).toEqual({ enabled: false });
+		}
 	});
 
 	it("does not retain a raw forwarding key from client config", () => {

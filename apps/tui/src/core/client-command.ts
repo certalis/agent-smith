@@ -53,10 +53,13 @@ export async function runClientCommand(argv: string[]): Promise<void> {
 		enabled: client.enabled,
 		installed,
 		...(client.baseUrl && { baseUrl: client.baseUrl }),
+		...(client.usageLabel && { usageLabel: client.usageLabel }),
 	};
 	if (values.raw) console.log(JSON.stringify(status));
 	else {
 		console.log(`Shared pool: ${status.enabled ? "on" : "off"}`);
+		if (status.usageLabel)
+			console.log(`Usage label: ${status.usageLabel} (self-reported)`);
 		console.log(
 			`Launchers: ${installed ? "installed" : "not configured; use client on to set up"}`,
 		);

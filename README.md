@@ -262,10 +262,15 @@ share that organisation's limits, so adding them adds no capacity.
 The private dashboard's **User usage** page separately shows tokens consumed
 by each user or service, independent of whose subscription served the request.
 Unlock management with the admin key, then filter by time range or model.
-Identify each caller through its [device key](docs/https-edge.md#authorize-devices);
-several devices can share one caller ID. Old requests and shared-key access remain
-**Unattributed**. Totals cover retained requests through this pool, not usage
-made elsewhere or a subscription's remaining credits.
+Identify callers through their [device keys](docs/https-edge.md#authorize-devices),
+or set optional `client.usage_label` to count a service with its existing key.
+The launchers send `X-Agent-Smith-Caller`; other services can add that header in
+their own HTTP configuration. Header labels are shown as **Self-reported label**,
+not verified identities. A known device owner takes priority, and a label cannot
+grant access or change quota/routing rules. No new key is needed for labeling.
+Old requests and unlabeled shared-key access remain **Unattributed**. Totals cover
+retained requests through this pool, not usage made elsewhere or a subscription's
+remaining credits. See [usage labels](docs/https-edge.md#usage-labels-without-new-keys).
 
 ## How failover works
 

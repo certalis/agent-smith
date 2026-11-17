@@ -46,6 +46,7 @@ describe("WebSocket proxy behavior", () => {
 					"Sec-WebSocket-Extensions": "permessage-deflate",
 					"chatgpt-account-id": "acct_123",
 					"x-client-request-id": "req_123",
+					"x-agent-smith-caller": "synthetic-service",
 					"x-codex-turn-metadata": '{"turn":1}',
 					session_id: "session_123",
 					"openai-beta": "responses=experimental",
@@ -96,6 +97,7 @@ describe("WebSocket proxy behavior", () => {
 		expect(capture.headers["openai-beta"]).toBe("responses=experimental");
 		expect(capture.headers["chatgpt-account-id"]).toBe("acct_123");
 		expect(capture.headers["x-client-request-id"]).toBe("req_123");
+		expect(capture.headers["x-agent-smith-caller"]).toBeUndefined();
 		expect(capture.headers["x-codex-turn-metadata"]).toBe('{"turn":1}');
 		expect(capture.headers.session_id).toBe("session_123");
 		expect(capture.headers["sec-websocket-extensions"]).toContain(

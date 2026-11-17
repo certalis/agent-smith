@@ -1,4 +1,8 @@
-import { isTimeRange, type TimeRange } from "@agent-smith/types";
+import {
+	CALLER_LABEL_PREFIX,
+	isTimeRange,
+	type TimeRange,
+} from "@agent-smith/types";
 import { TIME_RANGE_OPTIONS } from "@agent-smith/ui";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
@@ -171,7 +175,14 @@ export function CallerUsageTab() {
 											scope="row"
 											className="px-3 py-4 text-left font-medium whitespace-nowrap"
 										>
-											{row.callerId ?? "Unattributed"}
+											{row.callerId?.startsWith(CALLER_LABEL_PREFIX)
+												? row.callerId.slice(CALLER_LABEL_PREFIX.length)
+												: (row.callerId ?? "Unattributed")}
+											{row.callerId?.startsWith(CALLER_LABEL_PREFIX) && (
+												<p className="mt-1 font-normal text-xs text-muted-foreground">
+													Self-reported label
+												</p>
+											)}
 											{row.callerId === null && (
 												<p className="mt-1 font-normal text-xs text-muted-foreground">
 													Older requests or shared access

@@ -47,7 +47,7 @@ exit "\${FAKE_EXIT_CODE:-0}"
 			keep_claude_login: false,
 		},
 	};
-	const save = (data = initial) =>
+	const save = (data: Record<string, unknown> = initial) =>
 		writeFileSync(configPath, JSON.stringify(data), { mode: 0o600 });
 	save();
 	const env = {
@@ -184,6 +184,58 @@ describe("client commands", () => {
 		expect(f.launch("claude").stdout.toString()).toContain(
 			"api=synthetic-forwarding-key",
 		);
+	});
+
+	it("reads usage-label edits for both clients without changing their access key or native mode", () => {
+		for (const keepClaudeLogin of [false, true]) {
+			const f = fixture();
+			const saveLabel = (usageLabel: string) =>
+				f.save({
+					...f.initial,
+					client: {
+						...f.initial.client,
+						enabled: true,
+						keep_claude_login: keepClaudeLogin,
+						usage_label: usageLabel,
+					},
+				});
+			saveLabel("build-runner");
+			f.run("on");
+			const customHeaders = {
+				ANTHROPIC_CUSTOM_HEADERS: "x-client: preserved",
+			};
+			for (const label of ["build-runner", "nightly_2"]) {
+				saveLabel(label);
+				const claude = f.launch("claude", customHeaders);
+				expect(claude.exitCode).toBe(0);
+				const output = claude.stdout.toString();
+				expect(output).toContain("headers=x-client: preserved\n");
+				expect(output).toContain(`x-agent-smith-caller: ${label}\n`);
+				expect(output).toContain(
+					keepClaudeLogin
+						? "x-api-key: synthetic-forwarding-key\n"
+						: "api=synthetic-forwarding-key\n",
+				);
+				const codex = f.launch("codex");
+				expect(codex.exitCode).toBe(0);
+				expect(codex.stdout.toString()).toContain(
+					`arg=model_providers.agent_smith.http_headers.x-agent-smith-caller="${label}"\n`,
+				);
+				expect(codex.stdout.toString()).toContain(
+					"proxy=synthetic-forwarding-key\n",
+				);
+			}
+			f.run("off");
+			const native = f.launch("claude", customHeaders);
+			expect(native.exitCode).toBe(0);
+			expect(native.stdout.toString()).toContain(
+				"headers=x-client: preserved\n",
+			);
+			expect(native.stdout.toString()).not.toContain("x-agent-smith-caller");
+			expect(f.launch("codex").stdout.toString()).not.toContain(
+				"x-agent-smith-caller",
+			);
+		}
 	});
 
 	it("refuses a missing or unsafe forwarding key before enabling the pool", () => {

@@ -1,0 +1,8 @@
+{
+	"client": {
+		"enabled": false,
+		"base_url": "https://pool.example.com",
+		"proxy_key_file": "~/.config/agent-smith/existing-proxy.key",
+		"usage_label": "build-runner"
+	}
+}

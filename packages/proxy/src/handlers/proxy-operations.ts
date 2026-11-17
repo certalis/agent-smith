@@ -1,6 +1,10 @@
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import type { Account, RequestMeta } from "@agent-smith/types";
+import {
+	type Account,
+	CALLER_LABEL_HEADER,
+	type RequestMeta,
+} from "@agent-smith/types";
 import { forwardToClient } from "../response-handler";
 import {
 	type MessageThreadRequest,
@@ -103,6 +107,7 @@ function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 			input.req.headers,
 			requestAccount,
 		);
+		headers.delete(CALLER_LABEL_HEADER);
 		const upstreamRequestStartedAt = Date.now();
 		const response = await makeProxyRequest(
 			targetUrl,

@@ -2,7 +2,12 @@ import {
 	buildAnalyticsQuery,
 	type DatabaseOperations,
 } from "@agent-smith/database";
-import { type CallerUsageResponse, isTimeRange } from "@agent-smith/types";
+import {
+	CALLER_LABEL_PREFIX,
+	type CallerUsageResponse,
+	isCallerLabel,
+	isTimeRange,
+} from "@agent-smith/types";
 
 /** Private report; the runtime requires an admin key even for this GET. */
 export function createCallerUsageHandler(dbOps: DatabaseOperations) {
@@ -13,7 +18,12 @@ export function createCallerUsageHandler(dbOps: DatabaseOperations) {
 		if (
 			!isTimeRange(range) ||
 			(model !== undefined && (!model.trim() || model.length > 200)) ||
-			(callerId !== undefined && !/^[-a-zA-Z0-9_]{1,64}$/.test(callerId)) ||
+			(callerId !== undefined &&
+				!isCallerLabel(
+					callerId.startsWith(CALLER_LABEL_PREFIX)
+						? callerId.slice(CALLER_LABEL_PREFIX.length)
+						: callerId,
+				)) ||
 			[...params.keys()].some(
 				(key) =>
 					!["range", "model", "caller"].includes(key) ||

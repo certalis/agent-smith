@@ -138,6 +138,14 @@ shared-pool use. The launchers read it each time Claude Code or Codex starts:
 - `proxy_key_file`: an absolute path, or `~/` path, to an owner-only file
   containing the forwarding key. The key lets Claude Code and Codex send
   requests through the proxy but cannot change accounts or settings.
+- `usage_label`: optional name for internal usage statistics, for example
+  `build-runner`. Use 1–64 letters, digits, `_` or `-`; malformed values are
+  ignored like other optional client settings. Enabled launchers send it as
+  `X-Agent-Smith-Caller` for both Claude Code and Codex, with the existing key
+  unchanged. No label is added when routing is off. Edit it in this config and
+  restart the client session; no reinstall is needed. A known device owner
+  takes priority. Labels are self-reported metadata, not access permissions,
+  spending limits or proof of identity. Do not also add this header by hand.
 - `keep_claude_login`: `false` by default. Only literal `true` makes the Claude
   Code wrapper send the forwarding key as an `x-api-key` header through
   `ANTHROPIC_CUSTOM_HEADERS` instead of as `ANTHROPIC_API_KEY`. Claude Code then
@@ -159,9 +167,9 @@ Malformed or unreadable installed client settings stop the launcher rather than
 silently spending from a personal login. `install-client` remains available for
 explicit setup/removal, but is not required after toggles or origin changes.
 
-This is not B2 tenancy. One forwarding key does not identify individual callers
-or provide per-client fairness, so it is for the isolated B1 development path,
-not a team-wide distribution mechanism.
+This is not B2 tenancy. A shared forwarding key and usage labels do not prove
+individual caller identity or provide per-client fairness. Separate device keys
+remain the option for verified attribution and independent revocation.
 
 For SSH v1, point `base_url` at the local side of the SSH forward, for example
 `http://127.0.0.1:18181`. SSH is only the network path; it does not create a

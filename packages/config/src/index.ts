@@ -20,6 +20,7 @@ import {
 } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import {
+	isCallerLabel,
 	isFiniteNumber,
 	isLbStrategy,
 	isProviderWire,
@@ -125,6 +126,7 @@ export type ClientRoutingFileConfig = {
 	base_url?: string;
 	proxy_key_file?: string;
 	keep_claude_login?: boolean;
+	usage_label?: string;
 };
 
 export type ClientRoutingConfig = {
@@ -132,6 +134,7 @@ export type ClientRoutingConfig = {
 	baseUrl?: string;
 	proxyKeyFile?: string;
 	keepClaudeLogin?: boolean;
+	usageLabel?: string;
 };
 
 const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
@@ -403,6 +406,7 @@ function sanitizeClientRouting(
 	if (typeof value.keep_claude_login === "boolean") {
 		client.keep_claude_login = value.keep_claude_login;
 	}
+	if (isCallerLabel(value.usage_label)) client.usage_label = value.usage_label;
 	return Object.keys(client).length > 0 ? client : undefined;
 }
 
@@ -588,6 +592,7 @@ function clientRouting(
 		...(client?.base_url && { baseUrl: client.base_url }),
 		...(client?.proxy_key_file && { proxyKeyFile: client.proxy_key_file }),
 		...(client?.keep_claude_login === true && { keepClaudeLogin: true }),
+		...(client?.usage_label && { usageLabel: client.usage_label }),
 	};
 }
 
