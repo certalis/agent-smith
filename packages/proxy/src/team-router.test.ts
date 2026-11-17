@@ -10,6 +10,7 @@ const config: TeamRoutingConfig = {
 	admissionWaitMs: 30_000,
 	allowlistedAccountUuids: [],
 	distributionEnabled: true,
+	preferExpiringQuota: false,
 	enabled: true,
 	holdSeconds: 0,
 	maxUsage: 0.9,

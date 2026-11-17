@@ -24,6 +24,11 @@ import {
 	CODEX_OAUTH_TOKEN_URL,
 	CodexOAuthProvider,
 } from "./oauth";
+import {
+	consumeCodexResetCredit,
+	listCodexResetCredits,
+	readCodexResetQuota,
+} from "./reset-credits";
 
 const CODEX_CLIENT_VERSION = "0.118.0";
 const CODEX_USER_AGENT = `codex_cli_rs/${CODEX_CLIENT_VERSION} (Mac OS; arm64)`;
@@ -153,6 +158,42 @@ export class CodexProvider extends OpenAIProvider {
 	name: string = PROVIDER_NAME;
 	defaultBaseUrl: string = DEFAULT_BASE_URL;
 	wire = "openai-responses" as const;
+
+	supportsResetCredits(account: Account): boolean {
+		return (
+			account.auth_method === "oauth" &&
+			!!account.account_uuid &&
+			this.defaultBaseUrl.replace(/\/$/, "") ===
+				DEFAULT_BASE_URL.replace(/\/$/, "") &&
+			(account.base_url === null ||
+				account.base_url.replace(/\/$/, "") ===
+					DEFAULT_BASE_URL.replace(/\/$/, ""))
+		);
+	}
+
+	private requireResetAccount(account: Account): void {
+		if (!this.supportsResetCredits(account))
+			throw new Error("Reset credits require a direct Codex subscription");
+	}
+
+	async listResetCredits(account: Account, accessToken: string) {
+		this.requireResetAccount(account);
+		return listCodexResetCredits(account, accessToken);
+	}
+
+	async consumeResetCredit(
+		account: Account,
+		accessToken: string,
+		attempt: import("@agent-smith/types").ResetCreditRequest,
+	) {
+		this.requireResetAccount(account);
+		return consumeCodexResetCredit(account, accessToken, attempt);
+	}
+
+	async readResetQuota(account: Account, accessToken: string) {
+		this.requireResetAccount(account);
+		return readCodexResetQuota(account, accessToken);
+	}
 
 	getClientSessionId(headers: Headers): string | null {
 		return headers.get("session-id");

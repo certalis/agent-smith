@@ -10,10 +10,13 @@ import type {
 	AuthSessionStatusResponse,
 	CleanupResponse,
 	LogEvent,
+	ManualResetResult,
 	MutationResult,
 	OAuthProvider,
 	RequestPayload,
 	RequestSummary,
+	ResetCreditRequest,
+	ResetCredits,
 	RetentionGetResponse,
 	RetentionSetRequest,
 	StatsWithAccounts,
@@ -76,6 +79,25 @@ class API extends HttpClient {
 
 	async getAccounts(): Promise<AccountResponse[]> {
 		return this.getJson<AccountResponse[]>("/api/accounts");
+	}
+
+	getResetCredits(accountId: string): Promise<ResetCredits> {
+		return this.getJson(
+			`/api/accounts/${encodeURIComponent(accountId)}/reset-credits`,
+			this.withAdminKey({ retries: 0 }),
+		);
+	}
+
+	consumeResetCredit(
+		accountId: string,
+		attempt: ResetCreditRequest,
+	): Promise<ManualResetResult> {
+		// A lost reply must not trigger a new reset. The operator retries the same identity.
+		return this.postJson(
+			`/api/accounts/${encodeURIComponent(accountId)}/reset-credits/consume`,
+			{ ...attempt, confirmed: true },
+			{ retries: 0 },
+		);
 	}
 
 	async createApiKeyAccount(data: {

@@ -33,6 +33,7 @@ interface AccountListItemProps {
 	onPauseToggle: (account: AccountResponse) => void;
 	onRemove: (account: AccountResponse) => void;
 	onRename: (account: AccountResponse) => void;
+	onResetCredits: (account: AccountResponse) => void;
 }
 
 export function AccountListItem({
@@ -41,6 +42,7 @@ export function AccountListItem({
 	onPauseToggle,
 	onRemove,
 	onRename,
+	onResetCredits,
 }: AccountListItemProps) {
 	const presenter = new AccountPresenter(account);
 
@@ -95,6 +97,15 @@ export function AccountListItem({
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
+					{account.resetCreditsSupported && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => onResetCredits(account)}
+						>
+							Usage resets
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="sm"

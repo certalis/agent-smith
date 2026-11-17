@@ -392,6 +392,7 @@ export async function spawnServer(
 				...withoutProxyVariables(process.env),
 				AGENT_SMITH_ENROLLMENT_ORIGIN: undefined,
 				AGENT_SMITH_SCENARIO_CLAUDE_OAUTH_URL: undefined,
+				AGENT_SMITH_SCENARIO_CODEX_BACKEND_URL: undefined,
 				...options.environment,
 				AGENT_SMITH_STATE_DIR: options.standalone ? directory : undefined,
 				AGENT_SMITH_SCENARIO_POOL_ENTRY: options.standalone

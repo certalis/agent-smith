@@ -53,6 +53,50 @@ All API responses are in JSON format with `Content-Type: application/json`.
 
 ## Endpoints
 
+### Manual Codex usage resets (private, administrator only)
+
+These controls use limited reset grants saved on a direct Codex subscription.
+They do not purchase extra usage, transfer credits, reset the proxy's statistics
+or redeem anything automatically. Subscription-provider terms still apply.
+
+Both routes require the administrator key in `x-api-key`, including GET and
+direct loopback requests. Proxy/device credentials cannot inspect or use grants;
+the public inference/enrollment entrance never forwards either path. Existing
+Host and same-Origin management checks still apply.
+
+| Method / path | Body / response |
+|---|---|
+| `GET /api/accounts/:accountId/reset-credits` | `{availableCount, credits}`; each credit has `id`, `resetType`, `status`, `grantedAt`, `expiresAt`, `title`, `description`. Timestamps are provider-reported date strings; expiration can be `null`. Listing never consumes a reset. The provider may return fewer credit details than its total available count. |
+| `POST /api/accounts/:accountId/reset-credits/consume` | `{confirmed: true, creditId, requestId}`; choose a grant ID and generate one UUID `requestId` per logical attempt. Returns `{code, windowsReset, quotaRefreshed}`. |
+
+`code` is `reset`, `nothing_to_reset`, `no_credit` or `already_redeemed`.
+`windowsReset` is the number of allowances the provider says it reset, not a
+new usage reading. After `reset`/`already_redeemed`, the server re-reads Codex
+usage and saves only the returned windows. It never guesses zero usage or
+clears a pause, cooldown, exclusion, allowlist or other quota bucket. If the
+usage read fails, the acknowledged reset still returns its result with
+`quotaRefreshed: false`; existing limits remain until a later real observation.
+
+Missing accounts return 404; unsupported providers, API-key accounts or custom
+Codex upstreams return 400. Concurrent reset attempts on one account return 409.
+Unknown results, malformed provider data and provider/network failures return a
+sanitized 502. Such a failure may occur after a grant was consumed: retry the
+**same creditId and requestId**, never a fresh grant just to test. Idempotency is
+enforced by the provider's redemption ID, including after a proxy restart.
+
+In **Accounts → Usage resets**, the operator inspects expiration, chooses a
+grant, then confirms use for the named account. Buttons show pending work and
+the result. No automatic retry is sent. The tab retains a pending attempt in
+session storage across a reload/reopened dialog and blocks choosing a second
+grant until that attempt receives a known result. Closing the tab loses that
+local reminder; an operator must check the provider's history before starting
+another attempt. No provider token is returned or stored in the browser.
+
+Availability and affected allowances are provider-controlled. These backend
+paths follow the [official open-source Codex client](https://github.com/openai/codex/blob/main/codex-rs/backend-client/src/client/rate_limit_resets.rs)
+and can change independently of this proxy. Tests use only a fake backend;
+there is no claim that a real grant was redeemed during verification.
+
 ### Deployment drain (private, administrator only)
 
 `POST /api/drain` pauses new inference for two minutes; repeating it renews

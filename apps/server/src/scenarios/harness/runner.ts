@@ -343,6 +343,9 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 		...(scenario.claudeOAuth
 			? { AGENT_SMITH_SCENARIO_CLAUDE_OAUTH_URL: upstream.url }
 			: {}),
+		...(scenario.codexBackend
+			? { AGENT_SMITH_SCENARIO_CODEX_BACKEND_URL: upstream.url }
+			: {}),
 	};
 
 	try {

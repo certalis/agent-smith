@@ -92,6 +92,7 @@ function createProxyContext(
 			teamRouting: {
 				enabled: false,
 				distributionEnabled: true,
+				preferExpiringQuota: false,
 				allowlistedAccountUuids: [],
 				maxUsage: 0.9,
 				weeklyMaxUsage: 0.9,

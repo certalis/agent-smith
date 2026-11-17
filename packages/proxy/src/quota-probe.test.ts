@@ -7,6 +7,7 @@ import { QuotaProbe } from "./quota-probe";
 const config = {
 	enabled: true,
 	distributionEnabled: true,
+	preferExpiringQuota: false,
 	allowlistedAccountUuids: ["seat"],
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,

@@ -8,6 +8,7 @@ import {
 	DeleteConfirmationDialog,
 	RenameAccountDialog,
 } from "./accounts";
+import { ResetCreditsDialog } from "./accounts/ResetCreditsDialog";
 import { Button } from "./ui/button";
 import {
 	Card,
@@ -21,6 +22,9 @@ export function AccountsTab() {
 	const model = useAccountsPageModel();
 
 	const [adding, setAdding] = useState(false);
+	const [resetAccount, setResetAccount] = useState<AccountResponse | null>(
+		null,
+	);
 	const [confirmDelete, setConfirmDelete] = useState<{
 		show: boolean;
 		accountId: string;
@@ -135,10 +139,17 @@ export function AccountsTab() {
 						onPauseToggle={(account) => model.togglePause(account)}
 						onRemove={handleRemoveAccount}
 						onRename={(account) => setRenameDialog({ isOpen: true, account })}
+						onResetCredits={setResetAccount}
 					/>
 				</CardContent>
 			</Card>
 
+			{resetAccount && (
+				<ResetCreditsDialog
+					account={resetAccount}
+					onClose={() => setResetAccount(null)}
+				/>
+			)}
 			{confirmDelete.show && (
 				<DeleteConfirmationDialog
 					accountName={confirmDelete.accountName}

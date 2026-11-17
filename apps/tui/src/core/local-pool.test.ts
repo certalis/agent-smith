@@ -11,6 +11,7 @@ import {
 const routing: TeamRoutingConfig = {
 	enabled: true,
 	distributionEnabled: true,
+	preferExpiringQuota: false,
 	allowlistedAccountUuids: ["existing-seat"],
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,

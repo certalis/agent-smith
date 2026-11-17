@@ -4,6 +4,7 @@ import { TeamAdmission } from "./team-admission";
 const config = {
 	enabled: true,
 	distributionEnabled: true,
+	preferExpiringQuota: false,
 	allowlistedAccountUuids: ["acct-a"],
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,

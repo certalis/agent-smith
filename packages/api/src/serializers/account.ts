@@ -20,6 +20,10 @@ export function serializeAccount(
 		name: account.name,
 		provider: account.provider,
 		providerDisabled: !providerRegistry.getProvider(account.provider),
+		resetCreditsSupported:
+			providerRegistry
+				.getProvider(account.provider)
+				?.supportsResetCredits?.(account) ?? false,
 		auth_method: account.auth_method,
 		base_url: account.base_url,
 		requestCount: account.request_count,

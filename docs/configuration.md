@@ -78,6 +78,7 @@ The configuration file is stored at:
   "team_routing": {
     "enabled": false,
     "distribution_enabled": true,
+    "prefer_expiring_quota": false,
     "allowlisted_account_uuids": [],
     "max_usage": 0.9,
     "admission_cap": 5,
@@ -244,6 +245,7 @@ than `0.95`.
 |-------|---------|-------------|
 | `enabled` | `false` | Enables pooled-seat routing; only UUIDs on the allowlist are eligible. |
 | `distribution_enabled` | `true` | Disabling it drains existing conversation pins and stops placing new ones. |
+| `prefer_expiring_quota` | `false` | For new pinned chats, prefer fresh applicable 5h quota resetting within 1 hour or weekly quota within 24 hours, earliest reset first. Preserves priority tiers, existing pins, allowlist and hard caps. Requires team routing and distribution enabled. |
 | `allowlisted_account_uuids` | `[]` | Exact Claude Code OAuth seat UUIDs allowed in the pool. |
 | `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
 | `weekly_max_usage` | `0.95` | Hard weekly utilization ceiling, including applicable model-family weekly windows. |

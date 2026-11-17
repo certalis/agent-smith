@@ -2,6 +2,7 @@ import type { Config } from "@agent-smith/config";
 import type { DatabaseOperations } from "@agent-smith/database";
 import type { ProviderRegistry } from "@agent-smith/providers";
 import type {
+	Account,
 	AccountProvider,
 	AccountSwitchThreshold,
 	AuthMethod,
@@ -14,6 +15,7 @@ export interface AccountResponse {
 	name: string;
 	provider: AccountProvider;
 	providerDisabled: boolean;
+	resetCreditsSupported: boolean;
 	auth_method: AuthMethod;
 	base_url: string | null;
 	requestCount: number;
@@ -56,4 +58,5 @@ export interface APIContext {
 	getProviders: () => string[];
 	getRuntimeHealth?: () => RuntimeHealth;
 	getPoolStatus?: (provider: AccountProvider, model?: string) => PoolStatus;
+	getAccountAccessToken?: (account: Account) => Promise<string>;
 }

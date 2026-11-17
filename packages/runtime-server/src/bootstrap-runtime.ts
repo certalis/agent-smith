@@ -133,6 +133,16 @@ export function bootstrapRuntime(
 		dbOps,
 		providerRegistry,
 		getProviders: () => providerRegistry.listProviders(),
+		getAccountAccessToken: async (account) => {
+			const provider = providerRegistry.getProvider(account.provider);
+			if (!provider) throw new Error("Provider unavailable");
+			return getValidAccessToken(account, {
+				...proxyContext,
+				provider,
+				providerName: account.provider,
+				upstreamPath: "/",
+			});
+		},
 		getPoolStatus: (provider, model) =>
 			getPoolStatus(provider, model, {
 				dbOps,

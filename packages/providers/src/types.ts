@@ -2,6 +2,9 @@ import type {
 	Account,
 	AccountQuotaState,
 	ProviderWire,
+	ResetCreditRequest,
+	ResetCreditResult,
+	ResetCredits,
 } from "@agent-smith/types";
 
 export interface TokenRefreshResult {
@@ -23,6 +26,21 @@ export interface Provider {
 	name: string;
 	defaultBaseUrl: string;
 	wire: ProviderWire;
+	/** Manual operator-only grants. Never invoked by inference or background probing. */
+	supportsResetCredits?(account: Account): boolean;
+	listResetCredits?(
+		account: Account,
+		accessToken: string,
+	): Promise<ResetCredits>;
+	consumeResetCredit?(
+		account: Account,
+		accessToken: string,
+		attempt: ResetCreditRequest,
+	): Promise<ResetCreditResult>;
+	readResetQuota?(
+		account: Account,
+		accessToken: string,
+	): Promise<AccountQuotaState | null>;
 
 	/**
 	 * Whether the provider supports websocket upgrades for the given upstream path.

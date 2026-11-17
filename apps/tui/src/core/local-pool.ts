@@ -58,6 +58,7 @@ export function teamRoutingFileConfig(
 	return {
 		enabled: routing.enabled,
 		distribution_enabled: routing.distributionEnabled,
+		prefer_expiring_quota: routing.preferExpiringQuota,
 		allowlisted_account_uuids: routing.allowlistedAccountUuids,
 		max_usage: routing.maxUsage,
 		weekly_max_usage: routing.weeklyMaxUsage,
