@@ -2,12 +2,14 @@ import {
 	Activity,
 	BarChart3,
 	FileText,
+	Gauge,
 	LayoutDashboard,
 	Users,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { AccountsTab } from "./components/AccountsTab";
 import { AnalyticsTab } from "./components/AnalyticsTab";
+import { CallerUsageTab } from "./components/CallerUsageTab";
 import { LogsTab } from "./components/LogsTab";
 import { OverviewTab } from "./components/OverviewTab";
 import { RequestsTab } from "./components/RequestsTab";
@@ -45,6 +47,14 @@ export const dashboardRoutes: DashboardRoute[] = [
 		title: "Request History",
 		subtitle: "View detailed request and response data",
 		element: <RequestsTab />,
+	},
+	{
+		path: "/usage",
+		label: "User usage",
+		icon: Gauge,
+		title: "Usage by user",
+		subtitle: "Tokens consumed by each person and service",
+		element: <CallerUsageTab />,
 	},
 	{
 		path: "/accounts",

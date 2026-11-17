@@ -129,17 +129,23 @@ an `additionalUnixSocket` inside its protected state directory. Keep the server'
 Give each laptop its own random key (at least 32 printable ASCII characters).
 Put the raw key only in that laptop's mode-600 `client.proxy_key_file`.
 On the server, set `AGENT_SMITH_CLIENT_KEYS_FILE` to an absolute mode-600 JSON file owned
-by the pool process or root. Its values are SHA-256 hex digests of the raw keys,
-without a trailing newline:
+by the pool process or root. A plain value is a SHA-256 hex digest of the raw key,
+without a trailing newline; its entry name also identifies the caller in usage
+reports. An object can group distinct device keys under one stable `callerId`:
 
 ```json
 {
-  "laptop-01": "<64 lowercase hex characters>",
-  "laptop-02": "<a different SHA-256 digest>"
+  "build-runner": "<64 lowercase hex characters>",
+  "alex-laptop": { "sha256": "<a different SHA-256 digest>", "callerId": "alex" },
+  "alex-desktop": { "sha256": "<a third SHA-256 digest>", "callerId": "alex" }
 }
 ```
 
-Names contain letters, digits, `_` or `-`, up to 64 characters. The registry
+Names and caller IDs contain letters, digits, `_` or `-`, up to 64 characters.
+Duplicate digests or malformed ownership entries deny access rather than guess
+which user owns a key. Keep caller IDs stable when rotating device keys: existing
+usage retains its recorded owner, and deleting a key does not erase its history.
+The registry
 holds at most 128 devices and 32 KiB. Missing, invalid, symlinked or loosely
 permissioned files deny device access. No raw device key enters the registry.
 Write updates atomically in the same protected directory. Every request reloads
@@ -147,8 +153,17 @@ the file: deleting a device entry revokes new requests immediately, without
 restarting the pool. It does not cancel requests already in flight.
 
 Device keys allow only health, Messages, token counting and Responses. They
-cannot read management data or change accounts. This does not add per-device
-fairness, quotas or usage attribution.
+cannot read management data or change accounts, including the private usage
+report. This does not add per-device fairness or spending quotas.
+
+For separate service totals, give that service its own device key and caller ID;
+do not label a key that teammates also share as one service. The private dashboard's
+**User usage** page and [caller usage API](api-http.md#caller-token-usage-private-administrator-only)
+show input, output and cache-token totals by caller. Both require the admin key.
+Shared proxy/admin keys and unkeyed loopback requests are **Unattributed**; their
+history cannot be reliably split afterward. Attribution begins with the updated
+server and the distinct caller keys. Mapping an existing device key needs no
+client restart; switching a service to a different key affects new client sessions.
 
 ## Attach the narrow HTTPS entrance to an existing service
 

@@ -9,6 +9,34 @@ afterEach(() => {
 });
 
 describe("dashboard API admin authorization", () => {
+	it("authenticates caller usage reads, encodes filters and forgets authorization when locked", async () => {
+		const calls: Array<{ path: string; key: string | null }> = [];
+		globalThis.fetch = Object.assign(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				calls.push({
+					path: String(input),
+					key: new Headers(init?.headers).get("x-api-key"),
+				});
+				return Response.json({ startMs: 0, endMs: 1, rows: [], models: [] });
+			},
+			{ preconnect: originalFetch.preconnect },
+		);
+		api.setAdminKey("synthetic-admin-key");
+		await api.getCallerUsage({
+			range: "7d",
+			model: "model/a+b",
+			caller: "build-runner",
+		});
+		api.clearAdminKey();
+		await api.getCallerUsage({ range: "24h" });
+		expect(calls).toEqual([
+			{
+				path: "/api/usage/callers?range=7d&model=model%2Fa%2Bb&caller=build-runner",
+				key: "synthetic-admin-key",
+			},
+			{ path: "/api/usage/callers?range=24h", key: null },
+		]);
+	});
 	it("authenticates reset inspection and never automatically retries consuming a grant", async () => {
 		const calls: Array<{
 			path: string;

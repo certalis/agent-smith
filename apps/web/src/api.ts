@@ -8,6 +8,7 @@ import type {
 	AuthCompleteData,
 	AuthInitData,
 	AuthSessionStatusResponse,
+	CallerUsageResponse,
 	CleanupResponse,
 	LogEvent,
 	ManualResetResult,
@@ -29,6 +30,20 @@ import { API_LIMITS, API_TIMEOUT } from "./constants";
 
 class API extends HttpClient {
 	private adminKey: string | undefined;
+	private adminKeyRevision = 0;
+	private adminKeyListeners = new Set<() => void>();
+	getAdminKeyRevision = () => this.adminKeyRevision;
+	hasAdminKey = () => Boolean(this.adminKey);
+	subscribeAdminKey = (listener: () => void) => {
+		this.adminKeyListeners.add(listener);
+		return () => {
+			this.adminKeyListeners.delete(listener);
+		};
+	};
+	private adminKeyChanged(): void {
+		this.adminKeyRevision++;
+		for (const listener of this.adminKeyListeners) listener();
+	}
 
 	constructor() {
 		super({
@@ -43,10 +58,12 @@ class API extends HttpClient {
 
 	setAdminKey(adminKey: string): void {
 		this.adminKey = adminKey;
+		this.adminKeyChanged();
 	}
 
 	clearAdminKey(): void {
 		this.adminKey = undefined;
+		this.adminKeyChanged();
 	}
 
 	protected override postJson<T = unknown>(
@@ -75,6 +92,19 @@ class API extends HttpClient {
 
 	async getStats(): Promise<StatsWithAccounts> {
 		return this.getJson<StatsWithAccounts>("/api/stats");
+	}
+
+	getCallerUsage(
+		filters: { range: TimeRange; model?: string; caller?: string },
+		signal?: AbortSignal,
+	): Promise<CallerUsageResponse> {
+		const params = new URLSearchParams({ range: filters.range });
+		if (filters.model) params.set("model", filters.model);
+		if (filters.caller) params.set("caller", filters.caller);
+		return this.getJson(
+			`/api/usage/callers?${params}`,
+			this.withAdminKey({ retries: 0, signal }),
+		);
 	}
 
 	async getAccounts(): Promise<AccountResponse[]> {

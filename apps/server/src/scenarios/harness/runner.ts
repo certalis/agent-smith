@@ -289,6 +289,40 @@ function configForScenario(scenario: Scenario): Record<string, unknown> {
 	};
 }
 
+async function flushUsageWorker(
+	server: SpawnedServer,
+	proxyKey: string | undefined,
+): Promise<void> {
+	const deadline = performance.now() + SCENARIO_TIMEOUT_MS;
+	while (true) {
+		const response = await fetch(
+			`${server.unixSocket ? "http://localhost" : server.url}/health`,
+			{ unix: server.unixSocket, headers: { "x-api-key": proxyKey ?? "" } },
+		);
+		const health = (await response.json()) as {
+			runtime?: {
+				usageWorker?: {
+					state: string;
+					queuedMessages: number;
+					pendingAcks: number;
+				};
+			};
+		};
+		const worker = health.runtime?.usageWorker;
+		if (
+			worker?.state === "ready" &&
+			worker.queuedMessages === 0 &&
+			worker.pendingAcks === 0
+		)
+			return;
+		if (performance.now() >= deadline)
+			throw new Error(
+				`Usage worker did not become idle: ${JSON.stringify(worker)}`,
+			);
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	}
+}
+
 export async function runScenario(scenario: Scenario): Promise<void> {
 	await withoutProxyEnvironment(() => runScenarioWithoutProxy(scenario));
 }
@@ -357,15 +391,17 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 			environment: edgeEnvironment,
 			initialTime: now,
 			seed: (workspace) => {
-				if (scenario.edge || scenario.standalone) {
+				if (scenario.deviceKeys || scenario.edge || scenario.standalone) {
 					const clientsPath = join(workspace.directory, "clients.json");
 					writeFileSync(
 						clientsPath,
-						JSON.stringify({
-							"synthetic-device": createHash("sha256")
-								.update(wireDeviceKey)
-								.digest("hex"),
-						}),
+						JSON.stringify(
+							scenario.deviceKeys ?? {
+								"synthetic-device": createHash("sha256")
+									.update(wireDeviceKey)
+									.digest("hex"),
+							},
+						),
 						{ mode: 0o600 },
 					);
 					// spawnServer reads this object after seeding, before forking the pool.
@@ -489,6 +525,11 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 						await upstream.releaseHold(step.id);
 					} else if (step.type === "flush") {
 						await new Promise<void>((resolve) => setImmediate(resolve));
+						if (step.usageWorker)
+							await flushUsageWorker(
+								server,
+								edgeEnvironment.AGENT_SMITH_PROXY_KEY,
+							);
 					} else if (step.type === "wait-for-upstream") {
 						await upstream.waitForRequests(step.count);
 					} else if (step.type === "await") {

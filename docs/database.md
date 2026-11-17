@@ -54,6 +54,7 @@ erDiagram
         TEXT provider
         TEXT upstream_path
         TEXT account_used FK
+        TEXT caller_id
         INTEGER status_code
         BOOLEAN success
         TEXT error_message
@@ -107,6 +108,18 @@ erDiagram
 ```
 
 ## Core Tables
+
+### Caller usage
+
+`requests.caller_id` is a nullable, server-authenticated consumer ID, separate
+from `account_used` (the subscription that served the request). It is captured
+on insert and is not reassigned when completion data arrives. An additive,
+idempotent migration leaves existing rows null. A rollback can ignore the extra
+column; no second database or historical identity backfill is created.
+
+Only the [private admin report](api-http.md#caller-token-usage-private-administrator-only)
+groups token totals by this field. Generic request serializers omit it. Counts
+follow existing request retention; deleting a device key does not erase rows.
 
 ### `enrollment_contacts`
 

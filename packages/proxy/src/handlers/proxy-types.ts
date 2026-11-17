@@ -14,6 +14,8 @@ import type { UsageWorkerTransport } from "../usage-worker";
 import type { MessageThreadBinding } from "./message-thread";
 
 export interface ProxyContext {
+	/** Set by runtime authentication, never by a request body or header. */
+	callerId?: string | null;
 	strategy: LoadBalancingStrategy;
 	dbOps: DatabaseOperations;
 	runtime: RuntimeConfig;

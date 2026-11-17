@@ -117,6 +117,29 @@ starting jobs; ordinary health stays 200.
 
 See the [bounded rollout procedure](https-edge.md#deploy-with-less-interruption).
 
+### Caller token usage (private administrator only)
+
+`GET /api/usage/callers?range=24h` requires the admin key in `x-api-key`, including
+on loopback or the private Unix socket. It is not exposed by the public HTTPS
+entrance. Normal Origin checks apply and responses use `Cache-Control: no-store`.
+
+`range` accepts `1h`, `6h`, `24h` (default), `7d` or `30d`. Optional `model` and
+`caller` select exact values. The response contains inclusive `startMs`/`endMs`,
+`rows` grouped by authenticated `callerId`, and `models` observed over that time
+window. Each row gives `requests`, `pendingRequests`, `unreportedRequests`,
+`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`
+and `totalTokens`. Pending requests do not contribute tokens yet; completed rows
+missing a total are counted under `unreportedRequests`, with known token parts
+included in totals. Interrupted replies may still have incomplete usage.
+
+A null `callerId` means unattributed old/shared-key access, not the pooled
+subscription owner. Caller names come only from the protected device registry,
+never client-supplied headers, body fields, sessions or provider account names.
+The report returns no keys, digests, prompts or subscription identities; ordinary
+request summaries and payloads do not gain caller identity fields. Existing
+request retention also applies to these totals. No spending cap or provider quota
+percentage is inferred from token counts.
+
 ### Private Claude seat enrollment (opt-in)
 
 Set `AGENT_SMITH_ENROLLMENT_ORIGIN` to the exact external HTTPS origin (no trailing slash,

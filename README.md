@@ -259,6 +259,14 @@ shows `limits not observed yet` until a response carries quota headers;
 agent-smith never invents a zero limit. Several API keys from one organisation
 share that organisation's limits, so adding them adds no capacity.
 
+The private dashboard's **User usage** page separately shows tokens consumed
+by each user or service, independent of whose subscription served the request.
+Unlock management with the admin key, then filter by time range or model.
+Identify each caller through its [device key](docs/https-edge.md#authorize-devices);
+several devices can share one caller ID. Old requests and shared-key access remain
+**Unattributed**. Totals cover retained requests through this pool, not usage
+made elsewhere or a subscription's remaining credits.
+
 ## How failover works
 
 - **Inside a provider**, an account at its quota threshold is skipped. A

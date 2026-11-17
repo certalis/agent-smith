@@ -11,6 +11,7 @@ import {
 	createAccountUpdateHandler,
 } from "./handlers/accounts";
 import { createAnalyticsHandler } from "./handlers/analytics";
+import { createCallerUsageHandler } from "./handlers/caller-usage";
 import { createConfigHandlers } from "./handlers/config";
 import { EnrollmentHandlers } from "./handlers/enrollment";
 import { createHealthHandler } from "./handlers/health";
@@ -158,6 +159,10 @@ export class APIRouter {
 		const logsStreamHandler = createLogsStreamHandler();
 		const logsHistoryHandler = createLogsHistoryHandler();
 		const analyticsHandler = createAnalyticsHandler(this.context);
+		const callerUsageHandler = createCallerUsageHandler(dbOps);
+		this.staticHandlers.set("GET:/api/usage/callers", (_req, url) =>
+			callerUsageHandler(url.searchParams),
+		);
 		const requestsStreamHandler = createRequestsStreamHandler();
 		const cleanupHandler = createCleanupHandler(dbOps, config);
 		const compactHandler = createCompactHandler(dbOps);

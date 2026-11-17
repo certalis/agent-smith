@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { deviceKeyMatches } from "./device-keys";
+import { deviceKeyCallerId } from "./device-keys";
 import { isDeviceRoute } from "./inference-routes";
 
 const FORWARDED_HEADERS = [
@@ -105,17 +105,22 @@ function isResponsesInferenceRoute(pathname: string): boolean {
 	);
 }
 
-function keyRole(
+export type RequestAuthentication = {
+	role: "admin" | "proxy" | "device";
+	callerId: string | null;
+};
+
+export function authenticateRequest(
 	req: Request,
 	url: URL,
 	config: ExposureConfig,
-): "admin" | "proxy" | "device" | null {
+): RequestAuthentication | null {
 	const apiKey = req.headers.get("x-api-key");
 	if (safeKeyEqual(apiKey, config.adminKey)) {
-		return "admin";
+		return { role: "admin", callerId: null };
 	}
 	if (safeKeyEqual(apiKey, config.proxyKey)) {
-		return "proxy";
+		return { role: "proxy", callerId: null };
 	}
 	// Codex's Responses provider can only pass its configured credential as a
 	// bearer token. Keep that compatibility path to the two wrapper endpoints:
@@ -124,15 +129,14 @@ function keyRole(
 		isResponsesInferenceRoute(url.pathname) &&
 		safeKeyEqual(bearerToken(req), config.proxyKey)
 	) {
-		return "proxy";
+		return { role: "proxy", callerId: null };
 	}
-	if (
-		deviceKeyMatches(apiKey, config.clientKeysFile) ||
-		(isResponsesInferenceRoute(url.pathname) &&
-			deviceKeyMatches(bearerToken(req), config.clientKeysFile))
-	) {
-		return "device";
-	}
+	const callerId =
+		deviceKeyCallerId(apiKey, config.clientKeysFile) ??
+		(isResponsesInferenceRoute(url.pathname)
+			? deviceKeyCallerId(bearerToken(req), config.clientKeysFile)
+			: null);
+	if (callerId) return { role: "device", callerId };
 	return null;
 }
 
@@ -194,6 +198,11 @@ export function exposureFailure(
 	url: URL,
 	server: RequestServer | undefined,
 	config: ExposureConfig,
+	authentication: RequestAuthentication | null = authenticateRequest(
+		req,
+		url,
+		config,
+	),
 ): Response | null {
 	const remote = requestAddress(server, req);
 	const loopbackExempt =
@@ -202,7 +211,7 @@ export function exposureFailure(
 			? isLoopbackAddress(remote.address)
 			: isLocalHostHeader(url.host, config.bindHost)) &&
 		!isForwardedRequest(req.headers);
-	const role = keyRole(req, url, config);
+	const role = authentication?.role ?? null;
 	if (
 		role === "device" &&
 		!isDeviceRoute(req.method, url.pathname + url.search)
@@ -225,6 +234,7 @@ export function exposureFailure(
 
 		if (
 			url.pathname === "/api/drain" ||
+			url.pathname === "/api/usage/callers" ||
 			/^\/api\/accounts\/[^/]+\/reset-credits(?:\/consume)?$/.test(
 				url.pathname,
 			) ||

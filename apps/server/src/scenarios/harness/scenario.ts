@@ -72,6 +72,8 @@ export type ReleaseHoldStep = {
 /** Lets already-started client I/O reach the loopback server without time advancing. */
 export type FlushStep = {
 	type: "flush";
+	/** Wait through HTTP health until usage writes have been acknowledged. */
+	usageWorker?: true;
 };
 
 export type WaitForUpstreamStep = {
@@ -211,6 +213,8 @@ export type Scenario = {
 	name: string;
 	/** Start an extra Unix listener inside this scenario's temporary workspace. */
 	privateSocket?: boolean;
+	/** Synthetic, already-hashed device registry written inside the private workspace. */
+	deviceKeys?: Record<string, string | { sha256: string; callerId: string }>;
 	/** Run the real Node standalone supervisor and its Bun pool. */
 	standalone?: boolean;
 	/** Exercise the real Node edge against the Bun pool or a fake private listener. */

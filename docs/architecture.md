@@ -83,6 +83,10 @@ For managed HTTPS hosts, the Node-compatible `@certalis/agent-smith/edge`
 export forwards only exact inference routes and authenticated health to the
 existing private Unix socket. Runtime exposure checks authorize device keys
 from `AGENT_SMITH_CLIENT_KEYS_FILE` and refuse their management access. Optional
+caller ownership in that registry binds usage to a user/service, not a provider
+account. Runtime passes the authenticated ID in request-local context to the
+existing worker and SQLite request row; only a private admin report exposes it.
+No extra service or datastore is introduced. Optional
 enrollment forwards only the existing six sign-in routes when its exact origin
 is explicitly configured; it uses the same pool and email allowlist. The edge creates
 no second runtime or database; see [HTTPS deployment](https-edge.md).

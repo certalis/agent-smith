@@ -11,7 +11,7 @@ import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProxyContext } from "@agent-smith/proxy";
-import { deviceKeyMatches } from "./device-keys";
+import { deviceKeyCallerId } from "./device-keys";
 import { createServerFetchHandler } from "./fetch-handler";
 import { createProxyEdgeHandler } from "./proxy-edge";
 
@@ -37,18 +37,47 @@ function registry() {
 
 test("device registry reloads revocation and fails closed for invalid or loose files", () => {
 	const { path } = registry();
-	expect(deviceKeyMatches(DEVICE_KEY, path)).toBe(true);
-	expect(deviceKeyMatches("not-a-valid-device-key", path)).toBe(false);
+	expect(deviceKeyCallerId(DEVICE_KEY, path)).toBe("laptop");
+	expect(deviceKeyCallerId("not-a-valid-device-key", path)).toBe(null);
 	writeFileSync(path, JSON.stringify({ server: digest(OTHER_KEY) }));
-	expect(deviceKeyMatches(DEVICE_KEY, path)).toBe(false);
-	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(true);
+	expect(deviceKeyCallerId(DEVICE_KEY, path)).toBe(null);
+	expect(deviceKeyCallerId(OTHER_KEY, path)).toBe("server");
 	chmodSync(path, 0o644);
-	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(false);
+	expect(deviceKeyCallerId(OTHER_KEY, path)).toBe(null);
 	chmodSync(path, 0o600);
 	writeFileSync(path, "invalid");
-	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(false);
+	expect(deviceKeyCallerId(OTHER_KEY, path)).toBe(null);
 	unlinkSync(path);
-	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(false);
+	expect(deviceKeyCallerId(OTHER_KEY, path)).toBe(null);
+});
+
+test("device keys resolve one server-assigned caller and reject ambiguous ownership", () => {
+	const { path } = registry();
+	expect(deviceKeyCallerId(DEVICE_KEY, path)).toBe("laptop");
+	writeFileSync(
+		path,
+		JSON.stringify({
+			laptop: { sha256: digest(DEVICE_KEY), callerId: "build-runner" },
+			server: { sha256: digest(OTHER_KEY), callerId: "build-runner" },
+		}),
+	);
+	expect(deviceKeyCallerId(DEVICE_KEY, path)).toBe("build-runner");
+	expect(deviceKeyCallerId(OTHER_KEY, path)).toBe("build-runner");
+	for (const invalid of [
+		{ laptop: { sha256: digest(DEVICE_KEY), callerId: "" } },
+		{ laptop: { sha256: digest(DEVICE_KEY), callerId: "bad/owner" } },
+		{
+			laptop: {
+				sha256: digest(DEVICE_KEY),
+				callerId: "owner",
+				key: DEVICE_KEY,
+			},
+		},
+		{ laptop: digest(DEVICE_KEY), server: digest(DEVICE_KEY) },
+	]) {
+		writeFileSync(path, JSON.stringify(invalid));
+		expect(deviceKeyCallerId(DEVICE_KEY, path)).toBe(null);
+	}
 });
 
 async function fixture(maxBodyBytes = 1024) {

@@ -8,6 +8,8 @@ import type {
 	AccountQuotaState,
 	AnalyticsResponse,
 	AuthMethod,
+	CallerUsageQuery,
+	CallerUsageResponse,
 	HttpMethod,
 	Request,
 	RequestSummary,
@@ -259,6 +261,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		accountUsed: string | null,
 		statusCode: number | null,
 		timestamp?: number,
+		callerId?: string | null,
 	): void {
 		this.requests.saveMeta(
 			id,
@@ -269,6 +272,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 			accountUsed,
 			statusCode,
 			timestamp,
+			callerId,
 		);
 	}
 
@@ -286,12 +290,14 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		failoverAttempts: number,
 		usage?: RequestData["usage"],
 		options?: {
+			callerId?: string | null;
 			timestamp?: number;
 			payload?: unknown;
 			timings?: RequestData["timings"];
 		},
 	): void {
 		this.requests.save({
+			callerId: options?.callerId,
 			id,
 			method,
 			path,
@@ -439,6 +445,12 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 
 	getAnalytics(options: AnalyticsQueryOptions): AnalyticsResponse {
 		return this.analytics.getAnalytics(options);
+	}
+
+	getCallerUsage(
+		options: CallerUsageQuery,
+	): Pick<CallerUsageResponse, "rows" | "models"> {
+		return this.requests.getCallerUsage(options);
 	}
 
 	// Cleanup operations (payload by age; request metadata by age; plus orphan sweep)

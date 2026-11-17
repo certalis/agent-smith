@@ -78,6 +78,7 @@ export async function forwardToClient(
 		type: "start",
 		requestId,
 		accountId: account?.id || null,
+		callerId: ctx.callerId ?? null,
 		method,
 		path,
 		upstreamPath: ctx.upstreamPath,

@@ -17,6 +17,14 @@ inference through a protected Unix socket to this same runtime. Its allowlist
 excludes management/OAuth; the pool checks the current hash-only device registry
 before selecting an account. Deleting an entry stops subsequent requests.
 
+Authentication resolves the device's caller ID once. A request-local proxy
+context carries it through forwarding/failover and usage worker messages into
+the nullable `requests.caller_id` column. It is never added to provider headers,
+bodies or ordinary request events/summaries. Shared-key and loopback access stay
+unattributed. Only the private admin [caller report](api-http.md#caller-token-usage-private-administrator-only)
+and dashboard group recorded tokens by that ID; provider-account selection does
+not change the consumer who is charged with the recorded usage.
+
 ## Runtime Flow
 
 ```mermaid

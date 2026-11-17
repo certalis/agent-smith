@@ -97,6 +97,7 @@ function shouldMigrateRequestsTable(columns: TableInfoRow[]): boolean {
 function ensureRequestLinkageColumns(db: Database): void {
 	const columns = getTableInfo(db, "requests");
 	const requestColumns = [
+		["caller_id", "TEXT"],
 		["response_id", "TEXT"],
 		["previous_response_id", "TEXT"],
 		["response_chain_id", "TEXT"],
@@ -345,6 +346,7 @@ function migrateRequestsTable(db: Database, columns: TableInfoRow[]): void {
 			account_used TEXT,
 			status_code INTEGER,
 			success BOOLEAN,
+			caller_id TEXT,
 			error_message TEXT,
 			response_time_ms INTEGER,
 			failover_attempts INTEGER DEFAULT 0,
@@ -569,6 +571,7 @@ export function ensureSchema(db: Database): void {
 			provider TEXT NOT NULL DEFAULT '',
 			upstream_path TEXT NOT NULL DEFAULT '',
 			account_used TEXT,
+			caller_id TEXT,
 			status_code INTEGER,
 			success BOOLEAN,
 			error_message TEXT,

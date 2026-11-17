@@ -10,7 +10,11 @@ import {
 	type WebSocketProxyData,
 } from "@agent-smith/proxy";
 import { serveDashboardRoute } from "./dashboard-assets";
-import { type ExposureConfig, exposureFailure } from "./exposure";
+import {
+	authenticateRequest,
+	type ExposureConfig,
+	exposureFailure,
+} from "./exposure";
 import { forwardOAuthTokenRequest } from "./oauth-token";
 import { hasDotSegment } from "./request-path";
 
@@ -53,7 +57,14 @@ export function createServerFetchHandler({
 		const enrollmentResponse = apiRouter.handleEnrollmentRequest?.(url, req);
 		if (enrollmentResponse) return enrollmentResponse;
 
-		const rejected = exposureFailure(req, url, server, exposureConfig);
+		const authentication = authenticateRequest(req, url, exposureConfig);
+		const rejected = exposureFailure(
+			req,
+			url,
+			server,
+			exposureConfig,
+			authentication,
+		);
 		if (rejected) {
 			return rejected;
 		}
@@ -80,6 +91,10 @@ export function createServerFetchHandler({
 			url.pathname.startsWith("/v1/") ||
 			url.pathname.startsWith("/tc-acct/");
 		if (isProviderRoute) {
+			const requestContext = {
+				...proxyContext,
+				callerId: authentication?.callerId ?? null,
+			};
 			if (isDeploymentDraining()) {
 				return errorResponse(
 					new ServiceUnavailableError(
@@ -93,7 +108,7 @@ export function createServerFetchHandler({
 				const websocketResponse = await handleWebSocketUpgrade(
 					req,
 					url,
-					proxyContext,
+					requestContext,
 					server,
 				);
 				if (websocketResponse) {
@@ -105,7 +120,7 @@ export function createServerFetchHandler({
 			}
 
 			try {
-				return await handleProxyRequest(req, url, proxyContext);
+				return await handleProxyRequest(req, url, requestContext);
 			} catch (error) {
 				return errorResponse(error);
 			}

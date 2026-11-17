@@ -575,6 +575,7 @@ async function handleStart(msg: StartMessage): Promise<void> {
 			msg.accountId,
 			msg.responseStatus,
 			msg.timestamp,
+			msg.callerId,
 		),
 	);
 
@@ -853,6 +854,7 @@ async function handleEnd(msg: EndMessage): Promise<void> {
 				: undefined,
 			{
 				timestamp: startMessage.timestamp,
+				callerId: startMessage.callerId,
 				payload,
 				timings,
 			},

@@ -2,6 +2,8 @@ export const queryKeys = {
 	all: ["agent-smith"] as const,
 	accounts: () => [...queryKeys.all, "accounts"] as const,
 	stats: () => [...queryKeys.all, "stats"] as const,
+	callerUsage: (adminRevision: number) =>
+		[...queryKeys.all, "caller-usage", adminRevision] as const,
 	analytics: (
 		timeRange?: string,
 		filters?: unknown,

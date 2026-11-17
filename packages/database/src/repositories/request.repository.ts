@@ -1,6 +1,9 @@
 import { Logger } from "@agent-smith/logger";
 import {
 	type AccountProvider,
+	type CallerUsageQuery,
+	type CallerUsageResponse,
+	type CallerUsageRow,
 	extractRequestLinkageFromPayload,
 	type HttpMethod,
 	isHttpMethod,
@@ -51,6 +54,7 @@ function requestLinkageFromPayload(payload: unknown): {
 }
 
 export interface RequestData {
+	callerId?: string | null;
 	id: string;
 	method: HttpMethod;
 	path: string;
@@ -98,14 +102,15 @@ export class RequestRepository extends BaseRepository<RequestData> {
 		accountUsed: string | null,
 		statusCode: number | null,
 		timestamp?: number,
+		callerId?: string | null,
 	): void {
 		this.run(
 			`
 			INSERT INTO requests (
 				id, timestamp, method, path, provider, upstream_path, account_used, 
-				status_code, success, error_message, response_time_ms, failover_attempts
+				status_code, success, error_message, response_time_ms, failover_attempts, caller_id
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0, ?)
 		`,
 			[
 				id,
@@ -116,6 +121,7 @@ export class RequestRepository extends BaseRepository<RequestData> {
 				upstreamPath,
 				accountUsed,
 				statusCode,
+				callerId ?? null,
 			],
 		);
 	}
@@ -138,9 +144,9 @@ export class RequestRepository extends BaseRepository<RequestData> {
 				`
 				INSERT OR IGNORE INTO requests (
 					id, timestamp, method, path, provider, upstream_path, account_used,
-					status_code, success, error_message, response_time_ms, failover_attempts
+					status_code, success, error_message, response_time_ms, failover_attempts, caller_id
 				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0, ?)
 			`,
 				[
 					data.id,
@@ -151,6 +157,7 @@ export class RequestRepository extends BaseRepository<RequestData> {
 					data.upstreamPath,
 					data.accountUsed,
 					data.statusCode,
+					data.callerId ?? null,
 				],
 			);
 
@@ -401,6 +408,44 @@ export class RequestRepository extends BaseRepository<RequestData> {
 			`,
 			[requestId],
 		);
+	}
+
+	/** Caller IDs are written by authentication, never inferred from payloads. */
+	getCallerUsage(
+		options: CallerUsageQuery,
+	): Pick<CallerUsageResponse, "rows" | "models"> {
+		const filters = ["timestamp >= ?", "timestamp <= ?"];
+		const params: Array<string | number> = [options.startMs, options.endMs];
+		if (options.model !== undefined) {
+			filters.push("model = ?");
+			params.push(options.model);
+		}
+		if (options.callerId !== undefined) {
+			filters.push("caller_id = ?");
+			params.push(options.callerId);
+		}
+		const rows = this.query<CallerUsageRow>(
+			`
+			SELECT caller_id AS callerId, COUNT(*) AS requests,
+				SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS pendingRequests,
+				SUM(CASE WHEN success IS NOT NULL AND total_tokens IS NULL THEN 1 ELSE 0 END) AS unreportedRequests,
+				SUM(CASE WHEN success IS NOT NULL THEN COALESCE(input_tokens, 0) ELSE 0 END) AS inputTokens,
+				SUM(CASE WHEN success IS NOT NULL THEN COALESCE(output_tokens, 0) ELSE 0 END) AS outputTokens,
+				SUM(CASE WHEN success IS NOT NULL THEN COALESCE(cache_read_input_tokens, 0) ELSE 0 END) AS cacheReadInputTokens,
+				SUM(CASE WHEN success IS NOT NULL THEN COALESCE(cache_creation_input_tokens, 0) ELSE 0 END) AS cacheCreationInputTokens,
+				SUM(CASE WHEN success IS NOT NULL THEN COALESCE(total_tokens,
+					COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) +
+					COALESCE(cache_read_input_tokens, 0) + COALESCE(cache_creation_input_tokens, 0)) ELSE 0 END) AS totalTokens
+			FROM requests WHERE ${filters.join(" AND ")}
+			GROUP BY caller_id ORDER BY totalTokens DESC, caller_id ASC
+		`,
+			params,
+		);
+		const models = this.query<{ model: string }>(
+			"SELECT DISTINCT model FROM requests WHERE timestamp >= ? AND timestamp <= ? AND model IS NOT NULL ORDER BY model",
+			[options.startMs, options.endMs],
+		).map((row) => row.model);
+		return { rows, models };
 	}
 
 	// Analytics queries
