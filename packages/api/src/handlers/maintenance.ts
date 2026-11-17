@@ -1,6 +1,10 @@
 import type { Config } from "@agent-smith/config";
 import type { DatabaseOperations } from "@agent-smith/database";
-import { errorResponse, jsonResponse } from "@agent-smith/http";
+import {
+	errorResponse,
+	jsonResponse,
+	ServiceUnavailable,
+} from "@agent-smith/http";
 import { Logger } from "@agent-smith/logger";
 import type { CleanupResponse, MutationResult } from "@agent-smith/types";
 
@@ -46,7 +50,15 @@ export function createCleanupHandler(
 export function createCompactHandler(dbOps: DatabaseOperations) {
 	return (): Response => {
 		try {
-			dbOps.compact();
+			const { vacuumed, freeBytes, requiredBytes } = dbOps.compact();
+			if (!vacuumed) {
+				return errorResponse(
+					ServiceUnavailable("Not enough free disk space to compact", {
+						freeBytes,
+						requiredBytes,
+					}),
+				);
+			}
 			const result: MutationResult = {
 				success: true,
 				message: "Database compacted successfully",

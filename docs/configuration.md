@@ -385,7 +385,7 @@ an account.
 | `AGENT_SMITH_PROXY_KEY` | - (not persisted) | string | `AGENT_SMITH_PROXY_KEY=proxy-secret` |
 | `AGENT_SMITH_CLIENT_KEYS_FILE` | - (disabled) | absolute path | Owner-only JSON mapping device names to SHA-256 key digests; reloaded each request |
 | `AGENT_SMITH_ADMIN_KEY` | - (not persisted) | string | `AGENT_SMITH_ADMIN_KEY=admin-secret` |
-| `AGENT_SMITH_DATA_RETENTION_DAYS` | `data_retention_days` | number | `AGENT_SMITH_DATA_RETENTION_DAYS=7` (payloads) |
+| `AGENT_SMITH_DATA_RETENTION_DAYS` | `data_retention_days` | number | `AGENT_SMITH_DATA_RETENTION_DAYS=7` (payloads, 0–365; 0 stores none) |
 | `AGENT_SMITH_REQUEST_RETENTION_DAYS` | `request_retention_days` | number | `AGENT_SMITH_REQUEST_RETENTION_DAYS=365` (metadata) |
 | `AGENT_SMITH_CONFIG_PATH` | - | string | `AGENT_SMITH_CONFIG_PATH=/etc/agent-smith.json` |
 
@@ -685,7 +685,7 @@ Response:
 { "payloadDays": 7, "requestDays": 365 }
 ```
 
-Note: Payload retention applies to request/response JSON payloads. Request metadata retention controls how long rows in the `requests` table are kept (affects analytics beyond the window).
+Note: Payload retention applies to the request metadata payloads in `request_payloads` (headers, trace fields, timings, token curve; never bodies). `0` stores none: the Requests page then shows live traffic only and has no stored conversations to open, while analytics keep working from the `requests` table. Request metadata retention controls how long rows in the `requests` table are kept (affects analytics beyond the window). Expired rows are deleted at startup and then every hour.
 
 #### Set Retention
 ```http

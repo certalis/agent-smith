@@ -29,6 +29,7 @@ function createStartMessage(): StartMessage {
 		providerName: "openai",
 		retryAttempt: 0,
 		failoverAttempts: 0,
+		storePayload: true,
 	};
 }
 

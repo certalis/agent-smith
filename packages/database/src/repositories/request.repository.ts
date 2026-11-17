@@ -85,7 +85,9 @@ export interface RequestData {
 
 interface PersistRequestData extends RequestData {
 	timestamp?: number;
+	/** Read for response linkage even when `storePayload` is false. */
 	payload?: unknown;
+	storePayload?: boolean;
 }
 
 export class RequestRepository extends BaseRepository<RequestData> {
@@ -123,7 +125,9 @@ export class RequestRepository extends BaseRepository<RequestData> {
 	save(data: PersistRequestData): void {
 		const { usage, timings } = data;
 		const payloadJson =
-			data.payload === undefined ? undefined : JSON.stringify(data.payload);
+			data.payload === undefined || data.storePayload === false
+				? undefined
+				: JSON.stringify(data.payload);
 		const linkage = requestLinkageFromPayload(data.payload);
 		const responseChainId = this.resolveResponseChainId(
 			linkage.previousResponseId,
@@ -669,9 +673,14 @@ export class RequestRepository extends BaseRepository<RequestData> {
 		);
 	}
 
+	/** Scans the payloads, not the request history, so its cost stays bounded by payload retention. */
 	deletePayloadsOlderThan(cutoffTs: number): number {
 		return this.runWithChanges(
-			`DELETE FROM request_payloads WHERE id IN (SELECT id FROM requests WHERE timestamp < ?)`,
+			`DELETE FROM request_payloads
+			WHERE EXISTS (
+				SELECT 1 FROM requests r
+				WHERE r.id = request_payloads.id AND r.timestamp < ?
+			)`,
 			[cutoffTs],
 		);
 	}

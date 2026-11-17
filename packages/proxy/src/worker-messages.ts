@@ -36,6 +36,9 @@ export interface StartMessage {
 	// Retry info
 	retryAttempt: number;
 	failoverAttempts: number;
+
+	/** False when payload retention is 0 days: the metadata document is not written. */
+	storePayload: boolean;
 }
 
 export interface ChunkMessage {

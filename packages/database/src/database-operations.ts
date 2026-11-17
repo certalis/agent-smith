@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statfsSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Disposable } from "@agent-smith/core";
 import type {
@@ -38,12 +38,24 @@ export interface RuntimeConfig {
 	sessionDurationMs?: number;
 }
 
+export type CompactResult = {
+	vacuumed: boolean;
+	freeBytes: number;
+	requiredBytes: number;
+};
+
+function freeDiskBytes(directory: string): number {
+	const { bavail, bsize } = statfsSync(directory);
+	return bavail * bsize;
+}
+
 /**
  * DatabaseOperations using Repository Pattern
  * Provides a clean, organized interface for database operations
  */
 export class DatabaseOperations implements StrategyStore, Disposable {
 	private db: Database;
+	private dbPath: string;
 	private runtime?: RuntimeConfig;
 	private closed = false;
 
@@ -58,6 +70,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 
 	constructor(dbPath?: string) {
 		const resolvedPath = dbPath ?? resolveDbPath();
+		this.dbPath = resolvedPath;
 
 		// Ensure the directory exists
 		const dir = dirname(resolvedPath);
@@ -288,6 +301,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		options?: {
 			timestamp?: number;
 			payload?: unknown;
+			storePayload?: boolean;
 			timings?: RequestData["timings"];
 		},
 	): void {
@@ -306,6 +320,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 			usage,
 			timestamp: options?.timestamp,
 			payload: options?.payload,
+			storePayload: options?.storePayload,
 			timings: options?.timings,
 		});
 	}
@@ -473,7 +488,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 
 		this.closed = true;
 		// Ensure all write operations are flushed before closing
-		this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+		this.checkpointWal();
 		this.db.close();
 	}
 
@@ -487,11 +502,37 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		this.db.exec("PRAGMA wal_checkpoint(PASSIVE)");
 	}
 
-	/** Compact and reclaim disk space (blocks DB during operation) */
-	compact(): void {
-		// Ensure WAL is checkpointed and truncated, then VACUUM to rebuild file
+	/** Moves committed WAL pages into the database and truncates the WAL file. */
+	checkpointWal(): void {
 		this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+	}
+
+	/**
+	 * Compact and reclaim disk space (blocks DB during operation). VACUUM writes
+	 * a temporary copy and then the WAL, so it needs up to twice the live data
+	 * free (https://www.sqlite.org/lang_vacuum.html); short of that it is skipped
+	 * instead of filling the disk.
+	 */
+	compact(freeBytes = freeDiskBytes(dirname(this.dbPath))): CompactResult {
+		this.checkpointWal();
+		const requiredBytes = 2 * this.liveDataBytes();
+		if (freeBytes < requiredBytes) {
+			return { vacuumed: false, freeBytes, requiredBytes };
+		}
 		this.db.exec("VACUUM");
+		// In WAL mode the rebuilt pages sit in the WAL until a checkpoint shrinks the file.
+		this.checkpointWal();
+		return { vacuumed: true, freeBytes, requiredBytes };
+	}
+
+	private liveDataBytes(): number {
+		const row = this.db
+			.query(
+				`SELECT (page_count - freelist_count) * page_size AS bytes
+				FROM pragma_page_count(), pragma_freelist_count(), pragma_page_size()`,
+			)
+			.get() as { bytes: number };
+		return row.bytes;
 	}
 
 	/**

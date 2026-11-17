@@ -854,6 +854,7 @@ async function handleEnd(msg: EndMessage): Promise<void> {
 			{
 				timestamp: startMessage.timestamp,
 				payload,
+				storePayload: startMessage.storePayload,
 				timings,
 			},
 		),

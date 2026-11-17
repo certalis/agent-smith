@@ -34,7 +34,7 @@ export function DataRetentionCard() {
 
 	const disabled = isLoading || setRetention.isPending;
 	const validPayload =
-		Number.isFinite(payloadDays) && payloadDays >= 1 && payloadDays <= 365;
+		Number.isFinite(payloadDays) && payloadDays >= 0 && payloadDays <= 365;
 	const validRequests =
 		Number.isFinite(requestDays) && requestDays >= 1 && requestDays <= 3650;
 
@@ -43,8 +43,9 @@ export function DataRetentionCard() {
 			<CardHeader>
 				<CardTitle>Payload Retention</CardTitle>
 				<CardDescription>
-					Automatically delete request/response payloads older than this window.
-					Analytics remain intact.
+					Automatically delete request metadata payloads older than this window,
+					checked every hour. 0 stores none, so the Requests page shows live
+					traffic only. Analytics remain intact.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
@@ -53,7 +54,7 @@ export function DataRetentionCard() {
 						<span className="text-sm font-medium w-28">Payloads</span>
 						<Input
 							type="number"
-							min={1}
+							min={0}
 							max={365}
 							value={payloadDays}
 							onChange={(e) =>
@@ -141,6 +142,10 @@ export function DataRetentionCard() {
 					<p className="text-xs text-muted-foreground">
 						Database compacted. File size should reduce on disk.
 					</p>
+				)}
+
+				{compactDb.isError && (
+					<p className="text-xs text-destructive">{compactDb.error.message}</p>
 				)}
 			</CardContent>
 		</Card>

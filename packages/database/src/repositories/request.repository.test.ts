@@ -263,6 +263,44 @@ describe("RequestRepository", () => {
 		).toBeNull();
 	});
 
+	it("records conversation linkage without the payload row when payloads are not stored", () => {
+		repository.save({
+			id: "request-unstored",
+			method: "POST",
+			path: "/v1/openai/responses",
+			provider: "openai",
+			upstreamPath: "/responses",
+			accountUsed: "account-1",
+			statusCode: 200,
+			success: true,
+			errorMessage: null,
+			responseTime: 30,
+			failoverAttempts: 0,
+			payload: createPayload({
+				requestId: "request-unstored",
+				responseId: "resp-unstored",
+				previousResponseId: "resp-parent",
+			}),
+			storePayload: false,
+		});
+
+		expect(
+			db
+				.query(
+					`SELECT response_id, previous_response_id FROM requests WHERE id = ?`,
+				)
+				.get("request-unstored"),
+		).toEqual({
+			response_id: "resp-unstored",
+			previous_response_id: "resp-parent",
+		});
+		expect(
+			db
+				.query(`SELECT json FROM request_payloads WHERE id = ?`)
+				.get("request-unstored"),
+		).toBeNull();
+	});
+
 	it("stores conversation linkage and returns ancestor payloads up to the requested row", () => {
 		repository.save({
 			id: "request-root",
