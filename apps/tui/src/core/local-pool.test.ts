@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type { TeamRoutingConfig } from "@agent-smith/config";
+import {
+	type TeamRoutingConfig,
+	WINDOW_WARMUP_DEFAULTS,
+} from "@agent-smith/config";
 import type { Account } from "@agent-smith/types";
 import {
 	formatPoolLimits,
@@ -21,6 +24,7 @@ const routing: TeamRoutingConfig = {
 	admissionWaitMs: 30_000,
 	holdSeconds: 0,
 	quotaProbeSeconds: 0,
+	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 
 function oauthSeat(overrides: Partial<Account> = {}): Account {
@@ -83,6 +87,26 @@ describe("local pool policy", () => {
 			...routing,
 			enabled: false,
 			allowlistedAccountUuids: [],
+		});
+	});
+
+	it("writes the window warm-up schedule back, since a seat toggle replaces the whole policy", () => {
+		const windowWarmup = {
+			enabled: true,
+			times: ["07:30"],
+			timeZone: "Europe/London",
+			weekdaysOnly: false,
+			model: "claude-haiku-4-5",
+		};
+
+		expect(
+			teamRoutingFileConfig({ ...routing, windowWarmup }).window_warmup,
+		).toEqual({
+			enabled: true,
+			times: ["07:30"],
+			time_zone: "Europe/London",
+			weekdays_only: false,
+			model: "claude-haiku-4-5",
 		});
 	});
 

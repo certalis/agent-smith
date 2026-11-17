@@ -102,6 +102,53 @@ describe("ClaudeCodeProvider", () => {
 		});
 	});
 
+	it("starts a seat's window with one minimal Haiku message on its own token", async () => {
+		let request: Request | undefined;
+		const fiveHourReset = Math.floor(Date.now() / 1000) + 18_000;
+		globalThis.fetch = createJsonFetchMock(
+			{},
+			(received) => {
+				request = received;
+			},
+			{
+				headers: {
+					"anthropic-ratelimit-unified-5h-reset": String(fiveHourReset),
+					"anthropic-ratelimit-unified-5h-utilization": "0.01",
+				},
+			},
+		);
+
+		const quota = await provider.startQuotaWindow(
+			createOAuthAccount("claude-code"),
+			"seat-access-token",
+			null,
+		);
+
+		expect(request?.url).toBe("https://api.anthropic.com/v1/messages");
+		expect(request?.headers.get("authorization")).toBe(
+			"Bearer seat-access-token",
+		);
+		expect(request?.headers.get("anthropic-beta")).toBe("oauth-2025-04-20");
+		expect(await request?.json()).toEqual({
+			model: "claude-haiku-5-5",
+			max_tokens: 1,
+			messages: [{ role: "user", content: "hi" }],
+		});
+		expect(quota?.windows.unified5h?.resetAt).toBe(fiveHourReset * 1000);
+	});
+
+	it("reports a refused window warm-up by its status only", async () => {
+		globalThis.fetch = createJsonFetchMock({}, undefined, { status: 401 });
+
+		await expect(
+			provider.startQuotaWindow(
+				createOAuthAccount("claude-code"),
+				"seat-access-token",
+				null,
+			),
+		).rejects.toThrow(/^HTTP 401$/);
+	});
+
 	it("parses Anthropic unified rate limit headers", () => {
 		const resetSeconds = Math.floor((Date.now() + 120_000) / 1000);
 		const response = new Response("{}", {

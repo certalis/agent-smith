@@ -29,6 +29,13 @@ import {
 	type StrategyName,
 } from "@agent-smith/types";
 import { resolveConfigPath } from "./paths";
+import {
+	sanitizeWindowWarmup,
+	WINDOW_WARMUP_DEFAULTS,
+	type WindowWarmupConfig,
+	type WindowWarmupFileConfig,
+	windowWarmupConfig,
+} from "./window-warmup";
 
 const log = new Logger("Config");
 
@@ -57,6 +64,7 @@ export interface TeamRoutingConfig {
 	admissionWaitMs: number;
 	holdSeconds: number;
 	quotaProbeSeconds: number;
+	windowWarmup: WindowWarmupConfig;
 }
 
 export type TeamRoutingFileConfig = {
@@ -72,6 +80,7 @@ export type TeamRoutingFileConfig = {
 	admission_wait_ms?: number;
 	hold_seconds?: number;
 	quota_probe_seconds?: number;
+	window_warmup?: WindowWarmupFileConfig;
 };
 
 /** Where seat alerts go; a channel with an empty value stays off. */
@@ -159,6 +168,7 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	admissionWaitMs: 30_000,
 	holdSeconds: 0,
 	quotaProbeSeconds: 0,
+	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 
 export interface ConfigData {
@@ -556,6 +566,8 @@ function sanitizeTeamRouting(
 			7 * 24 * 60 * 60,
 		);
 	}
+	const windowWarmup = sanitizeWindowWarmup(value.window_warmup);
+	if (windowWarmup) result.window_warmup = windowWarmup;
 	return result;
 }
 
@@ -800,6 +812,7 @@ export class Config extends EventEmitter {
 			holdSeconds: file?.hold_seconds ?? TEAM_ROUTING_DEFAULTS.holdSeconds,
 			quotaProbeSeconds:
 				file?.quota_probe_seconds ?? TEAM_ROUTING_DEFAULTS.quotaProbeSeconds,
+			windowWarmup: windowWarmupConfig(file?.window_warmup),
 		};
 	}
 
@@ -892,6 +905,7 @@ export class Config extends EventEmitter {
 			"admission_wait_ms",
 			"hold_seconds",
 			"quota_probe_seconds",
+			"window_warmup",
 		]);
 		if (Object.keys(value).some((key) => !allowed.has(key))) {
 			throw new Error("team routing configuration contains an unknown field");
@@ -1094,3 +1108,10 @@ export class Config extends EventEmitter {
 
 export { resolveConfigPath } from "./paths";
 export { getPlatformConfigDir } from "./paths-common";
+export {
+	nextWindowWarmupAt,
+	WINDOW_WARMUP_DEFAULTS,
+	type WindowWarmupConfig,
+	type WindowWarmupFileConfig,
+	windowWarmupFileConfig,
+} from "./window-warmup";

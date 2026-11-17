@@ -14,6 +14,10 @@ import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 import { refreshBackoffUntil } from "./token-manager";
 
 type EligibilityContext = Pick<ProxyContext, "runtime" | "dbOps">;
+type SeatPolicyContext = {
+	runtime: Pick<ProxyContext["runtime"], "quotaThreshold" | "teamRouting">;
+	dbOps: Pick<ProxyContext["dbOps"], "getEnrollmentContact">;
+};
 type PoolStatusContext = Pick<
 	ProxyContext,
 	"runtime" | "dbOps" | "providerRegistry"
@@ -54,7 +58,7 @@ function pooledMaxUsage(
 	provider: Provider,
 	account: Account,
 	bucket: string,
-	ctx: EligibilityContext,
+	ctx: SeatPolicyContext,
 ): number | undefined {
 	const teamRouting = ctx.runtime.teamRouting;
 	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
@@ -77,7 +81,7 @@ function isQuotaEligible(
 	fleetThreshold: number,
 	now: number,
 	model: string | undefined,
-	ctx: EligibilityContext,
+	ctx: SeatPolicyContext,
 ): boolean {
 	const quota = account.quota_state;
 	if (!quota) return true;
@@ -110,14 +114,17 @@ function fleetAccounts(
 	provider: AccountProvider,
 	ctx: EligibilityContext,
 ): Account[] {
-	const teamRouting = ctx.runtime.teamRouting;
 	return ctx.dbOps
 		.getAccountsByProvider(provider)
-		.filter(
-			(account) =>
-				!account.paused &&
-				(teamRouting?.enabled !== true || isAllowlisted(account, teamRouting)),
-		);
+		.filter((account) => isFleetSeat(account, ctx));
+}
+
+function isFleetSeat(account: Account, ctx: SeatPolicyContext): boolean {
+	const teamRouting = ctx.runtime.teamRouting;
+	return (
+		!account.paused &&
+		(teamRouting?.enabled !== true || isAllowlisted(account, teamRouting))
+	);
 }
 
 /**
@@ -133,6 +140,28 @@ function cooldownEnd(account: Account, now: number): number | null {
 	return rateLimitEnd === null
 		? refreshEnd
 		: Math.max(rateLimitEnd, refreshEnd ?? 0);
+}
+
+/** Routing would serve this seat right now: in the fleet, not cooling, under every applicable cap. */
+export function isServableSeat(
+	provider: Provider,
+	account: Account,
+	model: string | undefined,
+	ctx: SeatPolicyContext,
+	now: number,
+): boolean {
+	return (
+		isFleetSeat(account, ctx) &&
+		cooldownEnd(account, now) === null &&
+		isQuotaEligible(
+			provider,
+			account,
+			ctx.runtime.quotaThreshold,
+			now,
+			model,
+			ctx,
+		)
+	);
 }
 
 function blockingResets(
@@ -224,17 +253,8 @@ export function getPoolStatus(
 	const config = ctx.runtime.teamRouting;
 	const now = Date.now();
 	const accounts = config?.enabled ? fleetAccounts(provider, ctx) : [];
-	const eligibleAccounts = accounts.filter(
-		(account) =>
-			cooldownEnd(account, now) === null &&
-			isQuotaEligible(
-				providerStrategy,
-				account,
-				ctx.runtime.quotaThreshold,
-				now,
-				model,
-				ctx,
-			),
+	const eligibleAccounts = accounts.filter((account) =>
+		isServableSeat(providerStrategy, account, model, ctx, now),
 	).length;
 	return {
 		version: 1,

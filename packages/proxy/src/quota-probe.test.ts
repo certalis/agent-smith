@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import type { Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account, AccountQuotaState } from "@agent-smith/types";
 import { OutsideSpendTracker } from "./outside-spend";
@@ -17,6 +18,7 @@ const config = {
 	admissionWaitMs: 1,
 	holdSeconds: 0,
 	quotaProbeSeconds: 1,
+	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 
 type ProviderLookup = Pick<ProviderRegistry, "getProvider">;

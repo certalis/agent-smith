@@ -1,6 +1,7 @@
-import type {
-	TeamRoutingConfig,
-	TeamRoutingFileConfig,
+import {
+	type TeamRoutingConfig,
+	type TeamRoutingFileConfig,
+	windowWarmupFileConfig,
 } from "@agent-smith/config";
 import type { Account, AccountQuotaState } from "@agent-smith/types";
 
@@ -68,6 +69,7 @@ export function teamRoutingFileConfig(
 		admission_wait_ms: routing.admissionWaitMs,
 		hold_seconds: routing.holdSeconds,
 		quota_probe_seconds: routing.quotaProbeSeconds,
+		window_warmup: windowWarmupFileConfig(routing.windowWarmup),
 	};
 }
 

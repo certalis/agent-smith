@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { type Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
@@ -102,6 +103,7 @@ function createProxyContext(
 				admissionWaitMs: 30_000,
 				holdSeconds: 0,
 				quotaProbeSeconds: 0,
+				windowWarmup: WINDOW_WARMUP_DEFAULTS,
 			},
 		},
 		refreshInFlight: new Map(),

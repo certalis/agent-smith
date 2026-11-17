@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { TeamAdmission } from "./team-admission";
 
 const config = {
@@ -14,6 +15,7 @@ const config = {
 	admissionWaitMs: 1_000,
 	holdSeconds: 0,
 	quotaProbeSeconds: 0,
+	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 
 test("queues one request behind a full account and grants it FIFO on release", async () => {

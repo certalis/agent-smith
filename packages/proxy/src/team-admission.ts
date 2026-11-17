@@ -1,4 +1,7 @@
-import type { TeamRoutingConfig } from "@agent-smith/config";
+import {
+	type TeamRoutingConfig,
+	WINDOW_WARMUP_DEFAULTS,
+} from "@agent-smith/config";
 
 const RAMP_INTERVAL_MS = 250;
 const RAMP_WINDOW_MS = 30_000;
@@ -107,6 +110,7 @@ export class TeamAdmission {
 			admissionWaitMs: 0,
 			holdSeconds: 0,
 			quotaProbeSeconds: 0,
+			windowWarmup: WINDOW_WARMUP_DEFAULTS,
 		});
 		// Already-serving siblings are warm; a new arrival must not shrink their cap.
 		if (account.active > 0 || account.queue.length > 0) return;
