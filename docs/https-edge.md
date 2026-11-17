@@ -50,8 +50,9 @@ Unset the variable and redeploy to close it.
 For [opt-in seat enrollment](api-http.md#private-claude-seat-enrollment-opt-in),
 share `https://pool.example.com/pool-enroll`, not the proxy homepage. The
 standalone entrance forwards only that page and its seven exact POST actions to
-the same pool. The email allowlist and provider identity check still apply;
-it grants neither a device key nor management access. Browser cookies and
+the same pool. The email allowlist accepts addresses or exact-domain rules such
+as `*@example.test`; the provider must still prove the exact entered email. The flow
+grants neither a device key nor management access. Browser cookies and
 `Set-Cookie` are forwarded only on these enrollment routes, never inference.
 Reopening the link in the same browser restores sign-in progress until the step
 expires or the pool restarts. Reconnect refreshes the saved identity rather than

@@ -97,7 +97,8 @@ Device keys allow independent revocation and cannot read management data.
 This does not add per-client fairness or budgets.
 
 Seat owners join through the server's optional `/pool-enroll` page, not its
-proxy homepage. Enable the existing email-listed sign-in flow with
+proxy homepage. Allow individual addresses or an exact domain (`*@example.test`)
+in [`enrollment_emails`](docs/configuration.md), then enable the sign-in flow with
 `AGENT_SMITH_ENROLLMENT_ORIGIN` as described in the
 [HTTPS deployment guide](docs/https-edge.md#standalone-render-web-service).
 
