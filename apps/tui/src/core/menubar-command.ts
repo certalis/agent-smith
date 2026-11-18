@@ -94,7 +94,7 @@ function defaultDeps(): MenubarDeps {
 			"agent-smith",
 			"menubar-status.json",
 		),
-		runtime: process.execPath,
+		runtime: Bun.which("bun") ?? process.execPath,
 		entry: () => realpathSync(process.argv[1] ?? ""),
 		pluginDirectory: swiftBarPluginDirectory,
 		fetchStatus: fetchPoolStatus,
