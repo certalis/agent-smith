@@ -8,6 +8,7 @@ The agent-smith CLI provides a command-line interface for managing OAuth account
 - [Global Options and Help](#global-options-and-help)
 - [Command Reference](#command-reference)
   - [Shared-pool Client Switch](#shared-pool-client-switch)
+  - [Pool Usage in the macOS Menu Bar](#pool-usage-in-the-macos-menu-bar)
   - [Account Management](#account-management)
   - [Statistics and History](#statistics-and-history)
   - [System Commands](#system-commands)
@@ -121,6 +122,31 @@ existing Claude Code/Codex sessions after switching; new launches read the
 current settings without reinstalling anything. Off uses the native client
 login and does not read the pool key. Status prints readable text; add `--raw`
 for JSON. These commands do not start a server or create a pool database.
+
+### Pool Usage in the macOS Menu Bar
+
+Operators with SSH access to the standalone pool host can watch the shared
+pool from the menu bar through [SwiftBar](https://github.com/swiftbar/SwiftBar).
+Install SwiftBar (`brew install --cask swiftbar`), open it once and pick a
+plugin folder, set `client.pool_ssh_host` in your
+[config](configuration.md#client-wrappers), then run:
+
+```bash
+agent-smith menubar install
+agent-smith menubar uninstall
+```
+
+`install` writes `agent-smith-pool.5m.sh` into the SwiftBar plugin folder. The
+plugin calls `agent-smith menubar render` every 5 minutes, so updating the
+package updates the menu without reinstalling it. `render` sends a read-only
+status script to the pool host over SSH (`ssh <pool_ssh_host> bun run -`), so
+it adds no HTTP route. The script reads the administrator key on the host and
+returns only account names, pool membership, 5h and 7d usage with their reset
+times, login-token state and the enrollment emails. The title shows how many
+pool accounts are under the usage cap in both windows. When a refresh fails, the
+menu keeps the last status, marks it with ⚠ and says why. That last status is
+cached owner-only in `~/Library/Caches/agent-smith/menubar-status.json`.
+`uninstall` removes only the plugin this command wrote.
 
 ### Account Management
 

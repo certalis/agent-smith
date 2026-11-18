@@ -63,7 +63,7 @@ export interface LocalRoutingStatus {
 	shellProfile: string;
 }
 
-function shellQuote(value: string): string {
+export function shellQuote(value: string): string {
 	return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 

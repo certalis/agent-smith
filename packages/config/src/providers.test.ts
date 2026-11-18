@@ -63,6 +63,20 @@ describe("provider configuration", () => {
 		});
 	});
 
+	it.each([
+		["pool-admin@ssh.example.test", "pool-admin@ssh.example.test"],
+		["pool-alias", "pool-alias"],
+		["-oProxyCommand=sh", undefined],
+		["admin@-oProxyCommand=sh", undefined],
+		["host;sh", undefined],
+		["host name", undefined],
+	])("keeps only a plain SSH destination for the pool: %s", (host, kept) => {
+		expect(
+			configFrom({ client: { pool_ssh_host: host } }).getClientRouting()
+				.poolSshHost,
+		).toBe(kept);
+	});
+
 	it("does not retain a raw forwarding key from client config", () => {
 		const config = configFrom({
 			client: {

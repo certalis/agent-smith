@@ -32,6 +32,7 @@ const result = await Bun.build({
 		join(tuiDir, "src/bin.ts"),
 		join(tuiDir, "src/server.ts"),
 		join(tuiDir, "src/pool.ts"),
+		join(tuiDir, "src/pool-status.ts"),
 		join(tuiDir, "src/core/client-launcher.ts"),
 		join(tuiDir, "../../packages/proxy/src/post-processor.worker.ts"),
 	],
