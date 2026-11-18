@@ -152,6 +152,11 @@ shared-pool use. The launchers read it each time Claude Code or Codex starts:
   Each request also carries that login's token to this Agent Smith server, which
   removes it before forwarding. Claude Code asks for a login when none is saved.
   Codex is unchanged.
+- `pool_ssh_host`: absent by default. The SSH destination (`user@host` or a
+  `~/.ssh/config` alias) of the standalone pool host, used only by
+  `agent-smith menubar` to read the pool's status. It must start with a letter,
+  digit or underscore and contain only letters, digits, `.`, `_`, `-` and one
+  `@`; other values are ignored.
 
 The agents service and a development caller use the same two values: an origin
 and a forwarding key. On the agents service they are environment settings; on a

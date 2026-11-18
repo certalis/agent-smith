@@ -9,6 +9,7 @@ import type { AccountDisplay } from "@agent-smith/ui";
 import * as tuiCore from "./core";
 import { parseArgs } from "./core";
 import { runClientCommand } from "./core/client-command";
+import { runMenubarCommand } from "./core/menubar-command";
 import { POC_NOTICE } from "./poc-notice";
 
 function printPocNotice() {
@@ -72,6 +73,10 @@ async function main() {
 		await runClientCommand(process.argv.slice(3));
 		return;
 	}
+	if (process.argv[2] === "menubar") {
+		await runMenubarCommand(process.argv.slice(3));
+		return;
+	}
 	// Initialize DI container and services
 	container.registerInstance(SERVICE_KEYS.Config, new Config());
 	container.registerInstance(SERVICE_KEYS.Logger, new Logger("TUI"));
@@ -95,6 +100,7 @@ Usage: agent-smith [options]
        agent-smith run [--port <number>] -- [claude arguments]
        agent-smith install-client
        agent-smith client on|off|status [--raw]
+       agent-smith menubar install|uninstall|render
 
 Options:
   --serve              Start API server with dashboard
@@ -125,6 +131,7 @@ Examples:
   agent-smith --analyze          # Run performance analysis
   agent-smith --stats            # View stats
   agent-smith install-client     # Configure Claude Code and Codex for this Agent Smith server
+  agent-smith menubar install    # Show the shared pool's usage in the macOS menu bar (SwiftBar)
 `);
 		process.exit(0);
 	}

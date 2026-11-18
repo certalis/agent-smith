@@ -135,6 +135,7 @@ export type ClientRoutingFileConfig = {
 	base_url?: string;
 	proxy_key_file?: string;
 	keep_claude_login?: boolean;
+	pool_ssh_host?: string;
 };
 
 export type ClientRoutingConfig = {
@@ -142,6 +143,7 @@ export type ClientRoutingConfig = {
 	baseUrl?: string;
 	proxyKeyFile?: string;
 	keepClaudeLogin?: boolean;
+	poolSshHost?: string;
 };
 
 const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
@@ -155,6 +157,7 @@ const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map(
 	BUILTIN_PROVIDER_CONFIGS.map((provider) => [provider.name, provider]),
 );
 const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
+const POOL_SSH_HOST_PATTERN = /^\w[\w.-]{0,127}(@\w[\w.-]{0,127})?$/;
 
 const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	enabled: false,
@@ -414,6 +417,12 @@ function sanitizeClientRouting(
 	if (typeof value.keep_claude_login === "boolean") {
 		client.keep_claude_login = value.keep_claude_login;
 	}
+	if (
+		typeof value.pool_ssh_host === "string" &&
+		POOL_SSH_HOST_PATTERN.test(value.pool_ssh_host)
+	) {
+		client.pool_ssh_host = value.pool_ssh_host;
+	}
 	return Object.keys(client).length > 0 ? client : undefined;
 }
 
@@ -601,6 +610,7 @@ function clientRouting(
 		...(client?.base_url && { baseUrl: client.base_url }),
 		...(client?.proxy_key_file && { proxyKeyFile: client.proxy_key_file }),
 		...(client?.keep_claude_login === true && { keepClaudeLogin: true }),
+		...(client?.pool_ssh_host && { poolSshHost: client.pool_ssh_host }),
 	};
 }
 
