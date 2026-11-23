@@ -2,6 +2,7 @@ import { AnthropicProvider } from "./providers/anthropic/provider";
 import { ClaudeCodeProvider } from "./providers/claude-code/provider";
 import { CodexProvider } from "./providers/codex/provider";
 import { ModelStudioAnthropicProvider } from "./providers/model-studio/provider";
+import { GoogleGeminiProvider } from "./providers/google-gemini/provider";
 import { OpenAIProvider } from "./providers/openai/provider";
 import { ProviderRegistry } from "./registry";
 import type { Provider } from "./types";
@@ -25,6 +26,8 @@ function createProvider(definition: ProviderDefinition): Provider {
 				return new AnthropicProvider();
 			case "model-studio-anthropic-api":
 				return new ModelStudioAnthropicProvider();
+			case "google-gemini-api":
+				return new GoogleGeminiProvider();
 			case "openai-api":
 				return new OpenAIProvider();
 			case "claude-code":

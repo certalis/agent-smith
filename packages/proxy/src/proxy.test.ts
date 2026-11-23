@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
-import { type Provider, ProviderRegistry } from "@agent-smith/providers";
+import {
+	GoogleGeminiProvider,
+	type Provider,
+	ProviderRegistry,
+} from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import { handleProxy, type ProxyContext } from "./proxy";
 import { TeamRouter } from "./team-router";
@@ -78,7 +82,7 @@ function createTestAccount(): Account {
 function createProxyContext(
 	providers: Provider[],
 	accounts: Account[] = [],
-	providerPools: Record<string, readonly string[]> = {},
+	providerRouting: Record<string, readonly string[]> | ProviderRegistry = {},
 ): ProxyContext {
 	const preferences = new Map<
 		string,
@@ -89,9 +93,12 @@ function createProxyContext(
 		{ category: string; lastSeenAt: number; retryAt: number | undefined }
 	>();
 	return {
-		providerRegistry: new ProviderRegistry(providers, {
-			providerPools,
-		}),
+		providerRegistry:
+			providerRouting instanceof ProviderRegistry
+				? providerRouting
+				: new ProviderRegistry(providers, {
+						providerPools: providerRouting,
+					}),
 		strategy: {
 			select(eligible: Account[]) {
 				return eligible;
@@ -190,6 +197,139 @@ afterEach(() => {
 });
 
 describe("handleProxy routing", () => {
+	it("converts a canonical pooled Messages call at the Google provider edge", async () => {
+		const provider = new GoogleGeminiProvider();
+		provider.name = "gemini";
+		const account: Account = {
+			...createTestAccount(),
+			provider: "gemini",
+			auth_method: "api_key",
+			api_key: "google-selected-key",
+			access_token: null,
+			refresh_token: null,
+			expires_at: null,
+		};
+		const registry = new ProviderRegistry([provider], {
+			modelMaps: { gemini: { "claude-sonnet-4-5": "gemini-2.5-flash" } },
+			providerPools: { "anthropic-messages": ["gemini"] },
+		});
+		const upstreams: Request[] = [];
+		globalThis.fetch = mock(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				const upstream = new Request(input, init);
+				upstreams.push(upstream);
+				return new Response(
+					JSON.stringify({
+						candidates: [
+							{
+								content: {
+									role: "model",
+									parts: [{ text: "Hello from Gemini" }],
+								},
+								finishReason: "STOP",
+							},
+						],
+						usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+					}),
+					{ headers: { "content-type": "application/json" } },
+				);
+			},
+		) as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"anthropic-version": "2023-06-01",
+					"content-type": "application/json",
+					"x-api-key": "caller-must-not-leak",
+				},
+				body: JSON.stringify({
+					model: "claude-sonnet-4-5",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "Say hello" }],
+				}),
+			}),
+			url,
+			createProxyContext([provider], [account], registry),
+		);
+
+		expect(upstreams).toHaveLength(1);
+		expect(upstreams[0]?.url).toBe(
+			"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+		);
+		expect(upstreams[0]?.headers.get("x-goog-api-key")).toBe(
+			"google-selected-key",
+		);
+		expect(upstreams[0]?.headers.get("x-api-key")).toBeNull();
+		expect(upstreams[0]?.headers.get("anthropic-version")).toBeNull();
+		expect(await upstreams[0]?.json()).toEqual({
+			contents: [{ role: "user", parts: [{ text: "Say hello" }] }],
+			generationConfig: { maxOutputTokens: 32 },
+		});
+		expect(await response.json()).toMatchObject({
+			type: "message",
+			model: "gemini-2.5-flash",
+			content: [{ type: "text", text: "Hello from Gemini" }],
+		});
+	});
+
+	it("returns a client error without an upstream call for unsupported Gemini input", async () => {
+		const provider = new GoogleGeminiProvider();
+		provider.name = "gemini";
+		const account: Account = {
+			...createTestAccount(),
+			provider: "gemini",
+			auth_method: "api_key",
+			api_key: "google-selected-key",
+			access_token: null,
+			refresh_token: null,
+			expires_at: null,
+		};
+		const registry = new ProviderRegistry([provider], {
+			modelMaps: { gemini: { "claude-sonnet-4-5": "gemini-2.5-flash" } },
+			providerPools: { "anthropic-messages": ["gemini"] },
+		});
+		const fetchMock = mock(() => Promise.resolve(new Response("unexpected")));
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					model: "claude-sonnet-4-5",
+					max_tokens: 32,
+					messages: [
+						{
+							role: "user",
+							content: [
+								{
+									type: "image",
+									source: { type: "base64", data: "not-supported" },
+								},
+							],
+						},
+					],
+				}),
+			}),
+			url,
+			createProxyContext([provider], [account], registry),
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.text()).toContain(
+			"does not support Anthropic image content",
+		);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it("returns 404 for an unknown provider", async () => {
 		const response = await handleProxy(
 			new Request("http://localhost:8080/v1/google/v1/chat", {

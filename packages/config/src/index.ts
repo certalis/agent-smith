@@ -110,6 +110,7 @@ export type AlertsFileConfig = {
 export const PROVIDER_STRATEGIES = [
 	"anthropic-api",
 	"model-studio-anthropic-api",
+	"google-gemini-api",
 	"openai-api",
 	"claude-code",
 	"codex",
@@ -508,6 +509,7 @@ function sanitizeProviderPools(
 function wireForStrategy(strategy: ProviderStrategy): ProviderWire {
 	return strategy === "anthropic-api" ||
 		strategy === "model-studio-anthropic-api" ||
+		strategy === "google-gemini-api" ||
 		strategy === "claude-code"
 		? "anthropic-messages"
 		: "openai-responses";

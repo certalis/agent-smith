@@ -211,12 +211,24 @@ saved accounts visible but cannot be selected. Subscription pool membership is
 controlled by `team_routing.allowlisted_account_uuids`; there is no provider
 account-count setting.
 
+`google-gemini-api` is a named, API-key-only provider strategy for the Gemini
+Developer API. It serves the `anthropic-messages` wire: Agent Smith translates
+the supported Anthropic Messages request and response at the selected provider
+edge, while routing and account selection remain on the canonical wire. Give it
+an explicit `models` map; the mapped value is the Gemini model name used in the
+native endpoint URL. It currently supports text, system text, generation
+settings, declared functions, function calls, and function results. Images,
+documents, cached content, thinking, and Google hosted tools return a client
+error rather than being silently omitted.
+
 ### Provider pools and model maps
 
 `provider_pools` creates one client route for an ordered list of providers that
-speak the same protocol. The two wire names are `anthropic-messages` and
-`openai-responses`; a provider on the other wire is ignored rather than being
-translated. `pool` is reserved and cannot be a provider name.
+speak the same client-facing protocol. The two wire names are
+`anthropic-messages` and `openai-responses`; a provider on the other wire is
+ignored. `google-gemini-api` is the explicit native adapter exception: it joins
+the `anthropic-messages` pool and translates only after that provider has been
+selected. `pool` is reserved and cannot be a provider name.
 
 ```json
 {

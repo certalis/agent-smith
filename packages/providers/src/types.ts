@@ -23,6 +23,33 @@ export interface RateLimitInfo {
 	quotaState?: AccountQuotaState;
 }
 
+export type ProviderRequestTransformInput = {
+	body: ArrayBuffer | null;
+	headers: Headers;
+	mappedModel: string | undefined;
+	query: string;
+	upstreamPath: string;
+};
+
+export type ProviderRequestTransform = {
+	body: ArrayBuffer | null;
+	query: string;
+	upstreamPath: string;
+};
+
+export type ProviderResponseContext = {
+	messageId: string;
+	model: string | undefined;
+};
+
+/** A canonical request the selected provider cannot represent safely. */
+export class ProviderRequestTransformError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "ProviderRequestTransformError";
+	}
+}
+
 export interface Provider extends CapacitySource {
 	name: string;
 	defaultBaseUrl: string;
@@ -65,6 +92,11 @@ export interface Provider extends CapacitySource {
 	 * Prepare headers for the provider request
 	 */
 	prepareHeaders(headers: Headers, account: Account | null): Headers;
+
+	/** Converts the canonical request only after routing has selected an account. */
+	transformRequest?(
+		input: ProviderRequestTransformInput,
+	): ProviderRequestTransform;
 
 	/**
 	 * Parse rate limit information from response
@@ -112,6 +144,7 @@ export interface Provider extends CapacitySource {
 	processResponse(
 		response: Response,
 		account: Account | null,
+		context?: ProviderResponseContext,
 	): Promise<Response>;
 
 	/**

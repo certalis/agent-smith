@@ -23,6 +23,7 @@ function configFrom(data: unknown): Config {
 const EXAMPLES_DIR = join(import.meta.dir, "../../../examples/config");
 const API_KEY_EXAMPLES = [
 	"anthropic-api-key.json",
+	"google-gemini-anthropic-messages.json",
 	"openai-api-key.json",
 	"compatible-endpoint-fallback.json",
 	"model-studio-compatible-providers.json",
@@ -193,6 +194,26 @@ describe("provider configuration", () => {
 		]);
 	});
 
+	it("routes a configured Gemini native provider through the canonical Messages pool", () => {
+		const config = configFrom({
+			providers: {
+				gemini: {
+					strategy: "google-gemini-api",
+					models: { "claude-sonnet-*": "gemini-2.5-flash" },
+				},
+			},
+			provider_pools: { "anthropic-messages": ["gemini"] },
+		});
+
+		expect(config.getProviderConfig("gemini")).toEqual({
+			name: "gemini",
+			enabled: true,
+			strategy: "google-gemini-api",
+			models: { "claude-sonnet-*": "gemini-2.5-flash" },
+		});
+		expect(config.getProviderPool("anthropic-messages")).toEqual(["gemini"]);
+	});
+
 	it("reserves pool as the protocol route name", () => {
 		const config = configFrom({
 			providers: { pool: { strategy: "anthropic-api" } },
@@ -212,6 +233,19 @@ describe("README example configurations", () => {
 		expect(
 			exampleConfig("openai-api-key.json").getProviderPool("openai-responses"),
 		).toEqual(["openai"]);
+		expect(
+			exampleConfig("google-gemini-anthropic-messages.json").getProviderPool(
+				"anthropic-messages",
+			),
+		).toEqual(["gemini"]);
+		expect(
+			exampleConfig("google-gemini-anthropic-messages.json").getProviderConfig(
+				"gemini",
+			),
+		).toMatchObject({
+			strategy: "google-gemini-api",
+			models: { "claude-sonnet-*": "gemini-2.5-flash" },
+		});
 
 		const fallback = exampleConfig("compatible-endpoint-fallback.json");
 		expect(fallback.getProviderPool("anthropic-messages")).toEqual([

@@ -62,8 +62,19 @@ export async function forwardToClient(
 		preExtractedModel,
 	} = options;
 
+	// The provider sees its native response only after all capacity decisions
+	// are complete. It may translate a successful native response to the
+	// canonical client wire; error responses remain native for classification.
+	const responseProcessed = await ctx.provider.processResponse(
+		responseRaw,
+		account,
+		{
+			messageId: `msg_${requestId.replaceAll("-", "")}`,
+			model: preExtractedModel,
+		},
+	);
 	// Always strip compression headers *before* we do anything else
-	const response = withSanitizedProxyHeaders(responseRaw);
+	const response = withSanitizedProxyHeaders(responseProcessed);
 
 	// Prepare objects once for serialisation - sanitize headers before storing
 	const sanitizedReq = sanitizeRequestHeaders(requestHeaders);
