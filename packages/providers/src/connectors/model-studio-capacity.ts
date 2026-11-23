@@ -8,6 +8,7 @@ const MAX_BLOCK_BODY_BYTES = 64 * 1024;
 const MODEL_STUDIO_BLOCK_CATEGORIES: Readonly<
 	Record<string, Exclude<ProviderBlockCategory, "unknown">>
 > = {
+	Throttling: "burst",
 	"Throttling.RateQuota": "request-rate",
 	"Throttling.AllocationQuota": "token-allocation",
 	"Throttling.BurstRate": "burst",

@@ -30,6 +30,17 @@ test.each([
 	expect(result).toEqual({ category });
 });
 
+test("classifies a real Model Studio concurrency throttle as a burst", async () => {
+	const response = new Response(
+		'{"request_id":"…","code":"Throttling","message":"Too many concurrent requests."}',
+		{ headers: { "content-type": "application/json" }, status: 429 },
+	);
+
+	expect(await classifyModelStudioCapacityBlock(response)).toEqual({
+		category: "burst",
+	});
+});
+
 test("keeps unfamiliar Model Studio 429 responses and large bodies honest", async () => {
 	const unknown = await classifyModelStudioCapacityBlock(
 		new Response(JSON.stringify({ code: "Throttling.NewLimit" }), {
