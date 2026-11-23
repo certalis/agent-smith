@@ -4,9 +4,10 @@
 
 agent-smith orders eligible accounts for each provider-native request. A direct
 `/v1/<provider>/*` route stays with that provider. A configured
-`/v1/pool/<wire>/*` route starts with its first compatible provider and may
-make one bounded move to the next compatible provider. It does not create a
-fleet-wide sticky account: that legacy behavior would override quota and
+`/v1/pool/<wire>/*` route starts with its first compatible provider. It changes
+provider only after a wrapped Claude Code user chooses one, or for a named
+unattended device with the private ordered-fallback policy. It does not create
+a fleet-wide sticky account: that legacy behavior would override quota and
 operator priority decisions.
 
 For a request, the proxy:
@@ -163,11 +164,12 @@ The selected account is tried first. Failover is deliberately bounded:
   sibling;
 - transport failure: one sibling.
 
-For a pool route, the next compatible provider replaces the ordinary
-all-accounts-spent response. A 5xx, 529, or failure found before the first
-streamed byte may use that next provider only when the current provider has no
-eligible sibling. The request never first tries a sibling and then walks to a
-second provider. A per-minute 429 always remains on its current provider.
+For a pool route, an ordinary caller receives the current provider's capacity
+or error response instead of silently moving to another provider. A wrapped
+Claude Code session may make that move only after the person chooses it. A
+named unattended device with `caller_provider_fallback: "ordered"` may continue
+only to later configured providers after a block. A per-minute 429 always
+remains on its current provider.
 
 No branch may silently reach a third account.
 

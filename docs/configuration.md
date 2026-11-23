@@ -241,13 +241,14 @@ an allowlist: its exact keys and trailing-`*` prefixes are the only client
 model names that provider can serve. On a mapped provider, only the JSON
 `model` value is patched in place; no request protocol is translated.
 
-The pool tries the first compatible provider, then at most one next provider
-when the first has no eligible account or has no eligible sibling for a
-pre-output 5xx/529 failure. A provider move loses prompt-cache warmth and may
-change model behavior or cost. A per-minute 429 never moves providers, and a
-direct `/v1/<provider>/*` route never uses a pool. If no pool provider serves a
-model, the proxy returns `400` naming `provider_pools.<wire>`; add a compatible
-provider/model map or use a direct route intentionally.
+The pool starts with the first compatible provider. An ordinary request stays
+there: a wrapped Claude Code user must choose another provider, or a named
+unattended device must have the private ordered-fallback policy. A provider
+move loses prompt-cache warmth and may change model behavior or cost. A
+per-minute 429 never moves providers, and a direct `/v1/<provider>/*` route
+never uses a pool. If no pool provider serves a model, the proxy returns `400`
+naming `provider_pools.<wire>`; add a compatible provider/model map or use a
+direct route intentionally.
 
 ### Qwen and Kimi through Model Studio
 
@@ -265,6 +266,10 @@ Beijing Model Studio region, so use a Beijing API key. For another region, use
 that region's matching endpoint and API key together. Add a Model Studio
 API-key account for each configured provider name. Using the same key under
 more than one name selects different models; it does not create extra capacity.
+A workspace endpoint such as
+`https://<WorkspaceId>.<region>.maas.aliyuncs.com/apps/anthropic` also works as
+`base_url`; the models available there depend on that workspace's region and
+deployment scope.
 
 The `kimi-*` names use Kimi models supplied through Model Studio. They are not
 a direct Kimi Chat Completions API configuration, which Agent-smith does not

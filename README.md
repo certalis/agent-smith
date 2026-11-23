@@ -270,9 +270,10 @@ share that organisation's limits, so adding them adds no capacity.
 
 - **Inside a provider**, an account at its quota threshold is skipped. A
   server error before any output may take one hop to another eligible account.
-- **Across providers**, a pool moves to its next provider only when the current
-  one has no eligible account, or has no eligible account left for that one
-  server-error hop. It moves at most once per request.
+- **Across providers**, an ordinary request never moves automatically. A person
+  in a wrapped Claude Code session must choose a provider, or a named unattended
+  device must have the private ordered-fallback policy. A change loses the
+  prompt cache and can change model behaviour and cost.
 - A per-minute rate limit never moves a request to another provider, and
   nothing moves once output has started reaching the client.
 - A conversation stays on its account while that account is eligible. Moving
