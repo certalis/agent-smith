@@ -26,6 +26,6 @@ export {
 	credentialsFromCodexTokenResponse,
 	importCodexCredentials,
 } from "./codex/index";
-export { ModelStudioAnthropicProvider } from "./model-studio/index";
 export { GoogleGeminiProvider } from "./google-gemini/index";
+export { ModelStudioAnthropicProvider } from "./model-studio/index";
 export { OpenAIOAuthProvider, OpenAIProvider } from "./openai/index";

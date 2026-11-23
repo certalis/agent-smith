@@ -1,8 +1,8 @@
 import { AnthropicProvider } from "./providers/anthropic/provider";
 import { ClaudeCodeProvider } from "./providers/claude-code/provider";
 import { CodexProvider } from "./providers/codex/provider";
-import { ModelStudioAnthropicProvider } from "./providers/model-studio/provider";
 import { GoogleGeminiProvider } from "./providers/google-gemini/provider";
+import { ModelStudioAnthropicProvider } from "./providers/model-studio/provider";
 import { OpenAIProvider } from "./providers/openai/provider";
 import { ProviderRegistry } from "./registry";
 import type { Provider } from "./types";

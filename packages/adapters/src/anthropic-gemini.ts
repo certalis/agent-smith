@@ -166,9 +166,12 @@ function toolDeclarations(value: unknown): JsonRecord[] | undefined {
 		if (tool.cache_control !== undefined) {
 			throw new UnsupportedAnthropicFeatureError("cached content");
 		}
+		if (tool.type !== undefined && tool.type !== "custom") {
+			throw new UnsupportedAnthropicFeatureError("provider-hosted tools");
+		}
 		const declaration: JsonRecord = {
 			name: string(tool.name, "tool.name"),
-			parametersJsonSchema: record(tool.input_schema, "tool.input_schema"),
+			parameters: record(tool.input_schema, "tool.input_schema"),
 		};
 		if (tool.description !== undefined) {
 			declaration.description = string(tool.description, "tool.description");

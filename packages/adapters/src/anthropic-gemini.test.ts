@@ -104,7 +104,7 @@ describe("toGeminiGenerateContent", () => {
 							{
 								name: "weather",
 								description: "Looks up a city's weather.",
-								parametersJsonSchema: {
+								parameters: {
 									type: "object",
 									properties: { city: { type: "string" } },
 									required: ["city"],
@@ -138,6 +138,22 @@ describe("toGeminiGenerateContent", () => {
 				},
 			},
 		});
+	});
+
+	it("rejects a provider-hosted tool instead of treating it as a function declaration", () => {
+		expect(() =>
+			toGeminiGenerateContent(
+				{
+					model: "claude-sonnet-4-5",
+					max_tokens: 32,
+					tools: [{ type: "web_search_20250305", name: "web_search" }],
+					messages: [{ role: "user", content: "Search for Paris weather" }],
+				},
+				"gemini-2.5-flash",
+			),
+		).toThrow(
+			"Gemini adapter does not support Anthropic provider-hosted tools",
+		);
 	});
 
 	it("rejects image content instead of dropping it", () => {

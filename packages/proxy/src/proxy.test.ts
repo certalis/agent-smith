@@ -330,6 +330,75 @@ describe("handleProxy routing", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
+	it("offers the provider chooser for a Google RESOURCE_EXHAUSTED response", async () => {
+		const gemini = new GoogleGeminiProvider();
+		gemini.name = "gemini";
+		const backup = createTestProvider("backup");
+		const accounts = [
+			{
+				...createTestAccount(),
+				id: "gemini-account",
+				provider: "gemini",
+				auth_method: "api_key",
+				api_key: "google-selected-key",
+				access_token: null,
+				refresh_token: null,
+				expires_at: null,
+			},
+			{ ...createTestAccount(), id: "backup-account", provider: "backup" },
+		] as Account[];
+		const registry = new ProviderRegistry([gemini, backup], {
+			modelMaps: { gemini: { "claude-sonnet-4-5": "gemini-2.5-flash" } },
+			providerPools: { "anthropic-messages": ["gemini", "backup"] },
+		});
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(
+				new Response(
+					JSON.stringify({
+						error: {
+							code: 429,
+							message: "Resource has been exhausted (e.g. check quota).",
+							status: "RESOURCE_EXHAUSTED",
+						},
+					}),
+					{ status: 429, headers: { "content-type": "application/json" } },
+				),
+			);
+		}) as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-agent-smith-interactive-provider-choice": "v1",
+				},
+				body: JSON.stringify({
+					model: "claude-sonnet-4-5",
+					max_tokens: 32,
+					messages: [{ role: "user", content: "Say hello" }],
+				}),
+			}),
+			url,
+			createProxyContext([gemini, backup], accounts, registry),
+		);
+
+		expect(response.status).toBe(429);
+		expect(await response.json()).toMatchObject({
+			blockedProvider: "gemini",
+			category: "unknown",
+			choices: [{ provider: "backup", model: "claude-sonnet-4-5" }],
+		});
+		expect(urls).toEqual([
+			"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+		]);
+	});
+
 	it("returns 404 for an unknown provider", async () => {
 		const response = await handleProxy(
 			new Request("http://localhost:8080/v1/google/v1/chat", {

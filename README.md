@@ -26,8 +26,9 @@ request to another provider.
 - **A pool of providers per client protocol.** Claude Code speaks
   `anthropic-messages`; Codex speaks `openai-responses`. Each protocol gets an
   ordered list of providers.
-- **Each provider is a built-in strategy** (`anthropic-api`, `openai-api`,
-  `google-gemini-api`, `claude-code`, `codex`). It knows how to authenticate,
+- **Each provider is a built-in strategy** (`anthropic-api`,
+  `model-studio-anthropic-api`, `google-gemini-api`, `openai-api`,
+  `claude-code`, `codex`). It knows how to authenticate,
   how to read its quota signals, and how to choose between its own accounts.
 - **Each provider holds its accounts**: API keys, or subscription sign-ins once
   you enable them.
@@ -164,7 +165,7 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | Key | What it does |
 |---|---|
 | `providers.<name>.enabled` | Turns a provider's routes on or off. By default `anthropic` and `openai` are on, and `claude-code` and `codex` are off. |
-| `providers.<name>.strategy` | The built-in strategy: `anthropic-api`, `google-gemini-api`, `openai-api`, `claude-code` or `codex`. Required for a provider name you add yourself. |
+| `providers.<name>.strategy` | The built-in strategy: `anthropic-api`, `model-studio-anthropic-api`, `google-gemini-api`, `openai-api`, `claude-code` or `codex`. Required for a provider name you add yourself. |
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |

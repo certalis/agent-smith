@@ -218,8 +218,9 @@ edge, while routing and account selection remain on the canonical wire. Give it
 an explicit `models` map; the mapped value is the Gemini model name used in the
 native endpoint URL. It currently supports text, system text, generation
 settings, declared functions, function calls, and function results. Images,
-documents, cached content, thinking, and Google hosted tools return a client
-error rather than being silently omitted.
+documents, cached content, thinking, Anthropic beta features, provider-hosted
+tools, metadata, context management, output configuration, service tier, and
+stream options return a client error rather than being silently omitted.
 
 ### Provider pools and model maps
 
