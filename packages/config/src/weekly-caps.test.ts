@@ -23,36 +23,43 @@ describe("weekly cap configuration", () => {
 			maxUsage: 0.9,
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: {},
+			callerWeeklyMaxUsage: {},
 		});
 	});
-	it("normalizes file and API email keys and persists caps across reload", () => {
+	it("normalizes private caps and preserves them across ordinary updates", () => {
 		const { config, path } = configFrom({
 			weekly_max_usage: 0.95,
 			weekly_max_usage_by_email: { " Tech@Example.test ": 0.3 },
+			caller_weekly_max_usage: { alice: 0.7 },
 		});
 		expect(config.getTeamRouting()).toMatchObject({
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
+			callerWeeklyMaxUsage: { alice: 0.7 },
 		});
 		config.setTeamRouting({ enabled: false });
 		expect(new Config(path).getTeamRouting()).toMatchObject({
 			enabled: false,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
+			callerWeeklyMaxUsage: { alice: 0.7 },
 		});
 		config.setTeamRouting({
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { " Other@Example.test ": 0.95 },
+			caller_weekly_max_usage: { bob: 0.8 },
 		});
 		expect(new Config(path).getRuntime().teamRouting).toMatchObject({
 			maxUsage: 0.8,
 			weeklyMaxUsage: 0.9,
 			weeklyMaxUsageByEmail: { "other@example.test": 0.95 },
+			callerWeeklyMaxUsage: { bob: 0.8 },
 		});
 		expect(JSON.parse(readFileSync(path, "utf8")).team_routing).toEqual({
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { "other@example.test": 0.95 },
+			caller_weekly_max_usage: { bob: 0.8 },
 		});
 	});
 	it.each([
@@ -62,9 +69,15 @@ describe("weekly cap configuration", () => {
 		...[0, -0.1, 0.951, Number.NaN, Infinity, "0.3", null].map((value) => ({
 			weekly_max_usage_by_email: { "tech@example.test": value },
 		})),
+		...[0, -0.1, 0.951, Number.NaN, Infinity, "0.3", null].map((value) => ({
+			caller_weekly_max_usage: { alice: value },
+		})),
 		{ weekly_max_usage_by_email: { "invalid-email": 0.3 } },
 		{ weekly_max_usage_by_email: [] },
 		{ weekly_max_usage_by_email: null },
+		{ caller_weekly_max_usage: { "alice@example.test": 0.7 } },
+		{ caller_weekly_max_usage: [] },
+		{ caller_weekly_max_usage: null },
 	])("rejects invalid weekly policy without replacing the saved policy: %j", (bad) => {
 		const { config, path } = configFrom({ enabled: true, max_usage: 0.8 });
 		const before = config.getTeamRouting();

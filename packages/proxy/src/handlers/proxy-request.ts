@@ -33,6 +33,7 @@ export function prepareProxyRequest(
 	teamRequestOverride?: TeamRoutingRequest,
 	mappedModel: string | undefined = undefined,
 	selectionOptions?: AccountSelectionOptions,
+	callerId?: string,
 ): { accounts: Account[]; request: ProxyRequest } {
 	const thread = parseMessageThreadRequest(
 		body,
@@ -48,6 +49,7 @@ export function prepareProxyRequest(
 		model: meta.model,
 		provider: ctx.providerName,
 		sessionId,
+		callerId,
 	};
 	const request = {
 		body,
@@ -94,14 +96,18 @@ export function selectRequestAccounts(
 /** When this request may retry: the soonest of its seats, one when a manual pin or a message thread binds it. */
 export function getRequestRetryAt(request: ProxyRequest): number | null {
 	const { ctx, teamRequest } = request;
-	return getSoonestQuotaReset(request.meta, ctx, (fleet) =>
-		onThreadSeat(
-			request,
-			ctx.teamRouter?.eligibleAccounts(
-				fleet,
-				teamRequest,
-				ctx.runtime.teamRouting,
-			) ?? fleet,
-		),
+	return getSoonestQuotaReset(
+		request.meta,
+		ctx,
+		(fleet) =>
+			onThreadSeat(
+				request,
+				ctx.teamRouter?.eligibleAccounts(
+					fleet,
+					teamRequest,
+					ctx.runtime.teamRouting,
+				) ?? fleet,
+			),
+		teamRequest.callerId,
 	);
 }

@@ -16,6 +16,16 @@ import {
 } from "@agent-smith/types";
 import { parseJsonObject } from "../utils/json";
 
+/** Named caller ceilings are routing policy, not dashboard configuration. */
+function publicTeamRouting(config: Config) {
+	const {
+		callerWeeklyMaxUsage: _callerWeeklyMaxUsage,
+		weeklyMaxUsageByEmail: _weeklyMaxUsageByEmail,
+		...routing
+	} = config.getTeamRouting();
+	return routing;
+}
+
 /**
  * Create config handlers
  */
@@ -78,11 +88,7 @@ export function createConfigHandlers(config: Config) {
 			return jsonResponse(LB_STRATEGIES);
 		},
 
-		getTeamRouting: (): Response => {
-			const { weeklyMaxUsageByEmail: _privateLimits, ...routing } =
-				config.getTeamRouting();
-			return jsonResponse(routing);
-		},
+		getTeamRouting: (): Response => jsonResponse(publicTeamRouting(config)),
 
 		setTeamRouting: async (req: Request): Promise<Response> => {
 			try {
@@ -91,7 +97,7 @@ export function createConfigHandlers(config: Config) {
 				return jsonResponse({
 					success: true,
 					message: "Team routing settings updated",
-					data: config.getTeamRouting(),
+					data: publicTeamRouting(config),
 				});
 			} catch (error) {
 				if (error instanceof ValidationError || error instanceof Error) {

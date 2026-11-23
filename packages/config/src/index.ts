@@ -60,6 +60,7 @@ export interface TeamRoutingConfig {
 	maxUsage: number;
 	weeklyMaxUsage: number;
 	weeklyMaxUsageByEmail: Record<string, number>;
+	callerWeeklyMaxUsage: Record<string, number>;
 	admissionCap: number;
 	admissionQueueLimit: number;
 	admissionWaitMs: number;
@@ -76,6 +77,7 @@ export type TeamRoutingFileConfig = {
 	max_usage?: number;
 	weekly_max_usage?: number;
 	weekly_max_usage_by_email?: Record<string, number>;
+	caller_weekly_max_usage?: Record<string, number>;
 	admission_cap?: number;
 	admission_queue_limit?: number;
 	admission_wait_ms?: number;
@@ -158,6 +160,8 @@ const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map(
 );
 const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
 const POOL_SSH_HOST_PATTERN = /^\w[\w.-]{0,127}(@\w[\w.-]{0,127})?$/;
+const CALLER_ID_PATTERN = /^[-a-zA-Z0-9_]{1,64}$/;
+const MAX_CALLERS = 128;
 
 const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	enabled: false,
@@ -167,6 +171,7 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.95,
 	weeklyMaxUsageByEmail: {},
+	callerWeeklyMaxUsage: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -558,6 +563,24 @@ function sanitizeTeamRouting(
 			) as Record<string, number>;
 		}
 	}
+	if (isRecord(value.caller_weekly_max_usage)) {
+		const entries = Object.entries(value.caller_weekly_max_usage);
+		if (
+			entries.length <= MAX_CALLERS &&
+			entries.every(
+				([caller, cap]) =>
+					CALLER_ID_PATTERN.test(caller) &&
+					isFiniteNumber(cap) &&
+					cap > 0 &&
+					cap <= 0.95,
+			)
+		) {
+			result.caller_weekly_max_usage = Object.fromEntries(entries) as Record<
+				string,
+				number
+			>;
+		}
+	}
 	if (isNonNegativeFiniteNumber(value.admission_cap)) {
 		result.admission_cap = Math.floor(value.admission_cap);
 	}
@@ -818,6 +841,7 @@ export class Config extends EventEmitter {
 			weeklyMaxUsage:
 				file?.weekly_max_usage ?? TEAM_ROUTING_DEFAULTS.weeklyMaxUsage,
 			weeklyMaxUsageByEmail: { ...file?.weekly_max_usage_by_email },
+			callerWeeklyMaxUsage: { ...file?.caller_weekly_max_usage },
 			admissionCap: file?.admission_cap ?? TEAM_ROUTING_DEFAULTS.admissionCap,
 			admissionQueueLimit:
 				file?.admission_queue_limit ??
@@ -915,6 +939,7 @@ export class Config extends EventEmitter {
 			"max_usage",
 			"weekly_max_usage",
 			"weekly_max_usage_by_email",
+			"caller_weekly_max_usage",
 			"admission_cap",
 			"admission_queue_limit",
 			"admission_wait_ms",
@@ -942,6 +967,14 @@ export class Config extends EventEmitter {
 		) {
 			sanitized.weekly_max_usage_by_email = {
 				...oldValue.weekly_max_usage_by_email,
+			};
+		}
+		if (
+			!("caller_weekly_max_usage" in value) &&
+			oldValue?.caller_weekly_max_usage
+		) {
+			sanitized.caller_weekly_max_usage = {
+				...oldValue.caller_weekly_max_usage,
 			};
 		}
 		this.persistStrictly("team_routing", sanitized);

@@ -19,6 +19,7 @@ const routing: TeamRoutingConfig = {
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
+	callerWeeklyMaxUsage: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -61,6 +62,7 @@ describe("local pool policy", () => {
 			...routing,
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
+			callerWeeklyMaxUsage: { alice: 0.7 },
 		};
 		const next = nextTeamRoutingConfig(policy, oauthSeat(), true);
 
@@ -73,6 +75,7 @@ describe("local pool policy", () => {
 			allowlisted_account_uuids: ["existing-seat", "new-seat"],
 			weekly_max_usage: 0.95,
 			weekly_max_usage_by_email: { "tech@example.test": 0.3 },
+			caller_weekly_max_usage: { alice: 0.7 },
 		});
 	});
 

@@ -59,6 +59,7 @@ function pooledMaxUsage(
 	account: Account,
 	bucket: string,
 	ctx: SeatPolicyContext,
+	callerId?: string,
 ): number | undefined {
 	const teamRouting = ctx.runtime.teamRouting;
 	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
@@ -68,10 +69,17 @@ function pooledMaxUsage(
 		.getEnrollmentContact(account.id)
 		?.email?.trim()
 		.toLowerCase();
-	const override = email ? teamRouting.weeklyMaxUsageByEmail[email] : undefined;
+	const accountOverride = email
+		? teamRouting.weeklyMaxUsageByEmail[email]
+		: undefined;
+	const callerOverride =
+		callerId && Object.hasOwn(teamRouting.callerWeeklyMaxUsage, callerId)
+			? teamRouting.callerWeeklyMaxUsage[callerId]
+			: undefined;
 	return Math.min(
 		teamRouting.weeklyMaxUsage,
-		override ?? teamRouting.weeklyMaxUsage,
+		accountOverride ?? Number.POSITIVE_INFINITY,
+		callerOverride ?? Number.POSITIVE_INFINITY,
 	);
 }
 
@@ -82,6 +90,7 @@ function isQuotaEligible(
 	now: number,
 	model: string | undefined,
 	ctx: SeatPolicyContext,
+	callerId?: string,
 ): boolean {
 	const quota = account.quota_state;
 	if (!quota) return true;
@@ -96,7 +105,7 @@ function isQuotaEligible(
 				fleetThreshold,
 				now,
 				model,
-				pooledMaxUsage(provider, account, name, ctx),
+				pooledMaxUsage(provider, account, name, ctx, callerId),
 			)
 		) {
 			return false;
@@ -170,6 +179,7 @@ function blockingResets(
 	model: string | undefined,
 	ctx: EligibilityContext,
 	now: number,
+	callerId?: string,
 ): number[] {
 	return Object.entries(account.quota_state?.windows ?? {})
 		.filter(
@@ -184,7 +194,7 @@ function blockingResets(
 					ctx.runtime.quotaThreshold,
 					now,
 					model,
-					pooledMaxUsage(provider, account, bucket, ctx),
+					pooledMaxUsage(provider, account, bucket, ctx, callerId),
 				),
 		)
 		.map(([, window]) => window.resetAt as number);
@@ -197,6 +207,7 @@ function servableAt(
 	model: string | undefined,
 	ctx: EligibilityContext,
 	now: number,
+	callerId?: string,
 ): number | null {
 	const cooldown = cooldownEnd(account, now);
 	if (
@@ -207,11 +218,12 @@ function servableAt(
 			now,
 			model,
 			ctx,
+			callerId,
 		)
 	) {
 		return cooldown;
 	}
-	const resets = blockingResets(provider, account, model, ctx, now);
+	const resets = blockingResets(provider, account, model, ctx, now, callerId);
 	return resets.length > 0 ? Math.max(...resets, cooldown ?? 0) : null;
 }
 
@@ -226,17 +238,18 @@ function soonestServableAt(
 	model: string | undefined,
 	ctx: EligibilityContext,
 	now: number,
+	callerId?: string,
 ): number | null {
 	if (
 		!fleet.some(
 			(account) =>
-				blockingResets(provider, account, model, ctx, now).length > 0,
+				blockingResets(provider, account, model, ctx, now, callerId).length > 0,
 		)
 	) {
 		return null;
 	}
 	const times = seats.flatMap((account) => {
-		const at = servableAt(provider, account, model, ctx, now);
+		const at = servableAt(provider, account, model, ctx, now, callerId);
 		return at === null ? [] : [at];
 	});
 	return times.length > 0 ? Math.min(...times) : null;
@@ -285,6 +298,7 @@ export function getSoonestQuotaReset(
 	meta: RequestMeta,
 	ctx: ResolvedProxyContext,
 	seatsFor: (fleet: Account[]) => Account[] = (fleet) => fleet,
+	callerId?: string,
 ): number | null {
 	const fleet = fleetAccounts(ctx.providerName, ctx);
 	return soonestServableAt(
@@ -294,6 +308,7 @@ export function getSoonestQuotaReset(
 		meta.model,
 		ctx,
 		Date.now(),
+		callerId,
 	);
 }
 
@@ -306,6 +321,7 @@ export function isEveryAccountQuotaBlocked(
 	meta: RequestMeta,
 	ctx: ResolvedProxyContext,
 	now: number = Date.now(),
+	callerId?: string,
 ): boolean {
 	return !fleetAccounts(ctx.providerName, ctx).some((account) =>
 		isQuotaEligible(
@@ -315,6 +331,7 @@ export function isEveryAccountQuotaBlocked(
 			now,
 			meta.model,
 			ctx,
+			callerId,
 		),
 	);
 }
@@ -324,6 +341,7 @@ function selectRevalidationProbe(
 	ctx: ResolvedProxyContext,
 	now: number,
 	model: string | undefined,
+	callerId?: string,
 ): Account[] {
 	const probes = ctx.quotaProbeAt;
 	const lastProbeAt = probes?.get(ctx.providerName);
@@ -336,12 +354,12 @@ function selectRevalidationProbe(
 
 	const [probe] = accounts
 		.filter((account) => {
-			// W2's real-client revalidation remains available for ordinary
-			// accounts. A pooled seat's configured owner reserve is stricter: it is
-			// never consumed by a probe.
+			// A real-client probe remains available for ordinary accounts. It must
+			// never bypass a weekly ceiling that applies to a pooled account.
+			const routing = ctx.runtime.teamRouting;
 			return (
-				ctx.runtime.teamRouting?.enabled !== true ||
-				!isAllowlisted(account, ctx.runtime.teamRouting) ||
+				routing?.enabled !== true ||
+				!isAllowlisted(account, routing) ||
 				isQuotaEligible(
 					ctx.provider,
 					account,
@@ -349,6 +367,7 @@ function selectRevalidationProbe(
 					now,
 					model,
 					ctx,
+					callerId,
 				)
 			);
 		})
@@ -376,6 +395,7 @@ export function getOrderedAccounts(
 	options: AccountSelectionOptions = {},
 ): Account[] {
 	const now = Date.now();
+	const callerId = teamRequest?.callerId;
 	const providerAccounts = ctx.dbOps
 		.getAvailableAccountsByProvider(ctx.providerName)
 		.filter((account) => refreshBackoffUntil(account, now) === null);
@@ -387,6 +407,7 @@ export function getOrderedAccounts(
 			now,
 			meta.model,
 			ctx,
+			callerId,
 		),
 	);
 	const candidates =
@@ -394,7 +415,13 @@ export function getOrderedAccounts(
 			? eligible
 			: options.allowRevalidationProbe === false || ctx.runtime.blockWhenAllFull
 				? []
-				: selectRevalidationProbe(providerAccounts, ctx, now, meta.model);
+				: selectRevalidationProbe(
+						providerAccounts,
+						ctx,
+						now,
+						meta.model,
+						callerId,
+					);
 	const prioritized = [...candidates].sort((left, right) => {
 		const priority = (left.priority ?? 0) - (right.priority ?? 0);
 		return priority !== 0

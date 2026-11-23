@@ -81,6 +81,9 @@ The configuration file is stored at:
     "prefer_expiring_quota": false,
     "allowlisted_account_uuids": [],
     "max_usage": 0.9,
+    "weekly_max_usage": 0.95,
+    "weekly_max_usage_by_email": {},
+    "caller_weekly_max_usage": {},
     "admission_cap": 5,
     "admission_queue_limit": 25,
     "admission_wait_ms": 30000,
@@ -249,8 +252,8 @@ provider/model map or use a direct route intentionally.
 
 `team_routing` is a single validated policy object. Unknown or invalid fields
 are rejected when changed through the API. `max_usage` must be greater than
-zero and no more than `0.9`; weekly limits must be greater than zero and no more
-than `0.95`.
+zero and no more than `0.9`; weekly ceilings must be greater than zero and no
+more than `0.95`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -261,6 +264,10 @@ than `0.95`.
 | `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
 | `weekly_max_usage` | `0.95` | Hard weekly utilization ceiling, including applicable model-family weekly windows. |
 | `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
+| `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
+| `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
+| `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
+| `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
@@ -484,7 +491,11 @@ Content-Type: application/json
 `POST` replaces the policy object using the snake_case fields shown above and
 takes effect for subsequent selection without a server restart. Management
 writes require `AGENT_SMITH_ADMIN_KEY` through `x-api-key`; do not put that key in the
-configuration file.
+configuration file. `caller_weekly_max_usage` is accepted only on this write
+path and is omitted from all API responses, including reads, so maintain the
+map in the server's owner-only configuration file. Its keys must match names
+from the protected device-key registry; a header, session, provider identity or
+arbitrary caller label cannot select an override.
 
 ### Runtime Update Behavior
 

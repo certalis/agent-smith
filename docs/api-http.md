@@ -308,9 +308,11 @@ The response uses `Cache-Control: no-store` and has no account identities or cre
 }
 ```
 
-Only available, allowlisted OAuth seats count. Quota thresholds and owner reserve
-reuse routing's eligibility rules. Disabled routing reports zero. Optional `model`
-includes that family's weekly quota; omission considers shared windows only.
+Only available, allowlisted OAuth seats count. Quota thresholds and the default
+weekly ceiling reuse routing's eligibility rules; caller-specific ceilings are
+not exposed by this aggregate scheduling endpoint. Disabled routing reports
+zero. Optional `model` includes that family's weekly quota; omission considers
+shared windows only.
 `retryAtMs` is, when no seat is eligible, the soonest a seat may serve again, in
 epoch milliseconds: once its last blocking quota window resets and its cooldown
 ends. It is null when no seat is quota-blocked or no reset is known. It is a

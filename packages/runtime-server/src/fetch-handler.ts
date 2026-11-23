@@ -10,7 +10,11 @@ import {
 	type WebSocketProxyData,
 } from "@agent-smith/proxy";
 import { serveDashboardRoute } from "./dashboard-assets";
-import { type ExposureConfig, exposureFailure } from "./exposure";
+import {
+	callerIdForRequest,
+	type ExposureConfig,
+	exposureFailure,
+} from "./exposure";
 import { forwardOAuthTokenRequest } from "./oauth-token";
 import { hasDotSegment } from "./request-path";
 
@@ -57,6 +61,7 @@ export function createServerFetchHandler({
 		if (rejected) {
 			return rejected;
 		}
+		const callerId = callerIdForRequest(req, url, exposureConfig);
 
 		const apiResponse = await apiRouter.handleRequest(url, req);
 		if (apiResponse) {
@@ -95,6 +100,7 @@ export function createServerFetchHandler({
 					url,
 					proxyContext,
 					server,
+					callerId,
 				);
 				if (websocketResponse) {
 					return websocketResponse;
@@ -105,7 +111,7 @@ export function createServerFetchHandler({
 			}
 
 			try {
-				return await handleProxyRequest(req, url, proxyContext);
+				return await handleProxyRequest(req, url, proxyContext, callerId);
 			} catch (error) {
 				return errorResponse(error);
 			}

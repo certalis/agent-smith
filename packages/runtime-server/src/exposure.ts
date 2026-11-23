@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { deviceKeyMatches } from "./device-keys";
+import { deviceKeyMatches, deviceKeyName } from "./device-keys";
 import { isDeviceRoute } from "./inference-routes";
 
 const FORWARDED_HEADERS = [
@@ -134,6 +134,22 @@ function keyRole(
 		return "device";
 	}
 	return null;
+}
+
+/** A named device key is the only caller identity allowed to affect routing. */
+export function callerIdForRequest(
+	req: Request,
+	url: URL,
+	config: ExposureConfig,
+): string | undefined {
+	if (keyRole(req, url, config) !== "device") return undefined;
+	const apiKey = req.headers.get("x-api-key");
+	return (
+		deviceKeyName(apiKey, config.clientKeysFile) ??
+		(isResponsesInferenceRoute(url.pathname)
+			? deviceKeyName(bearerToken(req), config.clientKeysFile)
+			: undefined)
+	);
 }
 
 function hostnameFromHostHeader(host: string): string | undefined {
