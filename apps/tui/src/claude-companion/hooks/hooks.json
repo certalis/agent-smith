@@ -1,0 +1,4 @@
+{
+	"description": "Agent-smith provider-choice companion",
+	"modules": ["./register.js"]
+}

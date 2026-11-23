@@ -1,6 +1,21 @@
+import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
+import {
+	ConversationProviderRouting,
+	capacityChoices,
+	createProviderCapacityProblem,
+	createProviderChoiceProblem,
+	interactiveProviderChoiceRequested,
+	manualProviderChoiceRequested,
+	type ProviderChoice,
+	providerPromotionDeclined,
+	providerWaitRequested,
+	readProviderChoice,
+	withProviderPromotionDetails,
+	withServedProviderHeaders,
+} from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
 import {
 	createResolvedProxyContext,
@@ -24,11 +39,13 @@ import {
 	type ProxyRequest,
 	prepareProxyRequest,
 } from "./handlers/proxy-request";
+import { PoolConversationProviderRoutingStore } from "./pool/conversation-provider-routing-store";
 import type { TeamRoutingRequest } from "./team-router";
 
 const log = new Logger("Proxy");
 
 type PoolCandidateResult =
+	| { block: ProviderCapacityBlock; kind: "capacity-block" }
 	| { kind: "next-provider" }
 	| { account?: Account; kind: "response"; response: Response };
 
@@ -78,6 +95,19 @@ function preferPinnedProvider(
 		: pool.providers;
 }
 
+function preferProvider(
+	providers: ResolvedProviderPool["providers"],
+	providerName: string | undefined,
+): ResolvedProviderPool["providers"] {
+	if (!providerName) return providers;
+	const preferred = providers.find(
+		(candidate) => candidate.provider.name === providerName,
+	);
+	return preferred
+		? [preferred, ...providers.filter((candidate) => candidate !== preferred)]
+		: providers;
+}
+
 async function proxyPoolCandidate(
 	request: ProxyRequest,
 	accounts: Account[],
@@ -94,6 +124,10 @@ async function proxyPoolCandidate(
 				kind: "response",
 				response: new Response("Bad Gateway", { status: 502 }),
 			};
+		}
+		if (attempt.kind === "provider-capacity-block") {
+			await attempt.discard?.();
+			return { block: attempt.block, kind: "capacity-block" };
 		}
 		if (attempt.kind === "per-minute-rate-limit") {
 			return {
@@ -176,6 +210,105 @@ async function proxyPoolCandidate(
 			};
 }
 
+function eligiblePoolProviders(
+	req: Request,
+	url: URL,
+	ctx: ProxyContext,
+	meta: RequestMeta,
+	body: ArrayBuffer | null,
+	pool: ResolvedProviderPool,
+	manualAccountName: string | undefined,
+	teamRequest: TeamRoutingRequest,
+): Set<string> {
+	const eligibleProviders = new Set<string>();
+	for (const candidate of pool.providers) {
+		const candidateContext = createResolvedProxyContext(
+			ctx,
+			candidate.provider,
+			pool.upstreamPath,
+		);
+		const prepared = prepareProxyRequest(
+			req,
+			url,
+			candidateContext,
+			{ ...meta, model: candidate.model },
+			body,
+			manualAccountName,
+			teamRequest,
+			candidate.model,
+			{ allowRevalidationProbe: false, applyTeamRouting: false },
+		);
+		if (prepared.request.thread || prepared.accounts.length === 0) continue;
+		const accounts = candidateContext.teamRouter
+			? candidateContext.teamRouter.eligibleAccounts(
+					prepared.accounts,
+					teamRequest,
+					candidateContext.runtime.teamRouting,
+				)
+			: prepared.accounts;
+		if (accounts.length > 0) eligibleProviders.add(candidate.provider.name);
+	}
+	return eligibleProviders;
+}
+
+function eligiblePoolChoices(
+	req: Request,
+	url: URL,
+	ctx: ProxyContext,
+	meta: RequestMeta,
+	body: ArrayBuffer | null,
+	pool: ResolvedProviderPool,
+	manualAccountName: string | undefined,
+	teamRequest: TeamRoutingRequest,
+	blockedProvider: string,
+): ReturnType<typeof capacityChoices> {
+	return capacityChoices(
+		pool.providers.map((candidate) => ({
+			model: candidate.model ?? meta.model ?? "",
+			provider: candidate.provider.name,
+		})),
+		blockedProvider,
+		eligiblePoolProviders(
+			req,
+			url,
+			ctx,
+			meta,
+			body,
+			pool,
+			manualAccountName,
+			teamRequest,
+		),
+	);
+}
+
+function eligibleHigherPoolChoices(
+	pool: ResolvedProviderPool,
+	selectedProvider: string,
+	eligibleProviders: ReadonlySet<string>,
+	routing: ConversationProviderRouting,
+	conversationKey: string,
+	now: number,
+): ProviderChoice[] {
+	const selectedIndex = pool.providers.findIndex(
+		(candidate) => candidate.provider.name === selectedProvider,
+	);
+	if (selectedIndex <= 0) return [];
+	return pool.providers.slice(0, selectedIndex).flatMap((candidate) => {
+		if (!eligibleProviders.has(candidate.provider.name)) return [];
+		if (
+			!routing.canOfferProvider(conversationKey, candidate.provider.name, now)
+		) {
+			return [];
+		}
+		return [
+			{
+				model: candidate.model ?? "",
+				provider: candidate.provider.name,
+			},
+		];
+	});
+}
+
 export async function proxyProviderPool(
 	req: Request,
 	url: URL,
@@ -185,6 +318,7 @@ export async function proxyProviderPool(
 	pool: ResolvedProviderPool,
 	manualAccountName?: string,
 	callerId?: string,
+	providerWaited = false,
 ): Promise<Response> {
 	const firstCandidate = pool.providers[0];
 	if (!firstCandidate) {
@@ -213,6 +347,65 @@ export async function proxyProviderPool(
 		firstContext.dbOps,
 	);
 	const pinnedAccount = pinnedId ? ctx.dbOps.getAccount(pinnedId) : null;
+	const conversationKey = firstContext.teamRouter?.getConversationPinKey(
+		teamRequest,
+		firstContext.runtime.teamRouting,
+		firstContext.provider,
+	);
+	const routing = new ConversationProviderRouting(
+		new PoolConversationProviderRoutingStore(ctx.dbOps),
+	);
+	let providerPreference = conversationKey
+		? routing.getPreference(conversationKey)
+		: null;
+	const interactive = interactiveProviderChoiceRequested(req.headers);
+	const manualChoice =
+		interactive && manualProviderChoiceRequested(req.headers);
+	if (
+		interactive &&
+		conversationKey &&
+		providerPreference &&
+		providerPromotionDeclined(req.headers)
+	) {
+		routing.declinePromotion(conversationKey, Date.now());
+		providerPreference = routing.getPreference(conversationKey);
+	}
+	const requestedChoice = interactive
+		? req.headers.get("x-agent-smith-provider-choice")
+		: null;
+	const configuredChoices = pool.providers.map((candidate) => ({
+		model: candidate.model ?? meta.model ?? "",
+		provider: candidate.provider.name,
+	}));
+	if (requestedChoice && !readProviderChoice(req.headers, configuredChoices)) {
+		return new Response("Selected provider is not available for this request", {
+			status: 409,
+		});
+	}
+	if (manualChoice) {
+		const ordered = preferProvider(
+			preferPinnedProvider(pool, pinnedAccount),
+			providerPreference?.provider,
+		);
+		const activeProvider =
+			ordered[0]?.provider.name ?? firstCandidate.provider.name;
+		const eligible = eligiblePoolProviders(
+			req,
+			url,
+			ctx,
+			meta,
+			body,
+			pool,
+			manualAccountName,
+			teamRequest,
+		);
+		return createProviderChoiceProblem({
+			activeProvider,
+			choices: configuredChoices.filter((choice) =>
+				eligible.has(choice.provider),
+			),
+		});
+	}
 	let soonestRetry: number | null = null;
 	let soonestFleetReset: number | null = null;
 	let everyCandidateFull = true;
@@ -231,7 +424,67 @@ export async function proxyProviderPool(
 		);
 	};
 
-	const candidates = preferPinnedProvider(pool, pinnedAccount).slice(0, 2);
+	const candidates = requestedChoice
+		? pool.providers.filter(
+				(candidate) => candidate.provider.name === requestedChoice,
+			)
+		: interactive
+			? preferProvider(
+					preferPinnedProvider(pool, pinnedAccount),
+					providerPreference?.provider,
+				).slice(0, 1)
+			: preferPinnedProvider(pool, pinnedAccount).slice(0, 2);
+	if (
+		interactive &&
+		providerWaitRequested(req.headers) &&
+		!providerWaited &&
+		candidates[0]
+	) {
+		const blocked = conversationKey
+			? routing.getBlock(conversationKey, candidates[0].provider.name)
+			: null;
+		const retryAt = blocked?.retryAt;
+		const holdMs = firstContext.runtime.teamRouting.holdSeconds * 1_000;
+		if (
+			ctx.quotaHold &&
+			retryAt !== undefined &&
+			retryAt > Date.now() &&
+			holdMs > 0 &&
+			retryAt - Date.now() <= holdMs
+		) {
+			await ctx.quotaHold.waitUntil(retryAt, req.signal);
+			return await proxyProviderPool(
+				req,
+				url,
+				ctx,
+				meta,
+				body,
+				pool,
+				manualAccountName,
+				callerId,
+				true,
+			);
+		}
+		if (retryAt === undefined || retryAt > Date.now()) {
+			return createProviderCapacityProblem({
+				blockedProvider: candidates[0].provider.name,
+				category: (blocked?.category ??
+					"unknown") as ProviderCapacityBlock["category"],
+				choices: eligiblePoolChoices(
+					req,
+					url,
+					ctx,
+					meta,
+					body,
+					pool,
+					manualAccountName,
+					teamRequest,
+					candidates[0].provider.name,
+				),
+				...(retryAt !== undefined && { retryAt }),
+			});
+		}
+	}
 	for (const [candidateIndex, candidate] of candidates.entries()) {
 		const candidateContext = createResolvedProxyContext(
 			ctx,
@@ -282,8 +535,46 @@ export async function proxyProviderPool(
 			accounts,
 			candidateIndex === 0,
 		);
+		if (result.kind === "capacity-block") {
+			if (conversationKey) {
+				routing.recordBlock(
+					conversationKey,
+					candidate.provider.name,
+					result.block,
+					Date.now(),
+				);
+			}
+			return createProviderCapacityProblem({
+				blockedProvider: candidate.provider.name,
+				category: result.block.category,
+				choices: eligiblePoolChoices(
+					req,
+					url,
+					ctx,
+					meta,
+					body,
+					pool,
+					manualAccountName,
+					teamRequest,
+					candidate.provider.name,
+				),
+				...(result.block.retryAt !== undefined && {
+					retryAt: result.block.retryAt,
+				}),
+			});
+		}
 		if (result.kind === "response") {
 			if (result.account) {
+				if (conversationKey) {
+					routing.clearBlock(conversationKey, candidate.provider.name);
+				}
+				if (conversationKey && requestedChoice) {
+					routing.selectProvider(
+						conversationKey,
+						candidate.provider.name,
+						Date.now(),
+					);
+				}
 				candidateContext.teamRouter?.rebind(
 					teamRequest,
 					result.account.id,
@@ -292,7 +583,40 @@ export async function proxyProviderPool(
 					candidateContext.dbOps,
 				);
 			}
-			return result.response;
+			if (!interactive) return result.response;
+			const served = withServedProviderHeaders(result.response, {
+				model: candidate.model ?? meta.model ?? "",
+				provider: candidate.provider.name,
+			});
+			if (
+				!conversationKey ||
+				!providerPreference ||
+				providerPreference.promotionDeclined ||
+				requestedChoice ||
+				providerPreference.provider !== candidate.provider.name
+			) {
+				return served;
+			}
+			return withProviderPromotionDetails(
+				served,
+				eligibleHigherPoolChoices(
+					pool,
+					candidate.provider.name,
+					eligiblePoolProviders(
+						req,
+						url,
+						ctx,
+						meta,
+						body,
+						pool,
+						manualAccountName,
+						teamRequest,
+					),
+					routing,
+					conversationKey,
+					Date.now(),
+				),
+			);
 		}
 
 		recordUnserved(prepared.request);
@@ -304,6 +628,27 @@ export async function proxyProviderPool(
 			soonestFleetReset,
 			{ blocked: true, holdSeconds: 0 },
 		);
+	}
+	if (interactive) {
+		const blockedProvider = candidates[0]?.provider.name;
+		if (blockedProvider) {
+			return createProviderCapacityProblem({
+				blockedProvider,
+				category: "unknown",
+				choices: eligiblePoolChoices(
+					req,
+					url,
+					ctx,
+					meta,
+					body,
+					pool,
+					manualAccountName,
+					teamRequest,
+					blockedProvider,
+				),
+				...(soonestRetry !== null && { retryAt: soonestRetry }),
+			});
+		}
 	}
 	if (soonestRetry !== null) return quotaExhaustionResponse(soonestRetry);
 	log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);

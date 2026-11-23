@@ -1,5 +1,10 @@
+import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import {
+	interactiveProviderChoiceRequested,
+	stripProviderChoiceHeaders,
+} from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
 import { forwardToClient } from "../response-handler";
 import {
@@ -81,6 +86,12 @@ export type ProxyAttempt =
 			forward: () => Promise<Response>;
 			kind: "quota-rate-limit";
 	  }
+	| {
+			block: ProviderCapacityBlock;
+			discard?: () => Promise<void>;
+			forward: () => Promise<Response>;
+			kind: "provider-capacity-block";
+	  }
 	| { forward: () => Promise<Response>; kind: "request-scoped-rate-limit" }
 	| {
 			discard?: () => Promise<void>;
@@ -100,7 +111,7 @@ function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 				? input.account
 				: { ...input.account, access_token: token };
 		const headers = input.ctx.provider.prepareHeaders(
-			input.req.headers,
+			stripProviderChoiceHeaders(input.req.headers),
 			requestAccount,
 		);
 		const upstreamRequestStartedAt = Date.now();
@@ -208,6 +219,17 @@ async function classifyUpstreamResponse(
 
 	let response = state.response;
 	const forward = createForwarder(input, upstream, state);
+	const capacityBlock = interactiveProviderChoiceRequested(input.req.headers)
+		? await input.ctx.provider.getCapacityBlock?.(response)
+		: null;
+	if (capacityBlock) {
+		return {
+			block: capacityBlock,
+			discard: discardUpstreamResponse(state),
+			forward,
+			kind: "provider-capacity-block",
+		};
+	}
 
 	if (isRequestScopedRateLimit(response, input.ctx.provider)) {
 		return { forward, kind: "request-scoped-rate-limit" };

@@ -31,6 +31,11 @@ const REQUEST_HEADERS = [
 	"x-client-request-id",
 	"x-stainless-retry-count",
 	"user-agent",
+	"x-agent-smith-interactive-provider-choice",
+	"x-agent-smith-provider-choice",
+	"x-agent-smith-provider-menu",
+	"x-agent-smith-provider-wait",
+	"x-agent-smith-provider-promotion-declined",
 ];
 const RESPONSE_HEADERS = [
 	"content-type",
@@ -47,6 +52,11 @@ const RESPONSE_HEADERS = [
 	"content-security-policy",
 	"referrer-policy",
 	"x-frame-options",
+	"x-agent-smith-provider-capacity",
+	"x-agent-smith-provider-capacity-details",
+	"x-agent-smith-provider-promotion-details",
+	"x-agent-smith-served-provider",
+	"x-agent-smith-served-model",
 ];
 
 function isEnrollmentRoute(method: string, path: string): boolean {

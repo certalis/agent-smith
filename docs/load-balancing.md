@@ -127,6 +127,15 @@ fallback. If no provider in a pool serves the requested model, the proxy returns
 `400` naming `provider_pools.<wire>`; add a matching model map or select a
 direct provider route intentionally.
 
+For a Claude Code request that carries the Agent-smith companion's interactive
+marker, this ordinary pool fallback is paused at a provider capacity block.
+The proxy returns only eligible configured alternatives and never changes the
+provider until the person chooses one. The companion's **Wait** option may hold
+the same request only for a known reset inside the configured hold window; a
+longer wait returns the original block without sending upstream again. An
+upstream block without a reset remains manual: it is not silently retried
+or promoted later as though it recovered.
+
 ## Affinity and failover
 
 The one W2 affinity is Claude message-thread continuation. A valid

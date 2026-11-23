@@ -8,6 +8,7 @@ export {
 } from "./configured-registry";
 // Export OAuth utilities
 export * from "./oauth";
+export * from "./provider-block";
 // Export providers
 export * from "./providers/index";
 // Export registry functions

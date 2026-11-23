@@ -89,6 +89,11 @@ describe("local client routing", () => {
 		}
 		await apply({ ...target, enabled: true });
 		expect(existsSync(join(binDir, "codex"))).toBe(true);
+		expect(
+			existsSync(
+				join(binDir, "agent-smith-claude-companion", "hooks", "register.js"),
+			),
+		).toBe(true);
 		expect(readFileSync(shellProfile, "utf8")).toContain(ROUTING_MARKER);
 		const routed = Bun.spawnSync([join(binDir, "claude")], {
 			env: environment,
@@ -108,6 +113,7 @@ describe("local client routing", () => {
 
 	it("routes Claude Code through the local Claude Code endpoint without touching the real client", async () => {
 		const directory = tempDir();
+		const binDir = join(directory, "bin");
 		const realClaude = join(directory, "real-claude");
 		writeFileSync(
 			realClaude,
@@ -116,16 +122,21 @@ describe("local client routing", () => {
 		);
 
 		await installClientWrappers({
-			binDir: join(directory, "bin"),
+			binDir,
 			claudePath: realClaude,
 			codexPath: join(directory, "real-codex"),
 			port: 8123,
 		});
 
-		const result = Bun.spawnSync([join(directory, "bin", "claude"), "hello"]);
+		const companionDir = join(binDir, "agent-smith-claude-companion");
+		expect(
+			existsSync(join(companionDir, ".claude-plugin", "plugin.json")),
+		).toBe(true);
+		expect(existsSync(join(companionDir, "hooks", "register.js"))).toBe(true);
+		const result = Bun.spawnSync([join(binDir, "claude"), "hello"]);
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.toString()).toBe(
-			"http://127.0.0.1:8123/v1/claude-code|agent-smith-local||hello\n",
+			`http://127.0.0.1:8123/v1/claude-code|agent-smith-local||--plugin-dir ${companionDir} hello\n`,
 		);
 	});
 
@@ -175,7 +186,7 @@ printf "%s\\n" "$@"
 		});
 		expect(claude.exitCode).toBe(0);
 		expect(claude.stdout.toString()).toBe(
-			"http://127.0.0.1:18181/v1/claude-code|client-forwarding-key|unset||\nhello\ntwo words\n",
+			`http://127.0.0.1:18181/v1/claude-code|client-forwarding-key|unset||\n--plugin-dir\n${join(directory, "bin", "agent-smith-claude-companion")}\nhello\ntwo words\n`,
 		);
 		expect(codex.stdout.toString()).toContain("client-forwarding-key|");
 		expect(codex.stdout.toString()).toContain(" exec\n");
@@ -329,6 +340,9 @@ printf "%s\\n" "$@"
 		expect(getLocalRoutingStatus({ binDir, shellProfile }).enabled).toBe(false);
 		expect(existsSync(realClaude)).toBe(true);
 		expect(existsSync(realCodex)).toBe(true);
+		expect(existsSync(join(binDir, "agent-smith-claude-companion"))).toBe(
+			false,
+		);
 	});
 
 	it("enables the installed client when the other client is absent", async () => {

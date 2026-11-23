@@ -1,13 +1,15 @@
 import { launchConfiguredClient } from "./local-routing";
 
 try {
-	const [configPath, tool, target, ...args] = process.argv.slice(2);
-	if (!configPath || !tool || !target)
+	const [configPath, tool, target, claudeCompanionDir, ...args] =
+		process.argv.slice(2);
+	if (!configPath || !tool || !target || claudeCompanionDir === undefined)
 		throw new Error("Invalid Agent Smith client launcher");
 	process.exitCode = await launchConfiguredClient(
 		configPath,
 		tool,
 		target,
+		claudeCompanionDir,
 		args,
 	);
 } catch (error) {

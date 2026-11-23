@@ -27,6 +27,8 @@ import {
 } from "./repositories/analytics.repository";
 import { AuthSessionRepository } from "./repositories/auth-session.repository";
 import { ConversationPinRepository } from "./repositories/conversation-pin.repository";
+import { ConversationProviderBlockRepository } from "./repositories/conversation-provider-block.repository";
+import { ConversationProviderPreferenceRepository } from "./repositories/conversation-provider-preference.repository";
 import {
 	type RequestData,
 	RequestRepository,
@@ -65,6 +67,8 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 	private requests: RequestRepository;
 	private authSessions: AuthSessionRepository;
 	private conversationPins: ConversationPinRepository;
+	private conversationProviderBlocks: ConversationProviderBlockRepository;
+	private conversationProviderPreferences: ConversationProviderPreferenceRepository;
 	private strategy: StrategyRepository;
 	private stats: StatsRepository;
 
@@ -93,6 +97,11 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 		this.requests = new RequestRepository(this.db);
 		this.authSessions = new AuthSessionRepository(this.db);
 		this.conversationPins = new ConversationPinRepository(this.db);
+		this.conversationProviderBlocks = new ConversationProviderBlockRepository(
+			this.db,
+		);
+		this.conversationProviderPreferences =
+			new ConversationProviderPreferenceRepository(this.db);
 		this.strategy = new StrategyRepository(this.db);
 		this.stats = new StatsRepository(this.db);
 	}
@@ -168,6 +177,8 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 	}
 
 	deleteAccount(accountId: string): boolean {
+		this.conversationProviderBlocks.deleteForAccount(accountId);
+		this.conversationProviderPreferences.deleteForAccount(accountId);
 		this.conversationPins.deleteForAccount(accountId);
 		return this.accounts.delete(accountId);
 	}
@@ -192,6 +203,50 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 
 	deleteExpiredConversationPins(before: number): void {
 		this.conversationPins.deleteExpired(before);
+		this.conversationProviderBlocks.deleteExpired(before);
+		this.conversationProviderPreferences.deleteExpired(before);
+	}
+
+	getConversationProviderPreference(pinKey: string) {
+		return this.conversationProviderPreferences.find(pinKey);
+	}
+
+	upsertConversationProviderPreference(
+		pinKey: string,
+		provider: string,
+		promotionDeclined: boolean,
+		lastSeenAt: number,
+	): void {
+		this.conversationProviderPreferences.upsert(
+			pinKey,
+			provider,
+			promotionDeclined,
+			lastSeenAt,
+		);
+	}
+
+	getConversationProviderBlock(pinKey: string, provider: string) {
+		return this.conversationProviderBlocks.find(pinKey, provider);
+	}
+
+	upsertConversationProviderBlock(
+		pinKey: string,
+		provider: string,
+		category: string,
+		retryAt: number | undefined,
+		lastSeenAt: number,
+	): void {
+		this.conversationProviderBlocks.upsert(
+			pinKey,
+			provider,
+			category,
+			retryAt,
+			lastSeenAt,
+		);
+	}
+
+	deleteConversationProviderBlock(pinKey: string, provider: string): void {
+		this.conversationProviderBlocks.delete(pinKey, provider);
 	}
 
 	countAccounts(): number {

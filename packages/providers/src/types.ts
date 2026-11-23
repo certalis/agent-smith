@@ -6,6 +6,7 @@ import type {
 	ResetCreditResult,
 	ResetCredits,
 } from "@agent-smith/types";
+import type { CapacitySource } from "@agent-smith/capacity";
 
 export interface TokenRefreshResult {
 	accessToken: string;
@@ -22,7 +23,7 @@ export interface RateLimitInfo {
 	quotaState?: AccountQuotaState;
 }
 
-export interface Provider {
+export interface Provider extends CapacitySource {
 	name: string;
 	defaultBaseUrl: string;
 	wire: ProviderWire;

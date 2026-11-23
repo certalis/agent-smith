@@ -129,3 +129,16 @@ test("a caller-specific ceiling does not create a separate conversation pin", ()
 		"alice-account",
 	);
 });
+
+test("exposes an opaque conversation key for durable provider choice", () => {
+	const router = new TeamRouter();
+
+	const key = router.getConversationPinKey(
+		poolRequest("qwen-claude"),
+		config,
+		provider,
+	);
+
+	expect(key).toMatch(/^[a-f0-9]{64}$/);
+	expect(key).not.toContain("session");
+});

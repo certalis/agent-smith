@@ -83,6 +83,9 @@ async function fixture(maxBodyBytes = 1024) {
 			return new Response("data: first\n\ndata: [DONE]\n\n", {
 				headers: {
 					"content-type": "text/event-stream",
+					"x-agent-smith-provider-capacity": "v1",
+					"x-agent-smith-provider-promotion-details": "synthetic-promotion",
+					"x-agent-smith-served-provider": "kimi-claude",
 					"set-cookie": "must-not-leak",
 					"x-api-key": "must-not-leak",
 				},
@@ -170,17 +173,30 @@ test("HTTPS edge streams the exact Messages body and only allowed headers throug
 			cookie: "secret",
 			"x-forwarded-for": "spoofed",
 			"anthropic-beta": "synthetic-beta",
+			"x-agent-smith-provider-choice": "kimi-claude",
+			"x-agent-smith-provider-menu": "v1",
+			"x-agent-smith-provider-wait": "v1",
 		},
 	);
 	expect(result.status).toBe(200);
 	expect(result.body).toBe("data: first\n\ndata: [DONE]\n\n");
 	expect(result.headers["set-cookie"]).toBeUndefined();
 	expect(result.headers["x-api-key"]).toBeUndefined();
+	expect(result.headers["x-agent-smith-provider-capacity"]).toBe("v1");
+	expect(result.headers["x-agent-smith-provider-promotion-details"]).toBe(
+		"synthetic-promotion",
+	);
+	expect(result.headers["x-agent-smith-served-provider"]).toBe("kimi-claude");
 	expect(received[0].body).toBe(body);
 	expect(received[0].path).toBe("/v1/claude-code/v1/messages?beta=true");
 	expect(received[0].headers.get("cookie")).toBeNull();
 	expect(received[0].headers.get("x-forwarded-for")).toBe("proxy-edge");
 	expect(received[0].headers.get("anthropic-beta")).toBe("synthetic-beta");
+	expect(received[0].headers.get("x-agent-smith-provider-choice")).toBe(
+		"kimi-claude",
+	);
+	expect(received[0].headers.get("x-agent-smith-provider-menu")).toBe("v1");
+	expect(received[0].headers.get("x-agent-smith-provider-wait")).toBe("v1");
 });
 
 test("health and Responses accept device keys; unknown and revoked keys cannot reach the pool", async () => {

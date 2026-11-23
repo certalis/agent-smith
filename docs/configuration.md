@@ -248,6 +248,57 @@ direct `/v1/<provider>/*` route never uses a pool. If no pool provider serves a
 model, the proxy returns `400` naming `provider_pools.<wire>`; add a compatible
 provider/model map or use a direct route intentionally.
 
+### Qwen and Kimi through Model Studio
+
+[`model-studio-compatible-providers.json`](../examples/config/model-studio-compatible-providers.json)
+is a complete API-key example for Qwen and Model-Studio-hosted Kimi. It keeps
+the two client protocols separate:
+
+- Claude Code requests can use `qwen-claude` or `kimi-claude`; both use the
+  Anthropic Messages wire.
+- Codex requests can use `qwen-codex` or `kimi-codex`; both use the OpenAI
+  Responses wire.
+
+The example starts each pool with Qwen, then Kimi. Its public URLs target the
+Beijing Model Studio region, so use a Beijing API key. For another region, use
+that region's matching endpoint and API key together. Add a Model Studio
+API-key account for each configured provider name. Using the same key under
+more than one name selects different models; it does not create extra capacity.
+
+The `kimi-*` names use Kimi models supplied through Model Studio. They are not
+a direct Kimi Chat Completions API configuration, which Agent-smith does not
+translate.
+
+If you have separately enabled and are authorized to use the Claude Code or
+Codex subscription provider, put it first in its matching pool yourself. The
+example deliberately does not enable subscription sign-ins. Restart
+Agent-smith after changing providers or pools.
+
+When Claude Code is started through `agent-smith install-client`, its wrapper
+loads the Agent-smith companion. For an interactive Claude-compatible pool,
+Agent-smith never silently changes provider. If the current provider blocks a
+turn, Claude Code shows the eligible replacements in the configured pool order,
+then **Wait**. Choosing one resends the same turn and context with only the
+mapped model changed; the chosen provider stays pinned for that conversation.
+The small `Agent-smith: <provider> · <model>` row under Claude's prompt reports
+the provider that actually answered, not the requested model.
+
+The block text distinguishes request rate, token allocation, traffic burst,
+temporary capacity, and an unknown upstream limit. It shows a retry time only
+when the upstream supplied one. **Wait** holds the request only when that time
+falls inside the configured `team_routing.hold_seconds`; outside that window it
+returns the same truthful block without a duplicate upstream retry. An unknown
+limit never gets a made-up countdown or a duplicate retry. A higher-ranked provider is
+offered once only after a known retry time or local pool availability says it
+may be tried. Declining keeps the current provider quiet for the rest of the
+conversation. Run `/agent-smith-provider` in Claude Code to reopen the full
+chooser on the next turn. Message-thread continuations never switch providers.
+
+Unwrapped or unattended clients keep the normal bounded pool behavior.
+Switching from a Claude Code chat to Codex means starting a new Codex chat and
+handing off the needed context yourself: the two clients use different request
+formats and Agent-smith does not convert chat history between them.
+
 ### Team routing
 
 `team_routing` is a single validated policy object. Unknown or invalid fields
@@ -345,6 +396,9 @@ locally installed `claude` and `codex` clients. It writes wrappers under the
 agent-smith config directory and one marked PATH block in the active shell profile;
 the original client binaries and their configuration are not modified. The
 wrappers route to the loopback proxy and work while the TUI is running.
+The generated Claude wrapper also copies and loads Agent-smith's own companion
+plugin under its private wrapper directory. It does not modify Claude Code's
+global plugin list, status line, Zed, or any other editor.
 When a matching `provider_pools` entry is configured, the Claude and Codex
 wrappers use its protocol route; without one, they retain their direct provider
 routes.
@@ -357,6 +411,11 @@ For a shared Agent Smith server, use the [`client` configuration](#client-wrappe
 and `agent-smith client on` instead. Its wrappers use the configured origin
 and forwarding key, whether the origin is directly reachable or the local side
 of an SSH tunnel.
+
+The Codex wrapper passes its Agent-smith provider settings when it starts
+Codex; it does not write them into Codex's configuration. Put a permanent
+Codex provider in `~/.codex/config.toml`, not a repository
+`.codex/config.toml`. Project configuration cannot redirect provider traffic.
 
 ### Load Balancing Strategy
 

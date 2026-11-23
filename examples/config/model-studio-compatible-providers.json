@@ -1,0 +1,32 @@
+{
+	"providers": {
+		"qwen-claude": {
+			"enabled": true,
+      "strategy": "model-studio-anthropic-api",
+			"base_url": "https://dashscope.aliyuncs.com/apps/anthropic",
+			"models": { "claude-sonnet-*": "qwen3-coder-flash" }
+		},
+		"kimi-claude": {
+			"enabled": true,
+      "strategy": "model-studio-anthropic-api",
+			"base_url": "https://dashscope.aliyuncs.com/apps/anthropic",
+			"models": { "claude-sonnet-*": "kimi-k3.1-pro" }
+		},
+		"qwen-codex": {
+			"enabled": true,
+			"strategy": "openai-api",
+			"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			"models": { "gpt-5.6-*": "qwen4-max" }
+		},
+		"kimi-codex": {
+			"enabled": true,
+			"strategy": "openai-api",
+			"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			"models": { "gpt-5.6-*": "kimi-k3.1-pro" }
+		}
+	},
+	"provider_pools": {
+		"anthropic-messages": ["qwen-claude", "kimi-claude"],
+		"openai-responses": ["qwen-codex", "kimi-codex"]
+	}
+}

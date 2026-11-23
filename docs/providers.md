@@ -2,7 +2,9 @@
 
 ## Overview
 
-agent-smith’s provider layer gives the rest of the system a consistent way to deal with multiple upstream APIs without collapsing all provider-specific behavior into the proxy.
+Agent-smith's provider layer is the connector boundary: it deals with multiple
+upstream APIs without collapsing provider-native authentication, execution, or
+rate-limit facts into the proxy.
 
 `packages/providers` owns:
 
@@ -14,12 +16,21 @@ agent-smith’s provider layer gives the rest of the system a consistent way to 
 - rate-limit parsing
 - response/usage parsing helpers
 
+Connectors report structured capacity facts through `@agent-smith/capacity`; they
+do not select fallback providers, read pool accounts, or apply conversation
+policy. Those responsibilities stay in `routing` and the proxy pool.
+
 ## Built-In Providers
 
 - `anthropic`
 - `openai`
 - `claude-code`
 - `codex`
+
+Configured API-key providers may also use `model-studio-anthropic-api`. It is
+an Anthropic Messages-compatible Model Studio adapter: it keeps Messages
+payloads intact and classifies only Model Studio's documented capacity codes.
+It is not a Google or OpenAI protocol translator.
 
 These are exposed through `/v1/{provider}/...` routes.
 
@@ -147,6 +158,14 @@ The proxy uses normalized rate-limit data to:
 - mark accounts unavailable
 - persist reset metadata
 - avoid repeatedly selecting bad candidates
+
+For Model Studio Anthropic-compatible providers, capacity blocks retain their
+native category and an upstream `Retry-After` only when supplied. Unknown
+codes remain unknown; Agent-smith never invents a recovery deadline.
+
+The normalized capacity fact is deliberately distinct from a routing decision:
+`routing` may offer a person another configured provider, but only after the
+pool has established that the chosen provider is actually blocked.
 
 ## Usage Extraction
 

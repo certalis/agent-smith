@@ -182,10 +182,22 @@ export class TeamRouter {
 			return undefined;
 		}
 		this.removeExpiredPins(now, store);
-		const key = pinKey(request, provider);
+		const key = this.getConversationPinKey(request, config, provider);
 		return key
 			? (this.pins.get(key) ?? store?.getConversationPin(key))?.accountId
 			: undefined;
+	}
+
+	/** Returns the durable, opaque conversation key shared by account and provider pins. */
+	getConversationPinKey(
+		request: TeamRoutingRequest | undefined,
+		_config: TeamRoutingConfig,
+		provider: Provider,
+	): string | undefined {
+		if (!request?.sessionId || request.manualAccountName) {
+			return undefined;
+		}
+		return pinKey(request, provider) ?? undefined;
 	}
 
 	begin(accountId: string): void {
