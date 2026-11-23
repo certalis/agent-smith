@@ -663,7 +663,7 @@ describe("handleProxy routing", () => {
 		expect(upstreamHeaders[0]?.get("x-agent-smith-provider-choice")).toBeNull();
 	});
 
-	it("keeps a selected provider active for later turns in the same Claude conversation", async () => {
+	it("keeps a selected provider for title requests with a different opening", async () => {
 		const qwen = createTestProvider("qwen-claude");
 		const kimi = createTestProvider("kimi-claude");
 		const accounts = [
@@ -679,7 +679,7 @@ describe("handleProxy routing", () => {
 		const context = createProxyContext([qwen, kimi], accounts, {
 			"anthropic-messages": ["qwen-claude", "kimi-claude"],
 		});
-		const request = (headers: Record<string, string>) =>
+		const request = (body: string, headers: Record<string, string>) =>
 			new Request(
 				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
 				{
@@ -690,7 +690,7 @@ describe("handleProxy routing", () => {
 						"x-claude-code-session-id": "session-for-choice",
 						...headers,
 					},
-					body: '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"same chat"}]}',
+					body,
 				},
 			);
 		const url = new URL(
@@ -698,11 +698,21 @@ describe("handleProxy routing", () => {
 		);
 
 		await handleProxy(
-			request({ "x-agent-smith-provider-choice": "kimi-claude" }),
+			request(
+				'{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"main turn"}]}',
+				{ "x-agent-smith-provider-choice": "kimi-claude" },
+			),
 			url,
 			context,
 		);
-		await handleProxy(request({}), url, context);
+		await handleProxy(
+			request(
+				'{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"title request"}]}',
+				{},
+			),
+			url,
+			context,
+		);
 
 		expect(urls).toEqual([
 			"https://kimi-claude.example.com/v1/messages",

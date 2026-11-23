@@ -52,6 +52,7 @@ const RESPONSE_HEADERS = [
 	"content-security-policy",
 	"referrer-policy",
 	"x-frame-options",
+	"x-should-retry",
 	"x-agent-smith-provider-capacity",
 	"x-agent-smith-provider-capacity-details",
 	"x-agent-smith-provider-promotion-details",

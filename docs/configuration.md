@@ -280,6 +280,8 @@ Agent-smith never silently changes provider. If the current provider blocks a
 turn, Claude Code shows the eligible replacements in the configured pool order,
 then **Wait**. Choosing one resends the same turn and context with only the
 mapped model changed; the chosen provider stays pinned for that conversation.
+Claude Code background requests, including title generation, reuse that choice
+without opening another chooser.
 The companion status row under Claude's prompt reports the provider that
 actually answered and its mapped model, not the requested model. This is a
 companion row, not a replacement for Claude Code's native status line.

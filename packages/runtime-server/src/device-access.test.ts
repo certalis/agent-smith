@@ -83,6 +83,7 @@ async function fixture(maxBodyBytes = 1024) {
 			return new Response("data: first\n\ndata: [DONE]\n\n", {
 				headers: {
 					"content-type": "text/event-stream",
+					"x-should-retry": "false",
 					"x-agent-smith-provider-capacity": "v1",
 					"x-agent-smith-provider-promotion-details": "synthetic-promotion",
 					"x-agent-smith-served-provider": "kimi-claude",
@@ -183,6 +184,7 @@ test("HTTPS edge streams the exact Messages body and only allowed headers throug
 	expect(result.headers["set-cookie"]).toBeUndefined();
 	expect(result.headers["x-api-key"]).toBeUndefined();
 	expect(result.headers["x-agent-smith-provider-capacity"]).toBe("v1");
+	expect(result.headers["x-should-retry"]).toBe("false");
 	expect(result.headers["x-agent-smith-provider-promotion-details"]).toBe(
 		"synthetic-promotion",
 	);

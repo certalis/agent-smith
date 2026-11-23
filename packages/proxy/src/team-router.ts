@@ -82,6 +82,15 @@ function pinKey(
 		.digest("hex");
 }
 
+function providerConversationKey(request: TeamRoutingRequest): string | null {
+	if (!request.sessionId) return null;
+	return createHash("sha256")
+		.update(
+			[request.pinScope ?? request.provider, request.sessionId].join("\u0000"),
+		)
+		.digest("hex");
+}
+
 export function isAllowlisted(
 	account: Account,
 	config: TeamRoutingConfig,
@@ -188,7 +197,7 @@ export class TeamRouter {
 			: undefined;
 	}
 
-	/** Returns the durable, opaque conversation key shared by account and provider pins. */
+	/** Returns the durable, opaque conversation key for account-seat pins. */
 	getConversationPinKey(
 		request: TeamRoutingRequest | undefined,
 		_config: TeamRoutingConfig,
@@ -198,6 +207,15 @@ export class TeamRouter {
 			return undefined;
 		}
 		return pinKey(request, provider) ?? undefined;
+	}
+
+	/** Returns the session-wide key for an interactive provider selection. */
+	getConversationProviderKey(
+		request: TeamRoutingRequest | undefined,
+		_config: TeamRoutingConfig,
+	): string | undefined {
+		if (!request?.sessionId || request.manualAccountName) return undefined;
+		return providerConversationKey(request) ?? undefined;
 	}
 
 	begin(accountId: string): void {

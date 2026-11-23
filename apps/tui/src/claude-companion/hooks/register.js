@@ -10,6 +10,7 @@ export function register(on) {
 	let promotionReadyAfterTurn = 0;
 	let completedMainTurns = 0;
 	let openChoiceMenu = false;
+	const providerChoiceDecisions = new Map();
 	on("session.start", async ($, event, next) => {
 		await $.command.register({
 			name: "agent-smith-provider",
@@ -51,8 +52,16 @@ export function register(on) {
 			initialChoice,
 			declinePromotion,
 			openChoiceMenu: chooseNow,
-			ask: (question, options) =>
-				$.ui.ask(question, { header: "Agent-smith", options }),
+			ask: (question, options) => {
+				const key = JSON.stringify([question, options]);
+				const existing = providerChoiceDecisions.get(key);
+				if (existing) return existing;
+				const decision = $.ui
+					.ask(question, { header: "Agent-smith", options })
+					.finally(() => providerChoiceDecisions.delete(key));
+				providerChoiceDecisions.set(key, decision);
+				return decision;
+			},
 			setStatus: (status) => $.ui.status(status),
 			onPromotion: (choices) => {
 				if (promotion) return;

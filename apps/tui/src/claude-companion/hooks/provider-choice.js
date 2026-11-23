@@ -176,6 +176,14 @@ function servedStatus(response) {
 	return provider && model ? `${displayProvider(provider)} · ${model}` : null;
 }
 
+function fetchResponse(result) {
+	if (typeof result !== "object" || result === null || !("value" in result)) {
+		return null;
+	}
+	const response = result.value;
+	return typeof response === "object" && response !== null ? response : null;
+}
+
 async function chooseProvider(details, ask) {
 	return await chooseChoices(
 		details.kind === "manual"
@@ -234,9 +242,11 @@ export async function retryCapacityBlockedRequest({
 	openChoiceMenu = false,
 	onPromotion,
 }) {
-	let response = await send(
+	let result = await send(
 		choiceHeaders(init, initialChoice, declinePromotion, openChoiceMenu),
 	);
+	let response = fetchResponse(result);
+	if (!response) return result;
 	const initialStatus = servedStatus(response);
 	if (initialStatus) setStatus(initialStatus);
 	if (!classifyCapacityResponse(response.status, response.headers)) {
@@ -244,15 +254,13 @@ export async function retryCapacityBlockedRequest({
 			? readPromotionDetails(response.headers)
 			: null;
 		if (promotion) onPromotion?.(promotion.choices);
-		return response;
+		return result;
 	}
 
 	const details = readCapacityDetails(response.headers);
-	if (!details) return response;
+	if (!details) return result;
 	if (details.choices.length === 0) {
-		return details.kind === "manual"
-			? await send(choiceHeaders(init))
-			: response;
+		return details.kind === "manual" ? await send(choiceHeaders(init)) : result;
 	}
 	let choice;
 	try {
@@ -261,25 +269,25 @@ export async function retryCapacityBlockedRequest({
 		setStatus(
 			"Agent-smith: provider choice dismissed; this turn remains blocked.",
 		);
-		return response;
+		return result;
 	}
 	if (choice === undefined) {
 		setStatus(
 			"Agent-smith: choose one listed provider or Wait; this turn remains blocked.",
 		);
-		return response;
+		return result;
 	}
 	if (choice === null && details.kind === "manual") {
 		setStatus("Agent-smith: provider choice left unchanged.");
-		return response;
+		return result;
 	}
 	if (choice === null && details.wait === null) {
 		setStatus(
 			"Agent-smith: the provider supplied no retry time, so this turn remains on its current provider.",
 		);
-		return response;
+		return result;
 	}
-	response = await send(
+	result = await send(
 		choiceHeaders(
 			init,
 			choice?.provider,
@@ -288,6 +296,8 @@ export async function retryCapacityBlockedRequest({
 			!choice && details.kind !== "manual",
 		),
 	);
+	response = fetchResponse(result);
+	if (!response) return result;
 	const status = servedStatus(response);
 	if (status) setStatus(status);
 	if (!choice) {
@@ -298,7 +308,7 @@ export async function retryCapacityBlockedRequest({
 			);
 		}
 	}
-	return response;
+	return result;
 }
 
 export function isAnthropicPoolRequest(url) {

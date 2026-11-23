@@ -114,10 +114,9 @@ function prepareProviderPoolSelection(
 		firstContext.dbOps,
 	);
 	const pinnedAccount = pinnedId ? ctx.dbOps.getAccount(pinnedId) : null;
-	const conversationKey = firstContext.teamRouter?.getConversationPinKey(
+	const conversationKey = firstContext.teamRouter?.getConversationProviderKey(
 		teamRequest,
 		firstContext.runtime.teamRouting,
-		firstContext.provider,
 	);
 	const routing = new ConversationProviderRouting(
 		new PoolConversationProviderRoutingStore(ctx.dbOps),
