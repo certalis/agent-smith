@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
+import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { type Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";

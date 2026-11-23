@@ -30,7 +30,7 @@
     },
     "apps/tui": {
       "name": "@certalis/agent-smith",
-      "version": "0.1.0",
+      "version": "0.1.19",
       "bin": {
         "agent-smith": "dist/bin.js",
       },
@@ -112,6 +112,10 @@
         "@agent-smith/types": "workspace:*",
       },
     },
+    "packages/capacity": {
+      "name": "@agent-smith/capacity",
+      "version": "0.1.0",
+    },
     "packages/config": {
       "name": "@agent-smith/config",
       "version": "0.1.0",
@@ -168,6 +172,7 @@
       "name": "@agent-smith/providers",
       "version": "0.1.0",
       "dependencies": {
+        "@agent-smith/capacity": "workspace:*",
         "@agent-smith/core": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
@@ -178,14 +183,23 @@
       "name": "@agent-smith/proxy",
       "version": "0.1.0",
       "dependencies": {
+        "@agent-smith/capacity": "workspace:*",
         "@agent-smith/config": "workspace:*",
         "@agent-smith/core": "workspace:*",
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
         "@agent-smith/providers": "workspace:*",
+        "@agent-smith/routing": "workspace:*",
         "@agent-smith/types": "workspace:*",
         "@dqbd/tiktoken": "^1.0.21",
+      },
+    },
+    "packages/routing": {
+      "name": "@agent-smith/routing",
+      "version": "0.1.0",
+      "dependencies": {
+        "@agent-smith/capacity": "workspace:*",
       },
     },
     "packages/runtime-server": {
@@ -225,6 +239,38 @@
     "react": "^19.0.0",
   },
   "packages": {
+    "@agent-smith/api": ["@agent-smith/api@workspace:packages/api"],
+
+    "@agent-smith/capacity": ["@agent-smith/capacity@workspace:packages/capacity"],
+
+    "@agent-smith/config": ["@agent-smith/config@workspace:packages/config"],
+
+    "@agent-smith/core": ["@agent-smith/core@workspace:packages/core"],
+
+    "@agent-smith/database": ["@agent-smith/database@workspace:packages/database"],
+
+    "@agent-smith/http": ["@agent-smith/http@workspace:packages/http"],
+
+    "@agent-smith/logger": ["@agent-smith/logger@workspace:packages/logger"],
+
+    "@agent-smith/oauth-flow": ["@agent-smith/oauth-flow@workspace:packages/oauth-flow"],
+
+    "@agent-smith/providers": ["@agent-smith/providers@workspace:packages/providers"],
+
+    "@agent-smith/proxy": ["@agent-smith/proxy@workspace:packages/proxy"],
+
+    "@agent-smith/routing": ["@agent-smith/routing@workspace:packages/routing"],
+
+    "@agent-smith/runtime-server": ["@agent-smith/runtime-server@workspace:packages/runtime-server"],
+
+    "@agent-smith/server": ["@agent-smith/server@workspace:apps/server"],
+
+    "@agent-smith/types": ["@agent-smith/types@workspace:packages/types"],
+
+    "@agent-smith/ui": ["@agent-smith/ui@workspace:packages/ui"],
+
+    "@agent-smith/web": ["@agent-smith/web@workspace:apps/web"],
+
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
 
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.28.5", "", {}, "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="],
@@ -250,34 +296,6 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.4.10", "", { "os": "win32", "cpu": "arm64" }, "sha512-umwQU6qPzH+ISTf/eHyJ/QoQnJs3V9Vpjz2OjZXe9MVBZ7prgGafMy7yYeRGnlmDAn87AKTF3Q6weLoMGpeqdQ=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.4.10", "", { "os": "win32", "cpu": "x64" }, "sha512-aW/JU5GuyH4uxMrNYpoC2kjaHlyJGLgIa3XkhPEZI0uKhZhJZU8BuEyJmvgzSPQNGozBwWjC972RaNdcJ9KyJg=="],
-
-    "@agent-smith/api": ["@agent-smith/api@workspace:packages/api"],
-
-    "@agent-smith/config": ["@agent-smith/config@workspace:packages/config"],
-
-    "@agent-smith/core": ["@agent-smith/core@workspace:packages/core"],
-
-    "@agent-smith/database": ["@agent-smith/database@workspace:packages/database"],
-
-    "@agent-smith/http": ["@agent-smith/http@workspace:packages/http"],
-
-    "@agent-smith/logger": ["@agent-smith/logger@workspace:packages/logger"],
-
-    "@agent-smith/oauth-flow": ["@agent-smith/oauth-flow@workspace:packages/oauth-flow"],
-
-    "@agent-smith/providers": ["@agent-smith/providers@workspace:packages/providers"],
-
-    "@agent-smith/proxy": ["@agent-smith/proxy@workspace:packages/proxy"],
-
-    "@agent-smith/runtime-server": ["@agent-smith/runtime-server@workspace:packages/runtime-server"],
-
-    "@agent-smith/server": ["@agent-smith/server@workspace:apps/server"],
-
-    "@agent-smith/types": ["@agent-smith/types@workspace:packages/types"],
-
-    "@agent-smith/ui": ["@agent-smith/ui@workspace:packages/ui"],
-
-    "@agent-smith/web": ["@agent-smith/web@workspace:apps/web"],
 
     "@certalis/agent-smith": ["@certalis/agent-smith@workspace:apps/tui"],
 

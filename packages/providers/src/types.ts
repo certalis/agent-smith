@@ -1,3 +1,4 @@
+import type { CapacitySource } from "@agent-smith/capacity";
 import type {
 	Account,
 	AccountQuotaState,
@@ -6,7 +7,6 @@ import type {
 	ResetCreditResult,
 	ResetCredits,
 } from "@agent-smith/types";
-import type { CapacitySource } from "@agent-smith/capacity";
 
 export interface TokenRefreshResult {
 	accessToken: string;

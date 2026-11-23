@@ -467,12 +467,12 @@ export async function launchConfiguredClient(
 		const script =
 			tool === "claude"
 				? claudeWrapper(
-					target,
-					base,
-					keyFile,
-					client.keepClaudeLogin === true,
-					claudeCompanionDir,
-				)
+						target,
+						base,
+						keyFile,
+						client.keepClaudeLogin === true,
+						claudeCompanionDir,
+					)
 				: codexWrapper(target, base, keyFile);
 		command = ["/bin/sh", "-c", script, "--", ...args];
 	}
