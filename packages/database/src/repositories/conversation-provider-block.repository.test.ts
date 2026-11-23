@@ -17,7 +17,7 @@ afterEach(() => {
 	db.close();
 });
 
-test("keeps an unknown upstream block manual and releases a block after its known retry time", () => {
+test("keeps unknown upstream blocks manual and expires stale persisted blocks", () => {
 	blocks.upsert(
 		"opaque-pin",
 		"qwen-claude",
