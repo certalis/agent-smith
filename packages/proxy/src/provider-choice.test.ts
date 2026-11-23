@@ -77,7 +77,7 @@ test("returns a marked private menu without calling a provider unavailable", asy
 
 	expect(response.status).toBe(409);
 	expect(await response.json()).toMatchObject({
-		title: "Choose provider for this turn",
+		title: "Choose provider for this conversation",
 		activeProvider: "kimi-claude",
 	});
 });
