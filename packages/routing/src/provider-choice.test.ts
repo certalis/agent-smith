@@ -21,6 +21,7 @@ test("owns the provider chooser protocol without a pool or connector", async () 
 	});
 
 	expect(await response.json()).toMatchObject({ choices });
+	expect(response.headers.get("x-should-retry")).toBe("false");
 	expect(
 		stripProviderChoiceHeaders(
 			new Headers({ "x-agent-smith-provider-choice": "kimi-claude" }),

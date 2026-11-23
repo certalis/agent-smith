@@ -482,13 +482,6 @@ function ensureConversationProviderBlocksTable(db: Database): void {
 			PRIMARY KEY (pin_key, provider)
 		)
 	`);
-	if (
-		!hasColumn(getTableInfo(db, "conversation_provider_blocks"), "category")
-	) {
-		db.run(
-			"ALTER TABLE conversation_provider_blocks ADD COLUMN category TEXT NOT NULL DEFAULT 'unknown'",
-		);
-	}
 	db.run(
 		`CREATE INDEX IF NOT EXISTS idx_conversation_provider_blocks_last_seen ON conversation_provider_blocks(last_seen_at)`,
 	);

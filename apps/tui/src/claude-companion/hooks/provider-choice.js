@@ -11,6 +11,8 @@ const SERVED_MODEL_HEADER = "x-agent-smith-served-model";
 const WAIT = "Wait";
 
 const CATEGORIES = new Set([
+	"five-hour-limit",
+	"weekly-limit",
 	"request-rate",
 	"token-allocation",
 	"burst",
@@ -156,6 +158,8 @@ function choiceLabel(choice) {
 function categoryLabel(category) {
 	return (
 		{
+			"five-hour-limit": "a five-hour session limit",
+			"weekly-limit": "a weekly limit",
 			"request-rate": "request rate",
 			"token-allocation": "token allocation",
 			burst: "traffic burst",
@@ -169,13 +173,13 @@ function categoryLabel(category) {
 function servedStatus(response) {
 	const provider = headerValue(response.headers, SERVED_PROVIDER_HEADER);
 	const model = headerValue(response.headers, SERVED_MODEL_HEADER);
-	return provider && model ? `Agent-smith: ${provider} · ${model}` : null;
+	return provider && model ? `${displayProvider(provider)} · ${model}` : null;
 }
 
 async function chooseProvider(details, ask) {
 	return await chooseChoices(
 		details.kind === "manual"
-			? "Choose provider for this turn."
+			? "Choose provider for this conversation."
 			: `${displayProvider(details.blockedProvider)} cannot serve this turn because of ${categoryLabel(details.category)}. Switch provider?`,
 		details.choices,
 		ask,
@@ -209,7 +213,7 @@ async function chooseChoices(question, choices, ask) {
 
 export async function choosePromotion(choices, ask) {
 	return await chooseChoices(
-		"A higher-ranked provider has an eligible Agent-smith account. Switch provider for this turn?",
+		"A higher-ranked provider has an eligible Agent-smith account. Switch this conversation?",
 		choices,
 		ask,
 	);
@@ -250,7 +254,15 @@ export async function retryCapacityBlockedRequest({
 			? await send(choiceHeaders(init))
 			: response;
 	}
-	const choice = await chooseProvider(details, ask);
+	let choice;
+	try {
+		choice = await chooseProvider(details, ask);
+	} catch {
+		setStatus(
+			"Agent-smith: provider choice dismissed; this turn remains blocked.",
+		);
+		return response;
+	}
 	if (!choice && details.kind !== "manual" && details.wait === null) {
 		setStatus(
 			"Agent-smith: the provider supplied no retry time, so this turn remains on its current provider.",

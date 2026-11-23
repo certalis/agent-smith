@@ -6,6 +6,8 @@ import {
 	type ConversationProviderPreference,
 	type ConversationProviderRouting,
 	createProviderCapacityProblem,
+	higherRankedProviderChoices,
+	withProviderPromotionDetails,
 	withServedProviderHeaders,
 } from "@agent-smith/routing";
 import type { Account } from "@agent-smith/types";
@@ -24,14 +26,16 @@ import {
 	resolveUpstreamFailure,
 } from "../handlers/proxy-attempts";
 import {
+	getRequestQuotaCapacityBlock,
 	getRequestRetryAt,
 	type ProxyRequest,
 	prepareProxyRequest,
 } from "../handlers/proxy-request";
 import {
+	configuredPoolChoices,
 	eligiblePoolChoices,
+	eligiblePoolProviders,
 	type InteractivePoolRequest,
-	withEligibleProviderPromotion,
 } from "./interactive-provider-pool";
 
 const log = new Logger("Proxy");
@@ -58,6 +62,7 @@ export type ProviderPoolCandidateAttempt =
 	| { kind: "response"; response: Response }
 	| {
 			everyCandidateFull: boolean;
+			firstCapacityBlock: ProviderCapacityBlock | null;
 			kind: "unserved";
 			soonestFleetReset: number | null;
 			soonestRetry: number | null;
@@ -93,6 +98,7 @@ async function proxyPoolCandidate(
 		}
 		if (attempt.kind === "provider-capacity-block") {
 			await attempt.discard?.();
+			if (accounts[index + 1]) continue;
 			return { block: attempt.block, kind: "capacity-block" };
 		}
 		if (attempt.kind === "per-minute-rate-limit") {
@@ -249,13 +255,16 @@ function resolvePoolCandidateResult({
 	) {
 		return served;
 	}
-	return withEligibleProviderPromotion({
-		conversationKey,
-		input: interactiveInput,
-		response: served,
-		routing,
-		selectedProvider: candidate.provider.name,
-	});
+	return withProviderPromotionDetails(
+		served,
+		higherRankedProviderChoices(
+			configuredPoolChoices(interactiveInput.pool, interactiveInput.meta.model),
+			candidate.provider.name,
+			eligiblePoolProviders(interactiveInput),
+			(provider) =>
+				routing.canOfferProvider(conversationKey, provider, Date.now()),
+		),
+	);
 }
 
 function preparePoolCandidate(
@@ -310,10 +319,12 @@ export async function proxyPoolCandidates({
 	let soonestRetry: number | null = null;
 	let soonestFleetReset: number | null = null;
 	let everyCandidateFull = true;
+	let firstCapacityBlock: ProviderCapacityBlock | null = null;
 	let emittedIngress = false;
 	const earliest = (current: number | null, next: number | null) =>
 		next !== null && (current === null || next < current) ? next : current;
 	const recordUnserved = (request: ProxyRequest) => {
+		firstCapacityBlock ??= getRequestQuotaCapacityBlock(request);
 		everyCandidateFull &&= isEveryAccountQuotaBlocked(
 			request.meta,
 			request.ctx,
@@ -372,6 +383,7 @@ export async function proxyPoolCandidates({
 	return {
 		everyCandidateFull,
 		kind: "unserved",
+		firstCapacityBlock,
 		soonestFleetReset,
 		soonestRetry,
 	};

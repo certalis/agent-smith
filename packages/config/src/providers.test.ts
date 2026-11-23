@@ -238,9 +238,13 @@ describe("README example configurations", () => {
 			"kimi-codex",
 		]);
 		expect(config.getProviderConfig("qwen-claude")?.models).toEqual({
+			"claude-haiku-*": "qwen3-coder-flash",
+			"claude-opus-*": "qwen3-coder-flash",
 			"claude-sonnet-*": "qwen3-coder-flash",
 		});
 		expect(config.getProviderConfig("kimi-claude")?.models).toEqual({
+			"claude-haiku-*": "kimi-k3.1-pro",
+			"claude-opus-*": "kimi-k3.1-pro",
 			"claude-sonnet-*": "kimi-k3.1-pro",
 		});
 		expect(config.getProviderConfig("qwen-codex")?.models).toEqual({

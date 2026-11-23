@@ -6,11 +6,14 @@ import {
 
 export function register(on) {
 	let promotion = null;
+	let promotionDecision = null;
+	let promotionReadyAfterTurn = 0;
+	let completedMainTurns = 0;
 	let openChoiceMenu = false;
 	on("session.start", async ($, event, next) => {
 		await $.command.register({
 			name: "agent-smith-provider",
-			description: "Choose a provider for your next turn",
+			description: "Choose a provider for this conversation",
 		});
 		return await next(event);
 	});
@@ -19,23 +22,29 @@ export function register(on) {
 		$.ui.status("Agent-smith: choose a provider on your next turn.");
 		return { isTextDisplayOnly: true };
 	});
+	on("turn.complete", async (_$, event, next) => {
+		if (!event.agentId) completedMainTurns += 1;
+		return await next(event);
+	});
 	on("http.fetch", async ($, event, next) => {
 		if (!isAnthropicPoolRequest(event.url)) return next(event);
 		let initialChoice;
 		const chooseNow = openChoiceMenu;
 		openChoiceMenu = false;
 		let declinePromotion = false;
-		if (promotion) {
-			try {
-				const choice = await choosePromotion(promotion, (question, options) =>
-					$.ui.ask(question, { header: "Agent-smith", options }),
-				);
-				initialChoice = choice?.provider;
-				declinePromotion = !initialChoice;
-			} catch {
-				declinePromotion = true;
-			}
+		if (
+			promotionDecision ||
+			(promotion && completedMainTurns >= promotionReadyAfterTurn)
+		) {
+			promotionDecision ??= choosePromotion(promotion, (question, options) =>
+				$.ui.ask(question, { header: "Agent-smith", options }),
+			)
+				.then((choice) => choice?.provider)
+				.catch(() => undefined);
+			initialChoice = await promotionDecision;
+			declinePromotion = !initialChoice;
 			promotion = null;
+			promotionDecision = null;
 		}
 		return await retryCapacityBlockedRequest({
 			init: event.init,
@@ -46,7 +55,9 @@ export function register(on) {
 				$.ui.ask(question, { header: "Agent-smith", options }),
 			setStatus: (status) => $.ui.status(status),
 			onPromotion: (choices) => {
+				if (promotion) return;
 				promotion = choices;
+				promotionReadyAfterTurn = completedMainTurns + 1;
 			},
 			send: async (init) => await next({ ...event, init }),
 		});

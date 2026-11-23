@@ -2,15 +2,23 @@
 	"providers": {
 		"qwen-claude": {
 			"enabled": true,
-      "strategy": "model-studio-anthropic-api",
+			"strategy": "model-studio-anthropic-api",
 			"base_url": "https://dashscope.aliyuncs.com/apps/anthropic",
-			"models": { "claude-sonnet-*": "qwen3-coder-flash" }
+			"models": {
+				"claude-haiku-*": "qwen3-coder-flash",
+				"claude-opus-*": "qwen3-coder-flash",
+				"claude-sonnet-*": "qwen3-coder-flash"
+			}
 		},
 		"kimi-claude": {
 			"enabled": true,
-      "strategy": "model-studio-anthropic-api",
+			"strategy": "model-studio-anthropic-api",
 			"base_url": "https://dashscope.aliyuncs.com/apps/anthropic",
-			"models": { "claude-sonnet-*": "kimi-k3.1-pro" }
+			"models": {
+				"claude-haiku-*": "kimi-k3.1-pro",
+				"claude-opus-*": "kimi-k3.1-pro",
+				"claude-sonnet-*": "kimi-k3.1-pro"
+			}
 		},
 		"qwen-codex": {
 			"enabled": true,

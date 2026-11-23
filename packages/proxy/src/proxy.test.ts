@@ -393,6 +393,135 @@ describe("handleProxy routing", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
+	it("identifies a prefiltered Claude five-hour quota block", async () => {
+		const claude = createTestProvider("claude-code");
+		claude.quotaBucketsFor = () => ["unified5h", "unified7d"];
+		claude.isFiveHourBucket = (bucket) => bucket === "unified5h";
+		claude.isWeeklyBucket = (bucket) => bucket === "unified7d";
+		const retryAt = Date.now() + 60_000;
+		const account = {
+			...createTestAccount(),
+			provider: "claude-code",
+			quota_state: {
+				windows: {
+					unified5h: {
+						resetAt: retryAt,
+						seenAt: Date.now(),
+						status: "rejected",
+						utilization: null,
+					},
+				},
+			},
+		} as Account;
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"x-agent-smith-interactive-provider-choice": "v1",
+					},
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			createProxyContext([claude], [account], {
+				"anthropic-messages": ["claude-code"],
+			}),
+		);
+
+		expect(response.status).toBe(429);
+		expect(await response.json()).toMatchObject({
+			category: "five-hour-limit",
+			wait: { retryAt },
+		});
+	});
+
+	it("tries every account of a blocked provider before asking to switch providers", async () => {
+		const qwen = createTestProvider("qwen-claude", {
+			category: "token-allocation",
+		});
+		const first = {
+			...createTestAccount(),
+			id: "qwen-first",
+			provider: "qwen-claude",
+		} as Account;
+		const second = {
+			...createTestAccount(),
+			id: "qwen-second",
+			name: "second-qwen",
+			provider: "qwen-claude",
+		} as Account;
+		const fetchMock = mock(() =>
+			Promise.resolve(new Response("limited", { status: 429 })),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"x-agent-smith-interactive-provider-choice": "v1",
+					},
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			createProxyContext([qwen], [first, second], {
+				"anthropic-messages": ["qwen-claude"],
+			}),
+		);
+
+		expect(response.status).toBe(429);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("handles a short Model Studio throttle without opening the provider chooser", async () => {
+		const qwen = createTestProvider("qwen-claude", {
+			category: "burst",
+		});
+		qwen.parseRateLimit = () => ({ isRateLimited: true });
+		const account = {
+			...createTestAccount(),
+			provider: "qwen-claude",
+		} as Account;
+		const fetchMock = mock(() =>
+			Promise.resolve(
+				new Response("limited", {
+					status: 429,
+					headers: { "retry-after": "0" },
+				}),
+			),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"x-agent-smith-interactive-provider-choice": "v1",
+					},
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			createProxyContext([qwen], [account], {
+				"anthropic-messages": ["qwen-claude"],
+			}),
+		);
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("x-agent-smith-provider-capacity")).toBeNull();
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
 	it("opens the full ranked chooser only when the Claude session explicitly asks again", async () => {
 		const qwen = createTestProvider("qwen-claude");
 		const kimi = createTestProvider("kimi-claude");

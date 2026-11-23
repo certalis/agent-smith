@@ -4,6 +4,8 @@ import { isProviderBlockCategory, PROVIDER_BLOCK_CATEGORIES } from "./index";
 
 test("exports a provider-neutral capacity block vocabulary", () => {
 	expect(PROVIDER_BLOCK_CATEGORIES).toEqual([
+		"five-hour-limit",
+		"weekly-limit",
 		"request-rate",
 		"token-allocation",
 		"burst",

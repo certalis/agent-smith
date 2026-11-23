@@ -8,6 +8,7 @@ import {
 	manualProviderChoiceRequested,
 	providerPromotionDeclined,
 	readProviderChoice,
+	selectPoolProviders,
 } from "@agent-smith/routing";
 import type { RequestMeta } from "@agent-smith/types";
 import {
@@ -22,7 +23,6 @@ import {
 	createManualProviderChoiceResponse,
 	eligiblePoolChoices,
 	type InteractivePoolRequest,
-	preferInteractivePoolProviders,
 	waitOrReturnProviderCapacity,
 } from "./pool/interactive-provider-pool";
 import { proxyPoolCandidates } from "./pool/provider-pool-attempts";
@@ -158,19 +158,17 @@ function prepareProviderPoolSelection(
 			),
 		};
 	}
-	const preferredCandidates = preferInteractivePoolProviders(
-		pool,
-		pinnedAccount,
-		providerPreference?.provider,
-	);
 	return {
-		candidates: requestedChoice
-			? pool.providers.filter(
-					(candidate) => candidate.provider.name === requestedChoice,
-				)
-			: interactive
-				? preferredCandidates.slice(0, 1)
-				: preferredCandidates.slice(0, 2),
+		candidates: selectPoolProviders(
+			pool.providers,
+			(candidate) => candidate.provider.name,
+			{
+				interactive,
+				pinnedProvider: pinnedAccount?.provider,
+				preferredProvider: providerPreference?.provider,
+				requestedProvider: requestedChoice,
+			},
+		),
 		conversationKey,
 		interactive,
 		interactiveInput,
@@ -261,13 +259,16 @@ export async function proxyProviderPool(
 	if (interactive) {
 		const blockedProvider = candidates[0]?.provider.name;
 		if (blockedProvider) {
+			const block = candidateAttempt.firstCapacityBlock;
+			const retryAt = block?.retryAt ?? candidateAttempt.soonestRetry;
 			return createProviderCapacityProblem({
 				blockedProvider,
-				category: "unknown",
+				category: block?.category ?? "unknown",
 				choices: eligiblePoolChoices(interactiveInput, blockedProvider),
-				...(candidateAttempt.soonestRetry !== null && {
-					retryAt: candidateAttempt.soonestRetry,
-				}),
+				...(retryAt !== null &&
+					retryAt !== undefined && {
+						retryAt,
+					}),
 			});
 		}
 	}

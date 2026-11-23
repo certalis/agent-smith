@@ -223,6 +223,36 @@ async function classifyUpstreamResponse(
 		? await input.ctx.provider.getCapacityBlock?.(response)
 		: null;
 	if (capacityBlock) {
+		const quotaRejected = await isQuotaRejection(response, input.ctx.provider);
+		const isRateLimited = processProxyResponse(
+			response,
+			input.account,
+			input.ctx,
+			quotaRejected,
+		);
+		const perMinuteRetryAfterMs = getPerMinuteRetryAfterMs(
+			response,
+			quotaRejected,
+		);
+		if (
+			capacityBlock.category === "request-rate" ||
+			capacityBlock.category === "burst"
+		) {
+			if (perMinuteRetryAfterMs !== undefined) {
+				return {
+					forward,
+					kind: "per-minute-rate-limit",
+					retryAfterMs: perMinuteRetryAfterMs,
+				};
+			}
+			if (isRateLimited && !response.ok) {
+				return {
+					discard: discardUpstreamResponse(state),
+					forward,
+					kind: "quota-rate-limit",
+				};
+			}
+		}
 		return {
 			block: capacityBlock,
 			discard: discardUpstreamResponse(state),

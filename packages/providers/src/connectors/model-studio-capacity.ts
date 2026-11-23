@@ -16,9 +16,9 @@ const MODEL_STUDIO_BLOCK_CATEGORIES: Readonly<
 	ServiceUnavailable: "temporary-capacity",
 };
 
-function retryAtFromHeader(
+export function retryAtFromHeader(
 	response: Response,
-	now: number,
+	now: number = Date.now(),
 ): number | undefined {
 	const retryAfter = response.headers.get("retry-after");
 	if (!retryAfter) return undefined;

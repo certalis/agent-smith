@@ -149,6 +149,7 @@ export function createProviderCapacityProblem({
 			headers: {
 				"cache-control": "no-store",
 				"content-type": "application/problem+json",
+				"x-should-retry": "false",
 				...(retryAfter ? { "retry-after": retryAfter } : {}),
 				[PROVIDER_CAPACITY_HEADER]: "v1",
 				[PROVIDER_CAPACITY_DETAILS_HEADER]: encodeCapacityDetails({
@@ -174,7 +175,7 @@ export function createProviderChoiceProblem({
 	return Response.json(
 		{
 			type: "urn:agent-smith:provider-choice:v1",
-			title: "Choose provider for this turn",
+			title: "Choose provider for this conversation",
 			status: 409,
 			activeProvider,
 			choices,
@@ -185,6 +186,7 @@ export function createProviderChoiceProblem({
 			headers: {
 				"cache-control": "no-store",
 				"content-type": "application/problem+json",
+				"x-should-retry": "false",
 				[PROVIDER_CAPACITY_HEADER]: "v1",
 				[PROVIDER_CAPACITY_DETAILS_HEADER]: encodeCapacityDetails({
 					kind: "manual",

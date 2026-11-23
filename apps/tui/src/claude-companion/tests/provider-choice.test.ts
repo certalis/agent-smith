@@ -5,6 +5,7 @@ import {
 	readPromotionDetails,
 	retryCapacityBlockedRequest,
 } from "../hooks/provider-choice.js";
+import { register } from "../hooks/register.js";
 
 function base64url(value: unknown): string {
 	const bytes = new TextEncoder().encode(JSON.stringify(value));
@@ -59,6 +60,21 @@ test("reads only a valid ranked chooser from the private response header", () =>
 	).toEqual({
 		choices: [{ provider: "qwen-claude", model: "qwen3-coder-flash" }],
 	});
+});
+
+test("recognizes five-hour and weekly seat limits from the pool", () => {
+	for (const category of ["five-hour-limit", "weekly-limit"]) {
+		expect(
+			readCapacityDetails({
+				"x-agent-smith-provider-capacity-details": base64url({
+					blockedProvider: "claude-code",
+					category,
+					choices: [{ provider: "qwen-claude", model: "qwen3-coder" }],
+					wait: { retryAt: 1_700_000_000_000 },
+				}),
+			}),
+		).toMatchObject({ category });
+	}
 });
 
 test("asks out of band, retries the same request on the selected provider, and shows the provider that served it", async () => {
@@ -122,7 +138,36 @@ test("asks out of band, retries the same request on the selected provider, and s
 			},
 		},
 	]);
-	expect(statuses).toEqual(["Agent-smith: kimi-claude · kimi-k3.1-pro"]);
+	expect(statuses).toEqual(["Kimi · kimi-k3.1-pro"]);
+});
+
+test("returns the original capacity response when the chooser is dismissed", async () => {
+	const statuses: string[] = [];
+	const response = await retryCapacityBlockedRequest({
+		init: { method: "POST", body: "same body" },
+		ask: async () => {
+			throw new Error("dismissed");
+		},
+		setStatus: (status) => statuses.push(status),
+		send: async () => ({
+			status: 429,
+			ok: false,
+			headers: {
+				"x-agent-smith-provider-capacity": "v1",
+				"x-agent-smith-provider-capacity-details": base64url({
+					blockedProvider: "qwen-claude",
+					category: "token-allocation",
+					choices: [{ provider: "kimi-claude", model: "kimi-k3.1-pro" }],
+					wait: null,
+				}),
+			},
+		}),
+	});
+
+	expect(response.status).toBe(429);
+	expect(statuses).toEqual([
+		"Agent-smith: provider choice dismissed; this turn remains blocked.",
+	]);
 });
 
 test("does not repeat an unknown-limit request when the person chooses Wait", async () => {
@@ -188,5 +233,122 @@ test("reports when the server cannot hold a known provider wait", async () => {
 	expect(response.status).toBe(429);
 	expect(statuses).toEqual([
 		"Agent-smith: it cannot hold this request until the provider retry time, so this turn remains blocked.",
+	]);
+});
+
+test("offers a recovered higher provider on the next completed main turn", async () => {
+	const handlers = new Map();
+	register((event, _matcher, handler) => {
+		const resolvedHandler = handler ?? _matcher;
+		handlers.set(event, resolvedHandler);
+		return { catch() {} };
+	});
+	const asks: string[] = [];
+	const status: string[] = [];
+	const $ = {
+		command: { register: async () => {} },
+		ui: {
+			ask: async (question) => {
+				asks.push(question);
+				return "Qwen · qwen3-coder-flash";
+			},
+			status: (value) => status.push(value),
+		},
+	};
+	const event = {
+		url: "http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		init: { method: "POST", headers: {} },
+	};
+	const fetch = handlers.get("http.fetch");
+	const complete = handlers.get("turn.complete");
+
+	await fetch($, event, async () => ({
+		status: 200,
+		ok: true,
+		headers: {
+			"x-agent-smith-provider-promotion-details": base64url({
+				choices: [{ provider: "qwen-claude", model: "qwen3-coder-flash" }],
+			}),
+		},
+	}));
+	expect(asks).toEqual([]);
+
+	await complete($, {}, async () => ({}));
+	const sentHeaders: Record<string, string>[] = [];
+	await fetch($, event, async (nextEvent) => {
+		sentHeaders.push(nextEvent.init.headers);
+		return { status: 200, ok: true, headers: {} };
+	});
+
+	expect(asks).toEqual([
+		"A higher-ranked provider has an eligible Agent-smith account. Switch this conversation?",
+	]);
+	expect(sentHeaders).toEqual([
+		{
+			"x-agent-smith-interactive-provider-choice": "v1",
+			"x-agent-smith-provider-choice": "qwen-claude",
+		},
+	]);
+	expect(status).toEqual([]);
+});
+
+test("shares one recovery choice across concurrent requests in the next turn", async () => {
+	const handlers = new Map();
+	register((event, _matcher, handler) => {
+		handlers.set(event, handler ?? _matcher);
+		return { catch() {} };
+	});
+	let resolveAsk: (answer: string) => void = () => {};
+	const asks: string[] = [];
+	const $ = {
+		command: { register: async () => {} },
+		ui: {
+			ask: async (question) => {
+				asks.push(question);
+				return await new Promise((resolve) => {
+					resolveAsk = resolve;
+				});
+			},
+			status() {},
+		},
+	};
+	const event = {
+		url: "http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		init: { method: "POST", headers: {} },
+	};
+	const fetch = handlers.get("http.fetch");
+	await fetch($, event, async () => ({
+		status: 200,
+		ok: true,
+		headers: {
+			"x-agent-smith-provider-promotion-details": base64url({
+				choices: [{ provider: "qwen-claude", model: "qwen3-coder-flash" }],
+			}),
+		},
+	}));
+	await handlers.get("turn.complete")($, {}, async () => ({}));
+
+	const sent: Record<string, string>[] = [];
+	const send = async (nextEvent) => {
+		sent.push(nextEvent.init.headers);
+		return { status: 200, ok: true, headers: {} };
+	};
+	const first = fetch($, event, send);
+	await Promise.resolve();
+	const second = fetch($, event, send);
+	await Promise.resolve();
+
+	expect(asks).toHaveLength(1);
+	resolveAsk("Qwen · qwen3-coder-flash");
+	await Promise.all([first, second]);
+	expect(sent).toEqual([
+		{
+			"x-agent-smith-interactive-provider-choice": "v1",
+			"x-agent-smith-provider-choice": "qwen-claude",
+		},
+		{
+			"x-agent-smith-interactive-provider-choice": "v1",
+			"x-agent-smith-provider-choice": "qwen-claude",
+		},
 	]);
 });

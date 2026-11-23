@@ -280,19 +280,22 @@ Agent-smith never silently changes provider. If the current provider blocks a
 turn, Claude Code shows the eligible replacements in the configured pool order,
 then **Wait**. Choosing one resends the same turn and context with only the
 mapped model changed; the chosen provider stays pinned for that conversation.
-The small `Agent-smith: <provider> · <model>` row under Claude's prompt reports
-the provider that actually answered, not the requested model.
+The companion status row under Claude's prompt reports the provider that
+actually answered and its mapped model, not the requested model. This is a
+companion row, not a replacement for Claude Code's native status line.
 
-The block text distinguishes request rate, token allocation, traffic burst,
-temporary capacity, and an unknown upstream limit. It shows a retry time only
-when the upstream supplied one. **Wait** holds the request only when that time
-falls inside the configured `team_routing.hold_seconds`; outside that window it
-returns the same truthful block without a duplicate upstream retry. An unknown
-limit never gets a made-up countdown or a duplicate retry. A higher-ranked provider is
-offered once only after a known retry time or local pool availability says it
-may be tried. Declining keeps the current provider quiet for the rest of the
-conversation. Run `/agent-smith-provider` in Claude Code to reopen the full
-chooser on the next turn. Message-thread continuations never switch providers.
+The block text distinguishes five-hour and weekly pool limits, request rate,
+token allocation, traffic burst, temporary capacity, and an unknown upstream
+limit. It shows a retry time only when the upstream supplied one. **Wait**
+holds the request only when that time falls inside the configured
+`team_routing.hold_seconds`; outside that window it returns the same truthful
+block without a duplicate upstream retry. An unknown limit never gets a
+made-up countdown or a duplicate retry. A higher-ranked provider is offered
+once only after a known retry time or local pool availability says it may be
+tried, and only after the next completed main turn. Declining keeps the current
+provider quiet for the rest of the conversation. Run
+`/agent-smith-provider` in Claude Code to reopen the full chooser on the next
+turn. Message-thread continuations never switch providers.
 
 Unwrapped or unattended clients keep the normal bounded pool behavior.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and

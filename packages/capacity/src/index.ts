@@ -1,4 +1,6 @@
 export const PROVIDER_BLOCK_CATEGORIES = [
+	"five-hour-limit",
+	"weekly-limit",
 	"request-rate",
 	"token-allocation",
 	"burst",
