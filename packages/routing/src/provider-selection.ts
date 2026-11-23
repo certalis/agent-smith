@@ -1,7 +1,6 @@
 import type { ProviderChoice } from "./provider-choice";
 
 export type ProviderSelection = {
-	interactive: boolean;
 	pinnedProvider?: string;
 	preferredProvider?: string;
 	requestedProvider?: string | null;
@@ -52,7 +51,7 @@ export function selectPoolProviders<T>(
 		selection.pinnedProvider,
 		selection.preferredProvider,
 	);
-	return preferred.slice(0, selection.interactive ? 1 : 2);
+	return preferred.slice(0, 1);
 }
 
 /** Returns eligible providers higher than the active pin, in configured order. */

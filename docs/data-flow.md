@@ -114,7 +114,8 @@ companion. The companion asks the person outside the transcript, then resends
 the unchanged request with a validated configured-provider choice. The proxy
 removes all chooser controls before upstream forwarding. A successful response
 returns the factual provider/model for the companion's status row. Unwrapped
-clients stay on the ordinary bounded pool path.
+clients stay on their current provider and receive its capacity response; the
+proxy never silently moves them to a lower-ranked provider.
 
 The companion transports this UI only. `routing` decides when a configured
 provider is eligible to offer or pin, `capacity` represents the upstream block,

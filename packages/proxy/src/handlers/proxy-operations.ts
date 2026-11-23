@@ -219,9 +219,8 @@ async function classifyUpstreamResponse(
 
 	let response = state.response;
 	const forward = createForwarder(input, upstream, state);
-	const capacityBlock = interactiveProviderChoiceRequested(input.req.headers)
-		? await input.ctx.provider.getCapacityBlock?.(response)
-		: null;
+	const interactive = interactiveProviderChoiceRequested(input.req.headers);
+	const capacityBlock = await input.ctx.provider.getCapacityBlock?.(response);
 	if (capacityBlock) {
 		const quotaRejected = await isQuotaRejection(response, input.ctx.provider);
 		processProxyResponse(response, input.account, input.ctx, quotaRejected);
@@ -230,8 +229,9 @@ async function classifyUpstreamResponse(
 			quotaRejected,
 		);
 		if (
-			capacityBlock.category === "request-rate" ||
-			capacityBlock.category === "burst"
+			interactive &&
+			(capacityBlock.category === "request-rate" ||
+				capacityBlock.category === "burst")
 		) {
 			if (perMinuteRetryAfterMs !== undefined) {
 				return {

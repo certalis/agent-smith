@@ -18,7 +18,8 @@
 Claude Code and Codex keep talking their own protocol. agent-smith sits between
 them and the provider: it chooses a provider from the pool you configure, then
 an account inside that provider, watches the quota each provider reports, and
-fails over when one cannot serve.
+may try another account from that same provider. It never silently moves a
+request to another provider.
 
 ## How it works
 
@@ -209,10 +210,12 @@ Each example is a complete config file, also in [`examples/config/`](examples/co
 }
 ```
 
-**An Anthropic-compatible endpoint as fallback**
+**An Anthropic-compatible provider choice**
 ([`compatible-endpoint-fallback.json`](examples/config/compatible-endpoint-fallback.json)).
-Requests go to Anthropic first. When Anthropic cannot serve, Sonnet requests move
-to `acme` and are sent as `acme-large`. `acme` serves no other model.
+Requests go to Anthropic first. A wrapped Claude Code session can choose `acme`
+after Anthropic reports a capacity block; that choice sends Sonnet as
+`acme-large`. Unattended callers receive Anthropic's capacity response and are
+never moved to `acme` automatically. `acme` serves no other model.
 
 ```json
 {

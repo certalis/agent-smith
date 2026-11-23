@@ -162,7 +162,6 @@ function prepareProviderPoolSelection(
 			pool.providers,
 			(candidate) => candidate.provider.name,
 			{
-				interactive,
 				pinnedProvider: pinnedAccount?.provider,
 				preferredProvider: providerPreference?.provider,
 				requestedProvider: requestedChoice,

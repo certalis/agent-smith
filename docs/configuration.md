@@ -130,7 +130,7 @@ The configuration file is stored at:
 | `alerts` | object | every channel off | Where seat alerts go; see [Alerts](#alerts). |
 | `enrollment_emails` | string[] | `[]` | Addresses or exact-domain rules (`*@example.test`) the stable `/pool-enroll` link admits (lowercased, at most 200 entries). Domain rules do not include subdomains. Edit through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
-| `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
+| `provider_pools` | object | none | Ordered provider-selection routes, keyed by wire protocol. Requests start with the first provider and never switch providers without an explicit interactive choice. |
 | `client` | object | absent | The endpoint and forwarding key for wrappers installed on this machine. It does not configure providers or change the server's pool. |
 
 ### Client wrappers
@@ -300,7 +300,9 @@ provider quiet for the rest of the conversation. Run
 `/agent-smith-provider` in Claude Code to reopen the full chooser on the next
 turn. Message-thread continuations never switch providers.
 
-Unwrapped or unattended clients keep the normal bounded pool behavior.
+Unwrapped or unattended clients stay on their current provider. A capacity block
+returns `429`, with `Retry-After` only when the provider supplied a retry time;
+they never silently move to another configured provider.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and
 handing off the needed context yourself: the two clients use different request
 formats and Agent-smith does not convert chat history between them.

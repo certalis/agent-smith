@@ -5,7 +5,7 @@ import {
 	selectPoolProviders,
 } from "./provider-selection";
 
-test("keeps a conversation provider first and limits an interactive attempt to it", () => {
+test("keeps a conversation provider first without a provider failover", () => {
 	const providers = [
 		{ name: "qwen-claude" },
 		{ name: "kimi-claude" },
@@ -14,17 +14,15 @@ test("keeps a conversation provider first and limits an interactive attempt to i
 
 	expect(
 		selectPoolProviders(providers, (provider) => provider.name, {
-			interactive: true,
 			pinnedProvider: "kimi-claude",
 			preferredProvider: "kimi-claude",
 		}),
 	).toEqual([{ name: "kimi-claude" }]);
 	expect(
 		selectPoolProviders(providers, (provider) => provider.name, {
-			interactive: false,
 			pinnedProvider: "kimi-claude",
 		}),
-	).toEqual([{ name: "kimi-claude" }, { name: "qwen-claude" }]);
+	).toEqual([{ name: "kimi-claude" }]);
 });
 
 test("keeps configured order while filtering promotion choices through routing policy", () => {

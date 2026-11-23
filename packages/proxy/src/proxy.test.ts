@@ -355,6 +355,96 @@ describe("handleProxy routing", () => {
 		).toBeNull();
 	});
 
+	it("returns a noninteractive burst block without serving the next provider", async () => {
+		const qwen = createTestProvider("qwen-claude", { category: "burst" });
+		qwen.parseRateLimit = () => ({ isRateLimited: true });
+		const kimi = createTestProvider("kimi-claude");
+		const accounts = [
+			{ ...createTestAccount(), id: "qwen-account", provider: "qwen-claude" },
+			{ ...createTestAccount(), id: "kimi-account", provider: "kimi-claude" },
+		] as Account[];
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(
+				url.includes("qwen-claude")
+					? new Response("limited", { status: 429 })
+					: new Response("served by kimi"),
+			);
+		}) as unknown as typeof fetch;
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			createProxyContext([qwen, kimi], accounts, {
+				"anthropic-messages": ["qwen-claude", "kimi-claude"],
+			}),
+		);
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("retry-after")).toBeNull();
+		expect(await response.json()).toMatchObject({
+			blockedProvider: "qwen-claude",
+			category: "burst",
+		});
+		expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
+	});
+
+	it("returns a noninteractive rate block with its upstream retry time", async () => {
+		const retryAt = Date.now() + 60_000;
+		const qwen = createTestProvider("qwen-claude", {
+			category: "request-rate",
+			retryAt,
+		});
+		qwen.parseRateLimit = () => ({ isRateLimited: true, resetTime: retryAt });
+		const kimi = createTestProvider("kimi-claude");
+		const accounts = [
+			{ ...createTestAccount(), id: "qwen-account", provider: "qwen-claude" },
+			{ ...createTestAccount(), id: "kimi-account", provider: "kimi-claude" },
+		] as Account[];
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(
+				url.includes("qwen-claude")
+					? new Response("limited", {
+							status: 429,
+							headers: { "retry-after": "60" },
+						})
+					: new Response("served by kimi"),
+			);
+		}) as unknown as typeof fetch;
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			createProxyContext([qwen, kimi], accounts, {
+				"anthropic-messages": ["qwen-claude", "kimi-claude"],
+			}),
+		);
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get("retry-after")).not.toBeNull();
+		expect(await response.json()).toMatchObject({
+			blockedProvider: "qwen-claude",
+			category: "request-rate",
+			wait: { retryAt },
+		});
+		expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
+	});
+
 	it("offers a chooser when the pinned provider has no eligible account before an upstream attempt", async () => {
 		const qwen = createTestProvider("qwen-claude");
 		const kimi = createTestProvider("kimi-claude");

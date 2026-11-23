@@ -120,17 +120,18 @@ serves and the upstream name to send. Selecting that provider changes only the
 JSON `model` value in place; all other request bytes stay untouched.
 
 A pool pin keeps a conversation on its prior account while that account is
-eligible. Moving to another provider loses prompt-cache warmth and can change
-model behavior or cost, so request and usage records report the provider and
-model that actually served the request. Direct routes do not use provider-pool
-fallback. If no provider in a pool serves the requested model, the proxy returns
-`400` naming `provider_pools.<wire>`; add a matching model map or select a
-direct provider route intentionally.
+eligible. The pool may try eligible accounts within the selected provider, but
+never silently changes provider: moving provider loses prompt-cache warmth and
+can change model behavior or cost. Request and usage records report the
+provider and model that actually served the request. If no provider in a pool
+serves the requested model, the proxy returns `400` naming
+`provider_pools.<wire>`; add a matching model map or select a direct provider
+route intentionally.
 
 For a Claude Code request that carries the Agent-smith companion's interactive
-marker, this ordinary pool fallback is paused at a provider capacity block.
-The proxy returns only eligible configured alternatives and never changes the
-provider until the person chooses one. The companion's **Wait** option may hold
+marker, the proxy returns only eligible configured alternatives when the selected
+provider has a capacity block. It never changes the provider until the person
+chooses one. The companion's **Wait** option may hold
 the same request only for a known reset inside the configured hold window; a
 longer wait returns the original block without sending upstream again. An
 upstream block without a reset remains manual: it is not silently retried

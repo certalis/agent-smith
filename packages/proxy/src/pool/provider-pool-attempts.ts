@@ -363,7 +363,7 @@ export async function proxyPoolCandidates({
 		const result = await proxyPoolCandidate(
 			request,
 			accounts,
-			candidateIndex === 0,
+			candidateIndex < candidates.length - 1,
 		);
 		const response = resolvePoolCandidateResult({
 			candidate,
