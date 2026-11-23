@@ -170,6 +170,38 @@ test("returns the original capacity response when the chooser is dismissed", asy
 	]);
 });
 
+test("does not turn typed chooser text into a provider wait", async () => {
+	const calls: unknown[] = [];
+	const statuses: string[] = [];
+	const response = await retryCapacityBlockedRequest({
+		init: { method: "POST", body: "same body" },
+		ask: async () => "something else",
+		setStatus: (status) => statuses.push(status),
+		send: async (init) => {
+			calls.push(init);
+			return {
+				status: 429,
+				ok: false,
+				headers: {
+					"x-agent-smith-provider-capacity": "v1",
+					"x-agent-smith-provider-capacity-details": base64url({
+						blockedProvider: "qwen-claude",
+						category: "request-rate",
+						choices: [{ provider: "kimi-claude", model: "kimi-k3.1-pro" }],
+						wait: { retryAt: 1_700_000_000_000 },
+					}),
+				},
+			};
+		},
+	});
+
+	expect(response.status).toBe(429);
+	expect(calls).toHaveLength(1);
+	expect(statuses).toEqual([
+		"Agent-smith: choose one listed provider or Wait; this turn remains blocked.",
+	]);
+});
+
 test("does not repeat an unknown-limit request when the person chooses Wait", async () => {
 	const calls: unknown[] = [];
 	const statuses: string[] = [];

@@ -283,6 +283,7 @@ mapped model changed; the chosen provider stays pinned for that conversation.
 The companion status row under Claude's prompt reports the provider that
 actually answered and its mapped model, not the requested model. This is a
 companion row, not a replacement for Claude Code's native status line.
+Claude Code adds its warning glyph and the companion's name to that row.
 
 The block text distinguishes five-hour and weekly pool limits, request rate,
 token allocation, traffic burst, temporary capacity, and an unknown upstream

@@ -522,6 +522,53 @@ describe("handleProxy routing", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("keeps a Model Studio rate block without a deadline classified and pinned", async () => {
+		const qwen = createTestProvider("qwen-claude", { category: "burst" });
+		qwen.parseRateLimit = () => ({ isRateLimited: true });
+		const account = {
+			...createTestAccount(),
+			provider: "qwen-claude",
+		} as Account;
+		const fetchMock = mock(() =>
+			Promise.resolve(new Response("limited", { status: 429 })),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+		const context = createProxyContext([qwen], [account], {
+			"anthropic-messages": ["qwen-claude"],
+		});
+		const request = (headers: Record<string, string> = {}) =>
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-agent-smith-interactive-provider-choice": "v1",
+					"x-claude-code-session-id": "model-studio-burst",
+					...headers,
+				},
+				body: '{"model":"claude-sonnet-4-5","messages":[]}',
+			});
+
+		const first = await handleProxy(request(), url, context);
+		expect(await first.json()).toMatchObject({
+			category: "burst",
+			wait: null,
+		});
+
+		const waited = await handleProxy(
+			request({ "x-agent-smith-provider-wait": "v1" }),
+			url,
+			context,
+		);
+		expect(await waited.json()).toMatchObject({
+			category: "burst",
+			wait: null,
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("opens the full ranked chooser only when the Claude session explicitly asks again", async () => {
 		const qwen = createTestProvider("qwen-claude");
 		const kimi = createTestProvider("kimi-claude");

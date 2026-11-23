@@ -224,12 +224,7 @@ async function classifyUpstreamResponse(
 		: null;
 	if (capacityBlock) {
 		const quotaRejected = await isQuotaRejection(response, input.ctx.provider);
-		const isRateLimited = processProxyResponse(
-			response,
-			input.account,
-			input.ctx,
-			quotaRejected,
-		);
+		processProxyResponse(response, input.account, input.ctx, quotaRejected);
 		const perMinuteRetryAfterMs = getPerMinuteRetryAfterMs(
 			response,
 			quotaRejected,
@@ -243,13 +238,6 @@ async function classifyUpstreamResponse(
 					forward,
 					kind: "per-minute-rate-limit",
 					retryAfterMs: perMinuteRetryAfterMs,
-				};
-			}
-			if (isRateLimited && !response.ok) {
-				return {
-					discard: discardUpstreamResponse(state),
-					forward,
-					kind: "quota-rate-limit",
 				};
 			}
 		}

@@ -206,9 +206,9 @@ async function chooseChoices(question, choices, ask) {
 		}
 		const choice = page.find((candidate) => choiceLabel(candidate) === answer);
 		if (choice) return choice;
-		return null;
+		return undefined;
 	}
-	return null;
+	return undefined;
 }
 
 export async function choosePromotion(choices, ask) {
@@ -263,7 +263,17 @@ export async function retryCapacityBlockedRequest({
 		);
 		return response;
 	}
-	if (!choice && details.kind !== "manual" && details.wait === null) {
+	if (choice === undefined) {
+		setStatus(
+			"Agent-smith: choose one listed provider or Wait; this turn remains blocked.",
+		);
+		return response;
+	}
+	if (choice === null && details.kind === "manual") {
+		setStatus("Agent-smith: provider choice left unchanged.");
+		return response;
+	}
+	if (choice === null && details.wait === null) {
 		setStatus(
 			"Agent-smith: the provider supplied no retry time, so this turn remains on its current provider.",
 		);
