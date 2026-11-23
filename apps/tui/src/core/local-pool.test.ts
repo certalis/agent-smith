@@ -62,7 +62,7 @@ describe("local pool policy", () => {
 			...routing,
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
-		callerWeeklyMaxUsage: { alice: 0.7 },
+			callerWeeklyMaxUsage: { alice: 0.7 },
 		};
 		const next = nextTeamRoutingConfig(policy, oauthSeat(), true);
 

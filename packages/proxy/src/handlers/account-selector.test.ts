@@ -222,7 +222,10 @@ describe("selectAccountsForRequest", () => {
 				},
 			},
 			strategy: { select: (accounts: Account[]) => accounts },
-			dbOps: { getAvailableAccountsByProvider: () => [account] },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => undefined,
+			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
 		} as unknown as ResolvedProxyContext;
 		expect(
@@ -365,7 +368,10 @@ describe("selectAccountsForRequest", () => {
 			quotaProbeAt: new Map([["claude-code", now]]),
 			runtime: { quotaThreshold: 0.98 },
 			strategy: { select: (accounts: Account[]) => accounts },
-			dbOps: { getAvailableAccountsByProvider: () => [account] },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => undefined,
+			},
 		} as unknown as ResolvedProxyContext;
 
 		expect(
@@ -411,11 +417,15 @@ describe("selectAccountsForRequest", () => {
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
 					weeklyMaxUsage: 0.95,
+					weeklyMaxUsageByEmail: {},
 					callerWeeklyMaxUsage: {},
 				},
 			},
 			strategy: { select: (accounts: Account[]) => accounts },
-			dbOps: { getAvailableAccountsByProvider: () => [account] },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => undefined,
+			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
 		} as unknown as ResolvedProxyContext;
 
@@ -472,12 +482,16 @@ describe("selectAccountsForRequest", () => {
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
 					weeklyMaxUsage: 0.95,
+					weeklyMaxUsageByEmail: {},
 					callerWeeklyMaxUsage: { alice: 0.7 },
 				},
 			},
 			quotaProbeAt: new Map<string, number>(),
 			strategy: { select: (accounts: Account[]) => accounts },
-			dbOps: { getAvailableAccountsByProvider: () => [account] },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => undefined,
+			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
 		} as unknown as ResolvedProxyContext;
 
