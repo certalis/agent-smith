@@ -141,7 +141,7 @@ export interface Provider extends CapacitySource {
 	/**
 	 * Process the response before returning to client
 	 */
-	processResponse(
+	processResponse?(
 		response: Response,
 		account: Account | null,
 		context?: ProviderResponseContext,
