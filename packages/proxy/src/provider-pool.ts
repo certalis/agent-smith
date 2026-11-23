@@ -36,6 +36,7 @@ type ProviderPoolSelection = {
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
 	kind: "selection";
+	orderedFallback: boolean;
 	pinnedId: string | undefined;
 	providerPreference: ReturnType<ConversationProviderRouting["getPreference"]>;
 	requestedChoice: string | null;
@@ -62,6 +63,19 @@ function poolTeamRequest(
 		sessionId:
 			pool.providers[0]?.provider.getClientSessionId?.(req.headers) ?? null,
 	};
+}
+
+function hasOrderedCallerFallback(
+	ctx: ProxyContext,
+	callerId: string | undefined,
+): boolean {
+	const routing = ctx.runtime.teamRouting;
+	return (
+		routing.enabled &&
+		callerId !== undefined &&
+		Object.hasOwn(routing.callerProviderFallback, callerId) &&
+		routing.callerProviderFallback[callerId] === "ordered"
+	);
 }
 
 function prepareProviderPoolSelection(
@@ -157,11 +171,14 @@ function prepareProviderPoolSelection(
 			),
 		};
 	}
+	const orderedFallback =
+		!interactive && hasOrderedCallerFallback(ctx, callerId);
 	return {
 		candidates: selectPoolProviders(
 			pool.providers,
 			(candidate) => candidate.provider.name,
 			{
+				orderedFallback,
 				pinnedProvider: pinnedAccount?.provider,
 				preferredProvider: providerPreference?.provider,
 				requestedProvider: requestedChoice,
@@ -171,6 +188,7 @@ function prepareProviderPoolSelection(
 		interactive,
 		interactiveInput,
 		kind: "selection",
+		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,
@@ -205,6 +223,7 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
+		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,
@@ -237,6 +256,7 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
+		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,

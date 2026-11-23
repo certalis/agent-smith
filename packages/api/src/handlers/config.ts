@@ -19,6 +19,7 @@ import { parseJsonObject } from "../utils/json";
 /** Named caller ceilings are routing policy, not dashboard configuration. */
 function publicTeamRouting(config: Config) {
 	const {
+		callerProviderFallback: _callerProviderFallback,
 		callerWeeklyMaxUsage: _callerWeeklyMaxUsage,
 		weeklyMaxUsageByEmail: _weeklyMaxUsageByEmail,
 		...routing

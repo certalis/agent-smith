@@ -84,6 +84,7 @@ The configuration file is stored at:
     "weekly_max_usage": 0.95,
     "weekly_max_usage_by_email": {},
     "caller_weekly_max_usage": {},
+    "caller_provider_fallback": {},
     "admission_cap": 5,
     "admission_queue_limit": 25,
     "admission_wait_ms": 30000,
@@ -302,7 +303,10 @@ turn. Message-thread continuations never switch providers.
 
 Unwrapped or unattended clients stay on their current provider. A capacity block
 returns `429`, with `Retry-After` only when the provider supplied a retry time;
-they never silently move to another configured provider.
+they never silently move to another configured provider. The sole exception is
+a registered device listed in the private `caller_provider_fallback` map with
+the value `"ordered"`: it continues forward through the configured pool order
+after a block. This is server policy, not a request header a client can opt into.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and
 handing off the needed context yourself: the two clients use different request
 formats and Agent-smith does not convert chat history between them.
@@ -327,6 +331,7 @@ more than `0.95`.
 | `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
 | `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
 | `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
+| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block; no other caller can switch automatically. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
@@ -337,8 +342,8 @@ more than `0.95`.
 Email overrides use private enrollment contacts; set them before inviting future
 members if needed. Keys are trimmed/lowercased. A per-email value never raises
 the global weekly ceiling. The proxy-readable `GET /api/config/team-routing`
-omits this private map. An administrator's POST preserves the map when the field
-is omitted; send an explicit empty object to clear it. These limits do not add
+omits these private maps. An administrator's POST preserves either map when its
+field is omitted; send an explicit empty object to clear it. These limits do not add
 accounts to the pool or resume manually paused accounts. Revalidation requests
 cannot bypass the hard caps, and stale known usage stays blocking until reset.
 
@@ -558,11 +563,12 @@ Content-Type: application/json
 `POST` replaces the policy object using the snake_case fields shown above and
 takes effect for subsequent selection without a server restart. Management
 writes require `AGENT_SMITH_ADMIN_KEY` through `x-api-key`; do not put that key in the
-configuration file. `caller_weekly_max_usage` is accepted only on this write
-path and is omitted from all API responses, including reads, so maintain the
-map in the server's owner-only configuration file. Its keys must match names
-from the protected device-key registry; a header, session, provider identity or
-arbitrary caller label cannot select an override.
+configuration file. `caller_weekly_max_usage` and `caller_provider_fallback`
+are accepted only on this write path and are omitted from all API responses,
+including reads, so maintain the maps in the server's owner-only configuration
+file. Their keys must match names from the protected device-key registry; a
+header, session, provider identity or arbitrary caller label cannot select an
+override.
 
 ### Runtime Update Behavior
 

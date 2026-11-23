@@ -61,6 +61,7 @@ export interface TeamRoutingConfig {
 	weeklyMaxUsage: number;
 	weeklyMaxUsageByEmail: Record<string, number>;
 	callerWeeklyMaxUsage: Record<string, number>;
+	callerProviderFallback: Record<string, "ordered">;
 	admissionCap: number;
 	admissionQueueLimit: number;
 	admissionWaitMs: number;
@@ -78,6 +79,7 @@ export type TeamRoutingFileConfig = {
 	weekly_max_usage?: number;
 	weekly_max_usage_by_email?: Record<string, number>;
 	caller_weekly_max_usage?: Record<string, number>;
+	caller_provider_fallback?: Record<string, "ordered">;
 	admission_cap?: number;
 	admission_queue_limit?: number;
 	admission_wait_ms?: number;
@@ -173,6 +175,7 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.95,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
+	callerProviderFallback: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -584,6 +587,21 @@ function sanitizeTeamRouting(
 			>;
 		}
 	}
+	if (isRecord(value.caller_provider_fallback)) {
+		const entries = Object.entries(value.caller_provider_fallback);
+		if (
+			entries.length <= MAX_CALLERS &&
+			entries.every(
+				([caller, fallback]) =>
+					CALLER_ID_PATTERN.test(caller) && fallback === "ordered",
+			)
+		) {
+			result.caller_provider_fallback = Object.fromEntries(entries) as Record<
+				string,
+				"ordered"
+			>;
+		}
+	}
 	if (isNonNegativeFiniteNumber(value.admission_cap)) {
 		result.admission_cap = Math.floor(value.admission_cap);
 	}
@@ -845,6 +863,7 @@ export class Config extends EventEmitter {
 				file?.weekly_max_usage ?? TEAM_ROUTING_DEFAULTS.weeklyMaxUsage,
 			weeklyMaxUsageByEmail: { ...file?.weekly_max_usage_by_email },
 			callerWeeklyMaxUsage: { ...file?.caller_weekly_max_usage },
+			callerProviderFallback: { ...file?.caller_provider_fallback },
 			admissionCap: file?.admission_cap ?? TEAM_ROUTING_DEFAULTS.admissionCap,
 			admissionQueueLimit:
 				file?.admission_queue_limit ??
@@ -943,6 +962,7 @@ export class Config extends EventEmitter {
 			"weekly_max_usage",
 			"weekly_max_usage_by_email",
 			"caller_weekly_max_usage",
+			"caller_provider_fallback",
 			"admission_cap",
 			"admission_queue_limit",
 			"admission_wait_ms",
@@ -978,6 +998,14 @@ export class Config extends EventEmitter {
 		) {
 			sanitized.caller_weekly_max_usage = {
 				...oldValue.caller_weekly_max_usage,
+			};
+		}
+		if (
+			!("caller_provider_fallback" in value) &&
+			oldValue?.caller_provider_fallback
+		) {
+			sanitized.caller_provider_fallback = {
+				...oldValue.caller_provider_fallback,
 			};
 		}
 		this.persistStrictly("team_routing", sanitized);

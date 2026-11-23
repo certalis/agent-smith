@@ -84,6 +84,14 @@ once-per-minute revalidation path. If every pooled seat is spent for that
 caller, a request normally receives a 429 with the nearest reset; setting
 `hold_seconds` lets a request wait only for a reset within that bounded period.
 
+`caller_provider_fallback` is a separate private policy for a named unattended
+device. With the value `"ordered"`, it starts at the current provider and may
+continue only to later providers in the configured order after a block; it never
+wraps back to a higher-ranked provider. API-key accounts at those later providers
+keep their ordinary account rules; this policy does not add provider-specific
+ceilings. No other caller, including an interactive Claude Code session, gets an
+automatic provider switch.
+
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one
 slot, then adds one slot every 250 ms for 30 seconds. Repeated arrivals share

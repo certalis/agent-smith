@@ -87,6 +87,7 @@ export default defineScenario({
 				max_usage: 0.9,
 				weekly_max_usage: 0.95,
 				caller_weekly_max_usage: { "synthetic-device": 0.7 },
+				caller_provider_fallback: { "synthetic-device": "ordered" },
 			}),
 		},
 		{
@@ -120,14 +121,22 @@ export default defineScenario({
 			type: "client",
 			request: "set-alice-policy",
 			status: 200,
-			bodyExcludes: ["caller_weekly_max_usage", "synthetic-device"],
+			bodyExcludes: [
+				"caller_weekly_max_usage",
+				"caller_provider_fallback",
+				"synthetic-device",
+			],
 		},
 		{
 			id: "caller-policy-stays-private",
 			type: "client",
 			request: "policy",
 			status: 200,
-			bodyExcludes: ["caller_weekly_max_usage", "synthetic-device"],
+			bodyExcludes: [
+				"caller_weekly_max_usage",
+				"caller_provider_fallback",
+				"synthetic-device",
+			],
 		},
 		{
 			id: "caller-cap-skips-only-for-alice",

@@ -97,7 +97,9 @@ key; provider tokens and the single database stay on the server.
 Device keys allow independent revocation and cannot read management data. A
 server-side policy may give a registered device name a lower weekly seat ceiling
 than the default; this filters account eligibility only and does not create a
-per-client budget or usage meter.
+per-client budget or usage meter. The owner can also grant a named unattended
+device forward-only provider fallback; every other caller still stays on its
+selected provider.
 
 Seat owners join through the server's optional `/pool-enroll` page, not its
 proxy homepage. Allow individual addresses or an exact domain (`*@example.test`)

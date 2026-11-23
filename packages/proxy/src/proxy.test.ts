@@ -98,6 +98,9 @@ function createProxyContext(
 			},
 		},
 		dbOps: {
+			getEnrollmentContact() {
+				return null;
+			},
 			getAllAccounts() {
 				return accounts;
 			},
@@ -143,7 +146,9 @@ function createProxyContext(
 			},
 		},
 		runtime: {
+			blockWhenAllFull: true,
 			clientId: "test-client",
+			quotaThreshold: 0.9,
 			retry: {
 				attempts: 1,
 				delayMs: 0,
@@ -394,6 +399,195 @@ describe("handleProxy routing", () => {
 			category: "burst",
 		});
 		expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
+	});
+
+	it("moves an ordered-fallback caller to the next provider after a capacity block", async () => {
+		const qwen = createTestProvider("qwen-claude", {
+			category: "token-allocation",
+		});
+		const kimi = createTestProvider("kimi-claude");
+		const accounts = [
+			{
+				...createTestAccount(),
+				id: "qwen-account",
+				provider: "qwen-claude",
+				auth_method: "oauth",
+				account_uuid: "qwen-seat",
+			},
+			{
+				...createTestAccount(),
+				id: "kimi-account",
+				provider: "kimi-claude",
+				auth_method: "api_key",
+				api_key: "kimi-api-key",
+			},
+		] as Account[];
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(
+				url.includes("qwen-claude")
+					? new Response("limited", { status: 429 })
+					: new Response("served by kimi"),
+			);
+		}) as unknown as typeof fetch;
+		const context = createProxyContext([qwen, kimi], accounts, {
+			"anthropic-messages": ["qwen-claude", "kimi-claude"],
+		});
+		Object.assign(context.runtime.teamRouting, {
+			enabled: true,
+			allowlistedAccountUuids: ["qwen-seat"],
+			callerProviderFallback: { "agents-box": "ordered" },
+		});
+
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			context,
+			"agents-box",
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe("served by kimi");
+		expect(urls).toEqual([
+			"https://qwen-claude.example.com/v1/messages",
+			"https://kimi-claude.example.com/v1/messages",
+		]);
+	});
+
+	it("keeps an interactive policy caller on a blocked provider until a choice is sent", async () => {
+		const qwen = createTestProvider("qwen-claude", {
+			category: "token-allocation",
+		});
+		const kimi = createTestProvider("kimi-claude");
+		const accounts = [
+			{
+				...createTestAccount(),
+				id: "qwen-account",
+				provider: "qwen-claude",
+				auth_method: "oauth",
+				account_uuid: "qwen-seat",
+			},
+			{
+				...createTestAccount(),
+				id: "kimi-account",
+				provider: "kimi-claude",
+				auth_method: "api_key",
+				api_key: "kimi-api-key",
+			},
+		] as Account[];
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(
+				url.includes("qwen-claude")
+					? new Response("limited", { status: 429 })
+					: new Response("served by kimi"),
+			);
+		}) as unknown as typeof fetch;
+		const context = createProxyContext([qwen, kimi], accounts, {
+			"anthropic-messages": ["qwen-claude", "kimi-claude"],
+		});
+		Object.assign(context.runtime.teamRouting, {
+			enabled: true,
+			allowlistedAccountUuids: ["qwen-seat"],
+			callerProviderFallback: { "agents-box": "ordered" },
+		});
+
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"x-agent-smith-interactive-provider-choice": "v1",
+					},
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			context,
+			"agents-box",
+		);
+
+		expect(response.status).toBe(429);
+		expect(await response.json()).toMatchObject({
+			blockedProvider: "qwen-claude",
+		});
+		expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
+	});
+
+	it("moves an ordered-fallback caller past a Claude seat at its weekly ceiling", async () => {
+		const claude = createTestProvider("claude-code");
+		claude.isWeeklyBucket = (bucket) => bucket === "unified7d";
+		const kimi = createTestProvider("kimi-claude");
+		const resetAt = Date.now() + 7 * 24 * 60 * 60 * 1_000;
+		const accounts = [
+			{
+				...createTestAccount(),
+				id: "claude-account",
+				provider: "claude-code",
+				auth_method: "oauth",
+				account_uuid: "claude-seat",
+				quota_state: {
+					windows: {
+						unified7d: {
+							resetAt,
+							seenAt: Date.now(),
+							status: "allowed",
+							utilization: 0.7,
+						},
+					},
+				},
+			},
+			{
+				...createTestAccount(),
+				id: "kimi-account",
+				provider: "kimi-claude",
+				auth_method: "api_key",
+				api_key: "kimi-api-key",
+			},
+		] as Account[];
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(new Response("served by kimi"));
+		}) as unknown as typeof fetch;
+		const context = createProxyContext([claude, kimi], accounts, {
+			"anthropic-messages": ["claude-code", "kimi-claude"],
+		});
+		Object.assign(context.runtime.teamRouting, {
+			enabled: true,
+			allowlistedAccountUuids: ["claude-seat"],
+			callerWeeklyMaxUsage: { "agents-box": 0.7 },
+			callerProviderFallback: { "agents-box": "ordered" },
+		});
+
+		const response = await handleProxy(
+			new Request(
+				"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+				{
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: '{"model":"claude-sonnet-4-5","messages":[]}',
+				},
+			),
+			new URL("http://localhost:8080/v1/pool/anthropic-messages/v1/messages"),
+			context,
+			"agents-box",
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe("served by kimi");
+		expect(urls).toEqual(["https://kimi-claude.example.com/v1/messages"]);
 	});
 
 	it("returns a noninteractive rate block with its upstream retry time", async () => {

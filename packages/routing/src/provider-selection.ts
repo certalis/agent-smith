@@ -1,6 +1,7 @@
 import type { ProviderChoice } from "./provider-choice";
 
 export type ProviderSelection = {
+	orderedFallback?: boolean;
 	pinnedProvider?: string;
 	preferredProvider?: string;
 	requestedProvider?: string | null;
@@ -51,6 +52,16 @@ export function selectPoolProviders<T>(
 		selection.pinnedProvider,
 		selection.preferredProvider,
 	);
+	if (selection.orderedFallback) {
+		const currentProvider =
+			selection.pinnedProvider ?? selection.preferredProvider;
+		const currentIndex = currentProvider
+			? providers.findIndex(
+					(provider) => providerName(provider) === currentProvider,
+				)
+			: -1;
+		return currentIndex < 0 ? [...providers] : providers.slice(currentIndex);
+	}
 	return preferred.slice(0, 1);
 }
 

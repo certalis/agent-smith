@@ -106,6 +106,7 @@ export class TeamAdmission {
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: {},
 			callerWeeklyMaxUsage: {},
+			callerProviderFallback: {},
 			admissionCap: 1,
 			admissionQueueLimit: 0,
 			admissionWaitMs: 0,

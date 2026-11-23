@@ -42,7 +42,7 @@ const log = new Logger("Proxy");
 
 type PoolCandidateResult =
 	| { block: ProviderCapacityBlock; kind: "capacity-block" }
-	| { kind: "next-provider" }
+	| { block?: ProviderCapacityBlock; kind: "next-provider" }
 	| { account?: Account; kind: "response"; response: Response };
 
 type ProviderPoolCandidateInput = {
@@ -50,6 +50,7 @@ type ProviderPoolCandidateInput = {
 	conversationKey: string | undefined;
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
+	orderedFallback: boolean;
 	pinnedId: string | undefined;
 	providerPreference: ConversationProviderPreference | null;
 	requestedChoice: string | null;
@@ -99,6 +100,9 @@ async function proxyPoolCandidate(
 		if (attempt.kind === "provider-capacity-block") {
 			await attempt.discard?.();
 			if (accounts[index + 1]) continue;
+			if (allowNextProvider) {
+				return { block: attempt.block, kind: "next-provider" };
+			}
 			return { block: attempt.block, kind: "capacity-block" };
 		}
 		if (attempt.kind === "per-minute-rate-limit") {
@@ -271,6 +275,7 @@ function preparePoolCandidate(
 	input: InteractivePoolRequest,
 	candidate: ResolvedPoolCandidate,
 	pinnedId: string | undefined,
+	orderedFallback: boolean,
 ): {
 	accounts: Account[];
 	context: ReturnType<typeof createResolvedProxyContext>;
@@ -292,13 +297,19 @@ function preparePoolCandidate(
 		candidate.model,
 		{ allowRevalidationProbe: false, applyTeamRouting: false },
 	);
-	const eligibleAccounts = context.teamRouter
+	const pooledAccounts = context.teamRouter
 		? context.teamRouter.eligibleAccounts(
 				prepared.accounts,
 				input.teamRequest,
 				context.runtime.teamRouting,
 			)
 		: prepared.accounts;
+	const eligibleAccounts = orderedFallback
+		? prepared.accounts.filter(
+				(account) =>
+					account.auth_method === "api_key" || pooledAccounts.includes(account),
+			)
+		: pooledAccounts;
 	return {
 		accounts: preferPinnedAccount(eligibleAccounts, pinnedId),
 		context,
@@ -311,6 +322,7 @@ export async function proxyPoolCandidates({
 	conversationKey,
 	interactive,
 	interactiveInput,
+	orderedFallback,
 	pinnedId,
 	providerPreference,
 	requestedChoice,
@@ -341,6 +353,7 @@ export async function proxyPoolCandidates({
 			interactiveInput,
 			candidate,
 			pinnedId,
+			orderedFallback,
 		);
 		if (accounts.length === 0) {
 			recordUnserved(request);
@@ -365,6 +378,17 @@ export async function proxyPoolCandidates({
 			accounts,
 			candidateIndex < candidates.length - 1,
 		);
+		if (result.kind === "next-provider" && result.block) {
+			firstCapacityBlock ??= result.block;
+			if (conversationKey) {
+				routing.recordBlock(
+					conversationKey,
+					candidate.provider.name,
+					result.block,
+					Date.now(),
+				);
+			}
+		}
 		const response = resolvePoolCandidateResult({
 			candidate,
 			candidateContext: context,

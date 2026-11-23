@@ -31,35 +31,41 @@ describe("weekly cap configuration", () => {
 			weekly_max_usage: 0.95,
 			weekly_max_usage_by_email: { " Tech@Example.test ": 0.3 },
 			caller_weekly_max_usage: { alice: 0.7 },
+			caller_provider_fallback: { "agents-box": "ordered" },
 		});
 		expect(config.getTeamRouting()).toMatchObject({
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
 			callerWeeklyMaxUsage: { alice: 0.7 },
+			callerProviderFallback: { "agents-box": "ordered" },
 		});
 		config.setTeamRouting({ enabled: false });
 		expect(new Config(path).getTeamRouting()).toMatchObject({
 			enabled: false,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
 			callerWeeklyMaxUsage: { alice: 0.7 },
+			callerProviderFallback: { "agents-box": "ordered" },
 		});
 		config.setTeamRouting({
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { " Other@Example.test ": 0.95 },
 			caller_weekly_max_usage: { bob: 0.8 },
+			caller_provider_fallback: { "agents-box": "ordered" },
 		});
 		expect(new Config(path).getRuntime().teamRouting).toMatchObject({
 			maxUsage: 0.8,
 			weeklyMaxUsage: 0.9,
 			weeklyMaxUsageByEmail: { "other@example.test": 0.95 },
 			callerWeeklyMaxUsage: { bob: 0.8 },
+			callerProviderFallback: { "agents-box": "ordered" },
 		});
 		expect(JSON.parse(readFileSync(path, "utf8")).team_routing).toEqual({
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { "other@example.test": 0.95 },
 			caller_weekly_max_usage: { bob: 0.8 },
+			caller_provider_fallback: { "agents-box": "ordered" },
 		});
 	});
 	it.each([
@@ -78,6 +84,10 @@ describe("weekly cap configuration", () => {
 		{ caller_weekly_max_usage: { "alice@example.test": 0.7 } },
 		{ caller_weekly_max_usage: [] },
 		{ caller_weekly_max_usage: null },
+		{ caller_provider_fallback: { alice: "automatic" } },
+		{ caller_provider_fallback: { "alice@example.test": "ordered" } },
+		{ caller_provider_fallback: [] },
+		{ caller_provider_fallback: null },
 	])("rejects invalid weekly policy without replacing the saved policy: %j", (bad) => {
 		const { config, path } = configFrom({ enabled: true, max_usage: 0.8 });
 		const before = config.getTeamRouting();
