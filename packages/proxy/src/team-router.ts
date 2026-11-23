@@ -75,7 +75,6 @@ function pinKey(
 			[
 				request.pinScope ?? request.provider,
 				request.pinBucket ?? provider.weeklyBucketFor(request.model) ?? "",
-				request.callerId ?? "",
 				request.sessionId,
 				digest,
 			].join("\u0000"),

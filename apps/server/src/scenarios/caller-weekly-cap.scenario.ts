@@ -120,13 +120,14 @@ export default defineScenario({
 			type: "client",
 			request: "set-alice-policy",
 			status: 200,
+			bodyExcludes: ["caller_weekly_max_usage", "synthetic-device"],
 		},
 		{
 			id: "caller-policy-stays-private",
 			type: "client",
 			request: "policy",
 			status: 200,
-			bodyExcludes: ["synthetic-device"],
+			bodyExcludes: ["caller_weekly_max_usage", "synthetic-device"],
 		},
 		{
 			id: "caller-cap-skips-only-for-alice",

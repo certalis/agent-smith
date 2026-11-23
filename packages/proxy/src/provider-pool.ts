@@ -223,18 +223,11 @@ export async function proxyProviderPool(
 		everyCandidateFull &&= isEveryAccountQuotaBlocked(
 			request.meta,
 			request.ctx,
-			undefined,
-			teamRequest.callerId,
 		);
 		soonestRetry = earliest(soonestRetry, getRequestRetryAt(request));
 		soonestFleetReset = earliest(
 			soonestFleetReset,
-			getSoonestQuotaReset(
-				request.meta,
-				request.ctx,
-				undefined,
-				teamRequest.callerId,
-			),
+			getSoonestQuotaReset(request.meta, request.ctx),
 		);
 	};
 
