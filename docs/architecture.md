@@ -29,6 +29,8 @@ graph LR
     end
 
     subgraph "Core Services"
+        ROUTING[routing]
+        CAPACITY[capacity]
         PROVIDERS[providers]
         OAUTH[oauth-flow]
         DB[(SQLite via database)]
@@ -45,8 +47,11 @@ graph LR
 
     API --> DB
     API --> OAUTH
+    PROXY --> ROUTING
+    ROUTING --> CAPACITY
     PROXY --> DB
     PROXY --> PROVIDERS
+    PROVIDERS --> CAPACITY
     PROXY --> WORKER
     WORKER --> DB
 ```
@@ -61,6 +66,7 @@ agent-smith/
 │   └── web/                 # Browser dashboard
 ├── packages/
 │   ├── api/                 # REST and SSE handler layer
+│   ├── capacity/            # Provider capacity vocabulary and source contract
 │   ├── config/              # Config loading, defaults, env overrides
 │   ├── core/                # Constants, validation, DI, lifecycle, pricing
 │   ├── database/            # SQLite schema, migrations, repositories
@@ -69,6 +75,7 @@ agent-smith/
 │   ├── oauth-flow/          # OAuth account onboarding flow
 │   ├── providers/           # Provider registry and provider implementations
 │   ├── proxy/               # Forwarding, retries, event emission, worker handoff
+│   ├── routing/              # Conversation provider-choice policy and protocol
 │   ├── runtime-server/      # Runtime bootstrap, routing, lifecycle orchestration
 │   ├── types/               # Shared domain/API types and guards
 │   └── ui/                  # Shared presenters, display helpers, components
@@ -219,6 +226,28 @@ Responsibilities:
 - emit request events
 - normalize rate-limit metadata
 - enqueue background post-processing for usage extraction and metadata storage
+
+### Provider-routing boundaries
+
+The proxy is still one deployable product, but the interactive provider path is
+split so future services can be extracted without redesign:
+
+- `routing` owns configured-provider choice, conversation pins, block records,
+  upgrade offers, and chooser policy. It receives opaque persistence through a
+  small interface; it has no account SQL or credentials.
+- `capacity` owns the structured provider-block vocabulary and the connector
+  source contract. It contains no selection policy or account state.
+- the proxy's pool adapter owns the account database, eligibility, leases, and
+  credentials. It supplies conversation-provider state to `routing`; it never
+  silently chooses a different configured provider.
+- `providers` contains connectors: native authentication, execution, and
+  provider-specific rate-limit parsing.
+- the Claude companion only transports chooser controls and presents status;
+  it does not make routing decisions.
+
+Canonical-protocol adapters will be introduced with the Google/OpenAI protocol
+work. They translate wire formats at the proxy edge and must not access account
+storage directly.
 
 ### Proxy Flow
 

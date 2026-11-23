@@ -30,6 +30,43 @@ describe("DatabaseOperations", () => {
 		}
 	});
 
+	it("removes conversation provider state when its pinned account is deleted", () => {
+		const tempDir = mkdtempSync(join(tmpdir(), "ccflare-db-ops-"));
+		tempDirs.push(tempDir);
+		const dbOps = new DatabaseOperations(join(tempDir, "ccflare.db"));
+
+		try {
+			const account = dbOps.createAccount({
+				name: "provider-preference-owner",
+				provider: "anthropic",
+				auth_method: "api_key",
+				api_key: "sk-test",
+			});
+			dbOps.upsertConversationPin("opaque-pin", account.id, 100);
+			dbOps.upsertConversationProviderPreference(
+				"opaque-pin",
+				"kimi-claude",
+				true,
+				100,
+			);
+			dbOps.upsertConversationProviderBlock(
+				"opaque-pin",
+				"qwen-claude",
+				"request-rate",
+				200,
+				100,
+			);
+
+			expect(dbOps.deleteAccount(account.id)).toBe(true);
+			expect(dbOps.getConversationProviderPreference("opaque-pin")).toBeNull();
+			expect(
+				dbOps.getConversationProviderBlock("opaque-pin", "qwen-claude"),
+			).toBeNull();
+		} finally {
+			dbOps.close();
+		}
+	});
+
 	it("lists request summaries with account names and preserves zero-valued usage", () => {
 		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);

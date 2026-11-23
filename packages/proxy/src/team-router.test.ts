@@ -20,6 +20,7 @@ const config: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
+	callerProviderFallback: {},
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
@@ -128,4 +129,17 @@ test("a caller-specific ceiling does not create a separate conversation pin", ()
 	expect(router.getPinnedAccountId(bob, config, provider)).toBe(
 		"alice-account",
 	);
+});
+
+test("exposes an opaque conversation key for durable provider choice", () => {
+	const router = new TeamRouter();
+
+	const key = router.getConversationPinKey(
+		poolRequest("qwen-claude"),
+		config,
+		provider,
+	);
+
+	expect(key).toMatch(/^[a-f0-9]{64}$/);
+	expect(key).not.toContain("session");
 });

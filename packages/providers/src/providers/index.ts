@@ -26,4 +26,5 @@ export {
 	credentialsFromCodexTokenResponse,
 	importCodexCredentials,
 } from "./codex/index";
+export { ModelStudioAnthropicProvider } from "./model-studio/index";
 export { OpenAIOAuthProvider, OpenAIProvider } from "./openai/index";

@@ -84,6 +84,7 @@ The configuration file is stored at:
     "weekly_max_usage": 0.95,
     "weekly_max_usage_by_email": {},
     "caller_weekly_max_usage": {},
+    "caller_provider_fallback": {},
     "admission_cap": 5,
     "admission_queue_limit": 25,
     "admission_wait_ms": 30000,
@@ -130,7 +131,7 @@ The configuration file is stored at:
 | `alerts` | object | every channel off | Where seat alerts go; see [Alerts](#alerts). |
 | `enrollment_emails` | string[] | `[]` | Addresses or exact-domain rules (`*@example.test`) the stable `/pool-enroll` link admits (lowercased, at most 200 entries). Domain rules do not include subdomains. Edit through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
-| `provider_pools` | object | none | Ordered provider fallback routes, keyed by wire protocol. |
+| `provider_pools` | object | none | Ordered provider-selection routes, keyed by wire protocol. Requests start with the first provider and never switch providers without an explicit interactive choice. |
 | `client` | object | absent | The endpoint and forwarding key for wrappers installed on this machine. It does not configure providers or change the server's pool. |
 
 ### Client wrappers
@@ -240,13 +241,80 @@ an allowlist: its exact keys and trailing-`*` prefixes are the only client
 model names that provider can serve. On a mapped provider, only the JSON
 `model` value is patched in place; no request protocol is translated.
 
-The pool tries the first compatible provider, then at most one next provider
-when the first has no eligible account or has no eligible sibling for a
-pre-output 5xx/529 failure. A provider move loses prompt-cache warmth and may
-change model behavior or cost. A per-minute 429 never moves providers, and a
-direct `/v1/<provider>/*` route never uses a pool. If no pool provider serves a
-model, the proxy returns `400` naming `provider_pools.<wire>`; add a compatible
-provider/model map or use a direct route intentionally.
+The pool starts with the first compatible provider. An ordinary request stays
+there: a wrapped Claude Code user must choose another provider, or a named
+unattended device must have the private ordered-fallback policy. A provider
+move loses prompt-cache warmth and may change model behavior or cost. A
+per-minute 429 never moves providers, and a direct `/v1/<provider>/*` route
+never uses a pool. If no pool provider serves a model, the proxy returns `400`
+naming `provider_pools.<wire>`; add a compatible provider/model map or use a
+direct route intentionally.
+
+### Qwen and Kimi through Model Studio
+
+[`model-studio-compatible-providers.json`](../examples/config/model-studio-compatible-providers.json)
+is a complete API-key example for Qwen and Model-Studio-hosted Kimi. It keeps
+the two client protocols separate:
+
+- Claude Code requests can use `qwen-claude` or `kimi-claude`; both use the
+  Anthropic Messages wire.
+- Codex requests can use `qwen-codex` or `kimi-codex`; both use the OpenAI
+  Responses wire.
+
+The example starts each pool with Qwen, then Kimi. Its public URLs target the
+Beijing Model Studio region, so use a Beijing API key. For another region, use
+that region's matching endpoint and API key together. Add a Model Studio
+API-key account for each configured provider name. Using the same key under
+more than one name selects different models; it does not create extra capacity.
+A workspace endpoint such as
+`https://<WorkspaceId>.<region>.maas.aliyuncs.com/apps/anthropic` also works as
+`base_url`; the models available there depend on that workspace's region and
+deployment scope.
+
+The `kimi-*` names use Kimi models supplied through Model Studio. They are not
+a direct Kimi Chat Completions API configuration, which Agent-smith does not
+translate.
+
+If you have separately enabled and are authorized to use the Claude Code or
+Codex subscription provider, put it first in its matching pool yourself. The
+example deliberately does not enable subscription sign-ins. Restart
+Agent-smith after changing providers or pools.
+
+When Claude Code is started through `agent-smith install-client`, its wrapper
+loads the Agent-smith companion. For an interactive Claude-compatible pool,
+Agent-smith never silently changes provider. If the current provider blocks a
+turn, Claude Code shows the eligible replacements in the configured pool order,
+then **Wait**. Choosing one resends the same turn and context with only the
+mapped model changed; the chosen provider stays pinned for that conversation.
+Claude Code background requests, including title generation, reuse that choice
+without opening another chooser.
+The companion status row under Claude's prompt reports the provider that
+actually answered and its mapped model, not the requested model. This is a
+companion row, not a replacement for Claude Code's native status line.
+Claude Code adds its warning glyph and the companion's name to that row.
+
+The block text distinguishes five-hour and weekly pool limits, request rate,
+token allocation, traffic burst, temporary capacity, and an unknown upstream
+limit. It shows a retry time only when the upstream supplied one. **Wait**
+holds the request only when that time falls inside the configured
+`team_routing.hold_seconds`; outside that window it returns the same truthful
+block without a duplicate upstream retry. An unknown limit never gets a
+made-up countdown or a duplicate retry. A higher-ranked provider is offered
+once only after a known retry time or local pool availability says it may be
+tried, and only after the next completed main turn. Declining keeps the current
+provider quiet for the rest of the conversation. Run
+`/agent-smith-provider` in Claude Code to reopen the full chooser on the next
+turn. Message-thread continuations never switch providers.
+
+Unwrapped or unattended clients stay on their current provider. A capacity block
+returns `429`, with `Retry-After` only when the provider supplied a retry time;
+they never silently move to another configured provider. The sole exception is
+a registered device listed in the private `caller_provider_fallback` map with
+the value `"ordered"`: it continues forward through the configured pool order
+after a block. This is server policy, not a request header a client can opt into.
+Switching from a Claude Code chat to Codex means starting a new Codex chat and
+handing off the needed context yourself: the two clients use different request
+formats and Agent-smith does not convert chat history between them.
 
 ### Team routing
 
@@ -268,6 +336,7 @@ more than `0.95`.
 | `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
 | `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
 | `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
+| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block; no other caller can switch automatically. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
@@ -278,8 +347,8 @@ more than `0.95`.
 Email overrides use private enrollment contacts; set them before inviting future
 members if needed. Keys are trimmed/lowercased. A per-email value never raises
 the global weekly ceiling. The proxy-readable `GET /api/config/team-routing`
-omits this private map. An administrator's POST preserves the map when the field
-is omitted; send an explicit empty object to clear it. These limits do not add
+omits these private maps. An administrator's POST preserves either map when its
+field is omitted; send an explicit empty object to clear it. These limits do not add
 accounts to the pool or resume manually paused accounts. Revalidation requests
 cannot bypass the hard caps, and stale known usage stays blocking until reset.
 
@@ -345,6 +414,9 @@ locally installed `claude` and `codex` clients. It writes wrappers under the
 agent-smith config directory and one marked PATH block in the active shell profile;
 the original client binaries and their configuration are not modified. The
 wrappers route to the loopback proxy and work while the TUI is running.
+The generated Claude wrapper also copies and loads Agent-smith's own companion
+plugin under its private wrapper directory. It does not modify Claude Code's
+global plugin list, status line, Zed, or any other editor.
 When a matching `provider_pools` entry is configured, the Claude and Codex
 wrappers use its protocol route; without one, they retain their direct provider
 routes.
@@ -357,6 +429,11 @@ For a shared Agent Smith server, use the [`client` configuration](#client-wrappe
 and `agent-smith client on` instead. Its wrappers use the configured origin
 and forwarding key, whether the origin is directly reachable or the local side
 of an SSH tunnel.
+
+The Codex wrapper passes its Agent-smith provider settings when it starts
+Codex; it does not write them into Codex's configuration. Put a permanent
+Codex provider in `~/.codex/config.toml`, not a repository
+`.codex/config.toml`. Project configuration cannot redirect provider traffic.
 
 ### Load Balancing Strategy
 
@@ -491,11 +568,12 @@ Content-Type: application/json
 `POST` replaces the policy object using the snake_case fields shown above and
 takes effect for subsequent selection without a server restart. Management
 writes require `AGENT_SMITH_ADMIN_KEY` through `x-api-key`; do not put that key in the
-configuration file. `caller_weekly_max_usage` is accepted only on this write
-path and is omitted from all API responses, including reads, so maintain the
-map in the server's owner-only configuration file. Its keys must match names
-from the protected device-key registry; a header, session, provider identity or
-arbitrary caller label cannot select an override.
+configuration file. `caller_weekly_max_usage` and `caller_provider_fallback`
+are accepted only on this write path and are omitted from all API responses,
+including reads, so maintain the maps in the server's owner-only configuration
+file. Their keys must match names from the protected device-key registry; a
+header, session, provider identity or arbitrary caller label cannot select an
+override.
 
 ### Runtime Update Behavior
 

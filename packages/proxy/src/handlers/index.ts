@@ -1,4 +1,5 @@
 export {
+	getQuotaCapacityBlock,
 	getSoonestQuotaReset,
 	isEveryAccountQuotaBlocked,
 	selectAccountsForRequest,
@@ -14,6 +15,7 @@ export {
 } from "./proxy-attempts";
 export { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
 export {
+	getRequestQuotaCapacityBlock,
 	getRequestRetryAt,
 	type ProxyRequest,
 	prepareProxyRequest,

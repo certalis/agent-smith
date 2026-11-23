@@ -83,6 +83,20 @@ describe("ProviderRegistry", () => {
 		);
 	});
 
+	it("uses the Model Studio adapter for an explicitly configured Anthropic-compatible provider", () => {
+		const registry = createConfiguredProviderRegistry([
+			{
+				name: "qwen-claude",
+				enabled: true,
+				strategy: "model-studio-anthropic-api",
+			},
+		]);
+
+		expect(registry.getProvider("qwen-claude")?.constructor.name).toBe(
+			"ModelStudioAnthropicProvider",
+		);
+	});
+
 	it("resolves an ordered same-wire pool and maps only configured model names", () => {
 		const registry = createConfiguredProviderRegistry(
 			[

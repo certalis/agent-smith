@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { chmod, cp, rm } from "node:fs/promises";
+import { chmod, cp, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 // Runtime dependencies stay in node_modules; workspace packages are bundled in.
@@ -57,6 +57,32 @@ const edge = await Bun.build({
 if (!edge.success) throw new Error("Failed to build the HTTP proxy edge");
 
 await cp(join(webDir, "dist"), join(distDir, "dashboard"), { recursive: true });
+const claudeCompanionDir = join(tuiDir, "src", "claude-companion");
+const bundledClaudeCompanionDir = join(distDir, "claude-companion");
+await Promise.all([
+	mkdir(join(bundledClaudeCompanionDir, ".claude-plugin"), {
+		recursive: true,
+	}),
+	mkdir(join(bundledClaudeCompanionDir, "hooks"), { recursive: true }),
+]);
+await Promise.all([
+	cp(
+		join(claudeCompanionDir, ".claude-plugin", "plugin.json"),
+		join(bundledClaudeCompanionDir, ".claude-plugin", "plugin.json"),
+	),
+	cp(
+		join(claudeCompanionDir, "hooks", "hooks.json"),
+		join(bundledClaudeCompanionDir, "hooks", "hooks.json"),
+	),
+	cp(
+		join(claudeCompanionDir, "hooks", "provider-choice.js"),
+		join(bundledClaudeCompanionDir, "hooks", "provider-choice.js"),
+	),
+	cp(
+		join(claudeCompanionDir, "hooks", "register.js"),
+		join(bundledClaudeCompanionDir, "hooks", "register.js"),
+	),
+]);
 await chmod(join(distDir, "bin.js"), 0o755);
 
 // npm only packs a README and LICENSE that sit in the package directory.

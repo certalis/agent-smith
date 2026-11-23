@@ -108,8 +108,13 @@ describe("client commands", () => {
 		const wrapper = join(f.root, "client-bin", "claude");
 		const before = statSync(wrapper).ino;
 		const profile = readFileSync(join(f.root, ".zshrc"), "utf8");
+		const companionDir = join(
+			f.root,
+			"client-bin",
+			"agent-smith-claude-companion",
+		);
 		expect(f.launch("claude").stdout.toString()).toContain(
-			"url=https://pool.example.test/v1/claude-code\napi=synthetic-forwarding-key\noauth=unset\nproxy=unset\nadmin=unset\narg=two words\narg=$(not-a-command)",
+			`url=https://pool.example.test/v1/claude-code\napi=synthetic-forwarding-key\noauth=unset\nproxy=unset\nadmin=unset\narg=--plugin-dir\narg=${companionDir}\narg=two words\narg=$(not-a-command)`,
 		);
 		expect(f.launch("codex").stdout.toString()).toContain(
 			'model_providers.agent_smith.base_url="https://pool.example.test/v1/codex"',

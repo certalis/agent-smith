@@ -1,6 +1,7 @@
 import { AnthropicProvider } from "./providers/anthropic/provider";
 import { ClaudeCodeProvider } from "./providers/claude-code/provider";
 import { CodexProvider } from "./providers/codex/provider";
+import { ModelStudioAnthropicProvider } from "./providers/model-studio/provider";
 import { OpenAIProvider } from "./providers/openai/provider";
 import { ProviderRegistry } from "./registry";
 import type { Provider } from "./types";
@@ -22,6 +23,8 @@ function createProvider(definition: ProviderDefinition): Provider {
 		switch (definition.strategy) {
 			case "anthropic-api":
 				return new AnthropicProvider();
+			case "model-studio-anthropic-api":
+				return new ModelStudioAnthropicProvider();
 			case "openai-api":
 				return new OpenAIProvider();
 			case "claude-code":

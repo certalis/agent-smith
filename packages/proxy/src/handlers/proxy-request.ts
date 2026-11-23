@@ -2,6 +2,7 @@ import type { Account, RequestMeta } from "@agent-smith/types";
 import type { TeamRoutingRequest } from "../team-router";
 import {
 	type AccountSelectionOptions,
+	getQuotaCapacityBlock,
 	getSoonestQuotaReset,
 	selectAccountsForRequest,
 } from "./account-selector";
@@ -97,6 +98,25 @@ export function selectRequestAccounts(
 export function getRequestRetryAt(request: ProxyRequest): number | null {
 	const { ctx, teamRequest } = request;
 	return getSoonestQuotaReset(
+		request.meta,
+		ctx,
+		(fleet) =>
+			onThreadSeat(
+				request,
+				ctx.teamRouter?.eligibleAccounts(
+					fleet,
+					teamRequest,
+					ctx.runtime.teamRouting,
+				) ?? fleet,
+			),
+		teamRequest.callerId,
+	);
+}
+
+/** The known quota category for the earliest seat this request may use. */
+export function getRequestQuotaCapacityBlock(request: ProxyRequest) {
+	const { ctx, teamRequest } = request;
+	return getQuotaCapacityBlock(
 		request.meta,
 		ctx,
 		(fleet) =>

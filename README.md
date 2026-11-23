@@ -18,7 +18,8 @@
 Claude Code and Codex keep talking their own protocol. agent-smith sits between
 them and the provider: it chooses a provider from the pool you configure, then
 an account inside that provider, watches the quota each provider reports, and
-fails over when one cannot serve.
+may try another account from that same provider. It never silently moves a
+request to another provider.
 
 ## How it works
 
@@ -96,7 +97,9 @@ key; provider tokens and the single database stay on the server.
 Device keys allow independent revocation and cannot read management data. A
 server-side policy may give a registered device name a lower weekly seat ceiling
 than the default; this filters account eligibility only and does not create a
-per-client budget or usage meter.
+per-client budget or usage meter. The owner can also grant a named unattended
+device forward-only provider fallback; every other caller still stays on its
+selected provider.
 
 Seat owners join through the server's optional `/pool-enroll` page, not its
 proxy homepage. Allow individual addresses or an exact domain (`*@example.test`)
@@ -209,10 +212,12 @@ Each example is a complete config file, also in [`examples/config/`](examples/co
 }
 ```
 
-**An Anthropic-compatible endpoint as fallback**
+**An Anthropic-compatible provider choice**
 ([`compatible-endpoint-fallback.json`](examples/config/compatible-endpoint-fallback.json)).
-Requests go to Anthropic first. When Anthropic cannot serve, Sonnet requests move
-to `acme` and are sent as `acme-large`. `acme` serves no other model.
+Requests go to Anthropic first. A wrapped Claude Code session can choose `acme`
+after Anthropic reports a capacity block; that choice sends Sonnet as
+`acme-large`. Unattended callers receive Anthropic's capacity response and are
+never moved to `acme` automatically. `acme` serves no other model.
 
 ```json
 {
@@ -265,9 +270,10 @@ share that organisation's limits, so adding them adds no capacity.
 
 - **Inside a provider**, an account at its quota threshold is skipped. A
   server error before any output may take one hop to another eligible account.
-- **Across providers**, a pool moves to its next provider only when the current
-  one has no eligible account, or has no eligible account left for that one
-  server-error hop. It moves at most once per request.
+- **Across providers**, an ordinary request never moves automatically. A person
+  in a wrapped Claude Code session must choose a provider, or a named unattended
+  device must have the private ordered-fallback policy. A change loses the
+  prompt cache and can change model behaviour and cost.
 - A per-minute rate limit never moves a request to another provider, and
   nothing moves once output has started reaching the client.
 - A conversation stays on its account while that account is eligible. Moving

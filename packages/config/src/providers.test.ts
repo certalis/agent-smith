@@ -25,6 +25,7 @@ const API_KEY_EXAMPLES = [
 	"anthropic-api-key.json",
 	"openai-api-key.json",
 	"compatible-endpoint-fallback.json",
+	"model-studio-compatible-providers.json",
 ];
 
 function exampleConfig(name: string): Config {
@@ -135,6 +136,27 @@ describe("provider configuration", () => {
 		});
 	});
 
+	it("keeps a configured Model Studio Anthropic-compatible provider on the Claude wire", () => {
+		const config = configFrom({
+			providers: {
+				"qwen-claude": {
+					strategy: "model-studio-anthropic-api",
+				},
+			},
+			provider_pools: {
+				"anthropic-messages": ["qwen-claude"],
+			},
+		});
+
+		expect(config.getProviderConfig("qwen-claude")).toMatchObject({
+			enabled: true,
+			strategy: "model-studio-anthropic-api",
+		});
+		expect(config.getProviderPool("anthropic-messages")).toEqual([
+			"qwen-claude",
+		]);
+	});
+
 	it("keeps only enabled, same-wire provider-pool entries and provider model maps", () => {
 		const config = configFrom({
 			providers: {
@@ -201,6 +223,35 @@ describe("README example configurations", () => {
 			strategy: "anthropic-api",
 			baseUrl: "https://api.acme.example",
 			models: { "claude-sonnet-*": "acme-large" },
+		});
+	});
+
+	it("keeps Model Studio Qwen and Kimi fallbacks on their matching wires", () => {
+		const config = exampleConfig("model-studio-compatible-providers.json");
+
+		expect(config.getProviderPool("anthropic-messages")).toEqual([
+			"qwen-claude",
+			"kimi-claude",
+		]);
+		expect(config.getProviderPool("openai-responses")).toEqual([
+			"qwen-codex",
+			"kimi-codex",
+		]);
+		expect(config.getProviderConfig("qwen-claude")?.models).toEqual({
+			"claude-haiku-*": "qwen3-coder-flash",
+			"claude-opus-*": "qwen3-coder-flash",
+			"claude-sonnet-*": "qwen3-coder-flash",
+		});
+		expect(config.getProviderConfig("kimi-claude")?.models).toEqual({
+			"claude-haiku-*": "kimi-k3.1-pro",
+			"claude-opus-*": "kimi-k3.1-pro",
+			"claude-sonnet-*": "kimi-k3.1-pro",
+		});
+		expect(config.getProviderConfig("qwen-codex")?.models).toEqual({
+			"gpt-5.6-*": "qwen4-max",
+		});
+		expect(config.getProviderConfig("kimi-codex")?.models).toEqual({
+			"gpt-5.6-*": "kimi-k3.1-pro",
 		});
 	});
 

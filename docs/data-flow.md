@@ -26,6 +26,8 @@ graph TD
     API[api]
     DASH[web assets]
     PROXY[proxy]
+    ROUTING[routing]
+    CAPACITY[capacity]
     DB[(SQLite)]
     PROVIDERS[providers]
     WORKER[post-processor worker]
@@ -35,8 +37,11 @@ graph TD
     SERVER --> DASH
     SERVER --> PROXY
     API --> DB
+    PROXY --> ROUTING
+    ROUTING --> CAPACITY
     PROXY --> PROVIDERS
     PROXY --> DB
+    PROVIDERS --> CAPACITY
     PROXY --> WORKER
     WORKER --> DB
 ```
@@ -66,11 +71,13 @@ Provider-native requests follow this path:
 1. request arrives at `/v1/{provider}/...`
 2. runtime server routes it to the proxy layer
 3. proxy resolves the provider implementation
-4. proxy/session strategy selects candidate accounts
-5. provider prepares upstream URL and headers
-6. request is forwarded upstream
-7. response metadata is normalized
-8. request events and persistence work are scheduled
+4. routing validates any explicit conversation-provider choice and reads its
+   opaque preference/block state
+5. proxy/session strategy selects candidate accounts only for that provider
+6. provider connector prepares upstream URL and headers
+7. request is forwarded upstream
+8. connector capacity facts and response metadata are normalized
+9. request events and persistence work are scheduled
 
 ### Proxy Forwarding Sequence
 
@@ -97,6 +104,27 @@ sequenceDiagram
     Proxy-->>Runtime: proxied response
     Runtime-->>Client: proxied response
 ```
+
+## Interactive Claude provider choice
+
+The optional Claude wrapper adds an Agent-smith companion only to wrapped
+Claude Code sessions. An interactive pool request stops at a classified
+provider block and returns private, versioned chooser details to that
+companion. The companion asks the person outside the transcript, then resends
+the unchanged request with a validated configured-provider choice. The proxy
+removes all chooser controls before upstream forwarding. A successful response
+returns the factual provider/model for the companion's status row. Unwrapped
+clients stay on their current provider and receive its capacity response; the
+proxy never silently moves them to a lower-ranked provider. A private
+`caller_provider_fallback` policy is the one exception for a named unattended
+device: `"ordered"` moves only forward through configured providers after a
+block. It is decided from the authenticated device identity, never a client
+header.
+
+The companion transports this UI only. `routing` decides when a configured
+provider is eligible to offer or pin, `capacity` represents the upstream block,
+and the pool supplies the underlying account state. No automatic provider
+switch is made for an interactive conversation.
 
 ## WebSocket Flow
 

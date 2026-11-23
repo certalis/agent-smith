@@ -65,6 +65,7 @@ export function teamRoutingFileConfig(
 		weekly_max_usage: routing.weeklyMaxUsage,
 		weekly_max_usage_by_email: routing.weeklyMaxUsageByEmail,
 		caller_weekly_max_usage: routing.callerWeeklyMaxUsage,
+		caller_provider_fallback: routing.callerProviderFallback,
 		admission_cap: routing.admissionCap,
 		admission_queue_limit: routing.admissionQueueLimit,
 		admission_wait_ms: routing.admissionWaitMs,

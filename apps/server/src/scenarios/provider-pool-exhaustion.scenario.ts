@@ -2,10 +2,9 @@ import { defineScenario } from "./harness/scenario";
 
 const now = 1_700_000_000_000;
 const body = '{"model":"claude-sonnet-4-5","messages":[]}' as const;
-const mappedBody = '{"model":"acme-sonnet","messages":[]}' as const;
 
 export default defineScenario({
-	name: "a pool moves from an exhausted provider to a compatible mapped provider",
+	name: "a caller without fallback policy stays on an exhausted provider",
 	config: {
 		providers: {
 			"claude-code": { enabled: true },
@@ -36,9 +35,7 @@ export default defineScenario({
 		},
 		{ name: "acme", provider: "acme", authMethod: "api_key" },
 	],
-	upstream: [
-		{ account: "acme", path: "/v1/messages", status: 200, json: { ok: true } },
-	],
+	upstream: [],
 	steps: [
 		{
 			type: "request",
@@ -48,11 +45,10 @@ export default defineScenario({
 	],
 	assertions: [
 		{
-			id: "falls-through-to-acme",
+			id: "never-sends-the-blocked-call-to-acme",
 			type: "upstream",
-			accounts: ["acme"],
-			bodyIdentical: mappedBody,
+			accounts: [],
 		},
-		{ id: "client-succeeds", type: "client", status: 200 },
+		{ id: "caller-receives-a-capacity-response", type: "client", status: 429 },
 	],
 });

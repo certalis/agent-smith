@@ -1,0 +1,8 @@
+{
+	"name": "agent-smith-provider-choice",
+	"version": "0.1.0",
+	"description": "Lets a Claude Code session choose an Agent-smith Claude-compatible provider without an automatic switch.",
+	"author": {
+		"name": "Agent-smith"
+	}
+}

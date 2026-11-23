@@ -1,3 +1,4 @@
+import type { CapacitySource } from "@agent-smith/capacity";
 import type {
 	Account,
 	AccountQuotaState,
@@ -22,7 +23,7 @@ export interface RateLimitInfo {
 	quotaState?: AccountQuotaState;
 }
 
-export interface Provider {
+export interface Provider extends CapacitySource {
 	name: string;
 	defaultBaseUrl: string;
 	wire: ProviderWire;

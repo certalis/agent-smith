@@ -334,6 +334,9 @@ export async function proxySelectedAccounts(
 		if (attempt.kind === "authentication-failure") {
 			return new Response("Bad Gateway", { status: 502 });
 		}
+		if (attempt.kind === "provider-capacity-block") {
+			return await attempt.forward();
+		}
 		if (attempt.kind === "per-minute-rate-limit") {
 			return await resolvePerMinuteRateLimit(
 				request,

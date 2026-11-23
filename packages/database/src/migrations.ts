@@ -457,6 +457,36 @@ function ensureConversationPinsTable(db: Database): void {
 	);
 }
 
+function ensureConversationProviderPreferencesTable(db: Database): void {
+	db.run(`
+		CREATE TABLE IF NOT EXISTS conversation_provider_preferences (
+			pin_key TEXT PRIMARY KEY,
+			provider TEXT NOT NULL,
+			promotion_declined INTEGER NOT NULL DEFAULT 0,
+			last_seen_at INTEGER NOT NULL
+		)
+	`);
+	db.run(
+		`CREATE INDEX IF NOT EXISTS idx_conversation_provider_preferences_last_seen ON conversation_provider_preferences(last_seen_at)`,
+	);
+}
+
+function ensureConversationProviderBlocksTable(db: Database): void {
+	db.run(`
+		CREATE TABLE IF NOT EXISTS conversation_provider_blocks (
+			pin_key TEXT NOT NULL,
+			provider TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT 'unknown',
+			retry_at INTEGER,
+			last_seen_at INTEGER NOT NULL,
+			PRIMARY KEY (pin_key, provider)
+		)
+	`);
+	db.run(
+		`CREATE INDEX IF NOT EXISTS idx_conversation_provider_blocks_last_seen ON conversation_provider_blocks(last_seen_at)`,
+	);
+}
+
 function remediateDuplicateAccountNames(db: Database): void {
 	const accounts = db
 		.query<AccountNameRow, []>(
@@ -612,6 +642,8 @@ export function ensureSchema(db: Database): void {
 
 	ensureAuthSessionsTable(db);
 	ensureConversationPinsTable(db);
+	ensureConversationProviderPreferencesTable(db);
+	ensureConversationProviderBlocksTable(db);
 }
 
 export function runMigrations(db: Database): void {
@@ -636,6 +668,8 @@ export function runMigrations(db: Database): void {
 	db.run("DROP INDEX IF EXISTS idx_oauth_sessions_expires");
 	ensureAuthSessionsTable(db);
 	ensureConversationPinsTable(db);
+	ensureConversationProviderPreferencesTable(db);
+	ensureConversationProviderBlocksTable(db);
 	ensureAccountsNameUniqueness(db);
 	db.run(`CREATE TABLE IF NOT EXISTS enrollment_contacts (
 		account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,

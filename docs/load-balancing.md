@@ -4,9 +4,10 @@
 
 agent-smith orders eligible accounts for each provider-native request. A direct
 `/v1/<provider>/*` route stays with that provider. A configured
-`/v1/pool/<wire>/*` route starts with its first compatible provider and may
-make one bounded move to the next compatible provider. It does not create a
-fleet-wide sticky account: that legacy behavior would override quota and
+`/v1/pool/<wire>/*` route starts with its first compatible provider. It changes
+provider only after a wrapped Claude Code user chooses one, or for a named
+unattended device with the private ordered-fallback policy. It does not create
+a fleet-wide sticky account: that legacy behavior would override quota and
 operator priority decisions.
 
 For a request, the proxy:
@@ -84,6 +85,14 @@ once-per-minute revalidation path. If every pooled seat is spent for that
 caller, a request normally receives a 429 with the nearest reset; setting
 `hold_seconds` lets a request wait only for a reset within that bounded period.
 
+`caller_provider_fallback` is a separate private policy for a named unattended
+device. With the value `"ordered"`, it starts at the current provider and may
+continue only to later providers in the configured order after a block; it never
+wraps back to a higher-ranked provider. API-key accounts at those later providers
+keep their ordinary account rules; this policy does not add provider-specific
+ceilings. No other caller, including an interactive Claude Code session, gets an
+automatic provider switch.
+
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one
 slot, then adds one slot every 250 ms for 30 seconds. Repeated arrivals share
@@ -120,12 +129,22 @@ serves and the upstream name to send. Selecting that provider changes only the
 JSON `model` value in place; all other request bytes stay untouched.
 
 A pool pin keeps a conversation on its prior account while that account is
-eligible. Moving to another provider loses prompt-cache warmth and can change
-model behavior or cost, so request and usage records report the provider and
-model that actually served the request. Direct routes do not use provider-pool
-fallback. If no provider in a pool serves the requested model, the proxy returns
-`400` naming `provider_pools.<wire>`; add a matching model map or select a
-direct provider route intentionally.
+eligible. The pool may try eligible accounts within the selected provider, but
+never silently changes provider: moving provider loses prompt-cache warmth and
+can change model behavior or cost. Request and usage records report the
+provider and model that actually served the request. If no provider in a pool
+serves the requested model, the proxy returns `400` naming
+`provider_pools.<wire>`; add a matching model map or select a direct provider
+route intentionally.
+
+For a Claude Code request that carries the Agent-smith companion's interactive
+marker, the proxy returns only eligible configured alternatives when the selected
+provider has a capacity block. It never changes the provider until the person
+chooses one. The companion's **Wait** option may hold
+the same request only for a known reset inside the configured hold window; a
+longer wait returns the original block without sending upstream again. An
+upstream block without a reset remains manual: it is not silently retried
+or promoted later as though it recovered.
 
 ## Affinity and failover
 
@@ -145,11 +164,12 @@ The selected account is tried first. Failover is deliberately bounded:
   sibling;
 - transport failure: one sibling.
 
-For a pool route, the next compatible provider replaces the ordinary
-all-accounts-spent response. A 5xx, 529, or failure found before the first
-streamed byte may use that next provider only when the current provider has no
-eligible sibling. The request never first tries a sibling and then walks to a
-second provider. A per-minute 429 always remains on its current provider.
+For a pool route, an ordinary caller receives the current provider's capacity
+or error response instead of silently moving to another provider. A wrapped
+Claude Code session may make that move only after the person chooses it. A
+named unattended device with `caller_provider_fallback: "ordered"` may continue
+only to later configured providers after a block. A per-minute 429 always
+remains on its current provider.
 
 No branch may silently reach a third account.
 

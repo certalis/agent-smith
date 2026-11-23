@@ -1,3 +1,4 @@
+import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import type { Provider } from "@agent-smith/providers";
 import {
 	type Account,
@@ -198,6 +199,74 @@ function blockingResets(
 				),
 		)
 		.map(([, window]) => window.resetAt as number);
+}
+
+function quotaBlockForAccount(
+	provider: Provider,
+	account: Account,
+	model: string | undefined,
+	ctx: EligibilityContext,
+	now: number,
+	callerId?: string,
+): ProviderCapacityBlock | null {
+	const blocking = Object.entries(account.quota_state?.windows ?? {}).filter(
+		([bucket, window]) =>
+			isQuotaBlocking(
+				provider,
+				account,
+				bucket,
+				window,
+				ctx.runtime.quotaThreshold,
+				now,
+				model,
+				pooledMaxUsage(provider, account, bucket, ctx, callerId),
+			),
+	);
+	if (blocking.length === 0) return null;
+	const [bucket, window] = [...blocking].sort(([, left], [, right]) => {
+		const leftReset = left.resetAt ?? Number.POSITIVE_INFINITY;
+		const rightReset = right.resetAt ?? Number.POSITIVE_INFINITY;
+		return rightReset - leftReset;
+	})[0] as [string, NonNullable<Account["quota_state"]>["windows"][string]];
+	const category = provider.isFiveHourBucket(bucket)
+		? "five-hour-limit"
+		: provider.isWeeklyBucket(bucket)
+			? "weekly-limit"
+			: "unknown";
+	return window.resetAt === null
+		? { category }
+		: { category, retryAt: window.resetAt };
+}
+
+/**
+ * Describes the quota fact that keeps the earliest eligible seat from serving.
+ * Generic cooldowns remain a request-rate problem rather than a made-up quota category.
+ */
+export function getQuotaCapacityBlock(
+	meta: RequestMeta,
+	ctx: ResolvedProxyContext,
+	seatsFor: (fleet: Account[]) => Account[] = (fleet) => fleet,
+	callerId?: string,
+): ProviderCapacityBlock | null {
+	const now = Date.now();
+	const blocks = seatsFor(fleetAccounts(ctx.providerName, ctx))
+		.map((account) =>
+			quotaBlockForAccount(
+				ctx.provider,
+				account,
+				meta.model,
+				ctx,
+				now,
+				callerId,
+			),
+		)
+		.filter((block): block is ProviderCapacityBlock => block !== null);
+	if (blocks.length === 0) return null;
+	return [...blocks].sort(
+		(left, right) =>
+			(left.retryAt ?? Number.POSITIVE_INFINITY) -
+			(right.retryAt ?? Number.POSITIVE_INFINITY),
+	)[0] as ProviderCapacityBlock;
 }
 
 /** When this seat serves again: every blocking window reset and its cooldown over. */
