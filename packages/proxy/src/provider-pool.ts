@@ -38,9 +38,11 @@ function poolTeamRequest(
 	pool: ResolvedProviderPool,
 	requestedModel: string | undefined,
 	manualAccountName: string | undefined,
+	callerId: string | undefined,
 ): TeamRoutingRequest {
 	return {
 		body,
+		callerId,
 		contentType: req.headers.get("content-type"),
 		manualAccountName,
 		model: requestedModel,
@@ -182,6 +184,7 @@ export async function proxyProviderPool(
 	body: ArrayBuffer | null,
 	pool: ResolvedProviderPool,
 	manualAccountName?: string,
+	callerId?: string,
 ): Promise<Response> {
 	const firstCandidate = pool.providers[0];
 	if (!firstCandidate) {
@@ -196,6 +199,7 @@ export async function proxyProviderPool(
 		pool,
 		meta.model,
 		manualAccountName,
+		callerId,
 	);
 	const firstContext = createResolvedProxyContext(
 		ctx,
@@ -219,11 +223,18 @@ export async function proxyProviderPool(
 		everyCandidateFull &&= isEveryAccountQuotaBlocked(
 			request.meta,
 			request.ctx,
+			undefined,
+			teamRequest.callerId,
 		);
 		soonestRetry = earliest(soonestRetry, getRequestRetryAt(request));
 		soonestFleetReset = earliest(
 			soonestFleetReset,
-			getSoonestQuotaReset(request.meta, request.ctx),
+			getSoonestQuotaReset(
+				request.meta,
+				request.ctx,
+				undefined,
+				teamRequest.callerId,
+			),
 		);
 	};
 

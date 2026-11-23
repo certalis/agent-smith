@@ -11,7 +11,7 @@ import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProxyContext } from "@agent-smith/proxy";
-import { deviceKeyMatches } from "./device-keys";
+import { deviceKeyMatches, deviceKeyName } from "./device-keys";
 import { createServerFetchHandler } from "./fetch-handler";
 import { createProxyEdgeHandler } from "./proxy-edge";
 
@@ -49,6 +49,13 @@ test("device registry reloads revocation and fails closed for invalid or loose f
 	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(false);
 	unlinkSync(path);
 	expect(deviceKeyMatches(OTHER_KEY, path)).toBe(false);
+});
+
+test("device registry resolves the trusted name for a matching key", () => {
+	const { path } = registry();
+
+	expect(deviceKeyName(DEVICE_KEY, path)).toBe("laptop");
+	expect(deviceKeyName("not-a-valid-device-key", path)).toBeUndefined();
 });
 
 async function fixture(maxBodyBytes = 1024) {

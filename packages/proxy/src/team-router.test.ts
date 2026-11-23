@@ -19,6 +19,7 @@ const config: TeamRoutingConfig = {
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
+	callerWeeklyMaxUsage: {},
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
@@ -115,4 +116,14 @@ test("a pool pin is readable across compatible providers after a serving rebind"
 			store,
 		),
 	).toBe("acme-account");
+});
+
+test("a caller-specific ceiling does not let another caller inherit its pin", () => {
+	const router = new TeamRouter();
+	const alice = { ...poolRequest("claude-code"), callerId: "alice" };
+	const bob = { ...poolRequest("claude-code"), callerId: "bob" };
+
+	router.rebind(alice, "alice-account", config, provider);
+
+	expect(router.getPinnedAccountId(bob, config, provider)).toBeUndefined();
 });

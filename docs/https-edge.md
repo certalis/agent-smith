@@ -147,8 +147,10 @@ the file: deleting a device entry revokes new requests immediately, without
 restarting the pool. It does not cancel requests already in flight.
 
 Device keys allow only health, Messages, token counting and Responses. They
-cannot read management data or change accounts. This does not add per-device
-fairness, quotas or usage attribution.
+cannot read management data or change accounts. A protected server-side policy
+may use the registered device name to apply a caller-specific weekly seat
+ceiling; it does not expose a per-device budget, usage attribution or a way for
+the device to choose its own identity.
 
 ## Attach the narrow HTTPS entrance to an existing service
 

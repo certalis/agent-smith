@@ -656,6 +656,7 @@ export function handleWebSocketUpgradeRequest(
 	url: URL,
 	ctx: ProxyContext,
 	server: Bun.Server<WebSocketProxyData>,
+	callerId?: string,
 ): Response | undefined {
 	if (!isWebSocketUpgradeRequest(req)) {
 		return undefined;
@@ -678,6 +679,7 @@ export function handleWebSocketUpgradeRequest(
 	const teamRequest: TeamRoutingRequest = {
 		body: null,
 		contentType: null,
+		callerId,
 		model: requestMeta.model,
 		provider: requestContext.providerName,
 		sessionId:

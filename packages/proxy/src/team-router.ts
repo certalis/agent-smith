@@ -9,6 +9,7 @@ const PIN_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export type TeamRoutingRequest = {
 	body: ArrayBuffer | null;
+	callerId?: string;
 	contentType: string | null;
 	manualAccountName?: string;
 	model: string | undefined;
@@ -74,6 +75,7 @@ function pinKey(
 			[
 				request.pinScope ?? request.provider,
 				request.pinBucket ?? provider.weeklyBucketFor(request.model) ?? "",
+				request.callerId ?? "",
 				request.sessionId,
 				digest,
 			].join("\u0000"),

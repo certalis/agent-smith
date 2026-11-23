@@ -13,6 +13,7 @@ const config = {
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
+	callerWeeklyMaxUsage: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1,

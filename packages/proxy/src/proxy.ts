@@ -130,6 +130,7 @@ export async function handleProxy(
 	req: Request,
 	url: URL,
 	ctx: ProxyContext,
+	callerId?: string,
 ): Promise<Response> {
 	const manualPin = manualPinFromUrl(url);
 	if (manualPin === "invalid")
@@ -166,6 +167,7 @@ export async function handleProxy(
 			body,
 			pool,
 			manualPin?.accountName,
+			callerId,
 		);
 	}
 	const requestMeta = createRequestMetadata(req, upstreamUrl);
@@ -182,6 +184,10 @@ export async function handleProxy(
 		requestMeta,
 		body,
 		manualPin?.accountName,
+		undefined,
+		undefined,
+		undefined,
+		callerId,
 	);
 	let accounts = initiallySelectedAccounts;
 	if (accounts.length === 0) {

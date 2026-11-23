@@ -46,10 +46,11 @@ failure that starts a sibling's admission ramp.
 stored account UUID is on `allowlisted_account_uuids` can receive pooled
 traffic. A protected seat is never a fallback.
 
-For Claude Code traffic, a conversation pin is the session ID plus a hashed
-digest of its opening, scoped to the model's weekly family. Pins are durable,
-so a restart does not move a conversation. The account remains pinned until it
-is ineligible; a per-minute 429 does not rotate it. New pinned conversations
+For Claude Code traffic, a conversation pin is the named caller (when one is
+authenticated), session ID and a hashed digest of its opening, scoped to the
+model's weekly family. Pins are durable, so a restart does not move a
+conversation or let another caller inherit it. The account remains pinned until
+it is ineligible; a per-minute 429 does not rotate it. New pinned conversations
 choose, in the best priority tier, the lowest 5-hour usage, then the lowest
 weekly usage and the nearest weekly reset. The hard quota cap is checked before
 that ordering, so no seat at its limit is selected. A
@@ -72,14 +73,16 @@ Without a conversation key, or with distribution disabled, this option has no
 effect. The same rule applies to Claude Code and Codex pinned conversations.
 
 Pooled seats keep their `max_usage` ceiling (never above `0.9`) for 5-hour and
-other non-weekly windows. Weekly windows use `weekly_max_usage` (default `0.95`),
-or the lower private `weekly_max_usage_by_email` limit when their enrollment
-contact matches. For example, a `0.3` weekly limit reserves 70% for that owner
-without changing their 5-hour cap. This includes applicable model-family weekly
-windows. The limits apply to ordinary selection, capacity status and the
-once-per-minute revalidation path. If every pooled seat is spent, a request
-normally receives a 429 with the nearest reset; setting `hold_seconds` lets a
-request wait only for a reset within that bounded period.
+other non-weekly windows. Weekly windows use `weekly_max_usage` (default `0.95`)
+and can only be lowered by either private map: `weekly_max_usage_by_email` for
+one account, or `caller_weekly_max_usage` for one named authenticated device.
+For example, Alice at `0.70` skips a seat at 70% weekly use while an
+unconfigured caller may still use that seat through 95%; a lower account cap
+still applies to both. These are eligibility rules, not separate spend counters.
+They cover applicable model-family weekly windows, ordinary selection and the
+once-per-minute revalidation path. If every pooled seat is spent for that
+caller, a request normally receives a 429 with the nearest reset; setting
+`hold_seconds` lets a request wait only for a reset within that bounded period.
 
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one

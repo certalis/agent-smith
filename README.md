@@ -93,8 +93,10 @@ Render. HTTPS needs no VPN: use the shipped standalone launcher or let an existi
 only inference to the pool's private socket. Each device has its own revocable
 key; provider tokens and the single database stay on the server.
 
-Device keys allow independent revocation and cannot read management data.
-This does not add per-client fairness or budgets.
+Device keys allow independent revocation and cannot read management data. A
+server-side policy may give a registered device name a lower weekly seat ceiling
+than the default; this filters account eligibility only and does not create a
+per-client budget or usage meter.
 
 Seat owners join through the server's optional `/pool-enroll` page, not its
 proxy homepage. Allow individual addresses or an exact domain (`*@example.test`)
