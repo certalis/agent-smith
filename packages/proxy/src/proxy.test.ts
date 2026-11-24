@@ -3,6 +3,7 @@ import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import {
+	ClaudeCodeProvider,
 	GoogleGeminiProvider,
 	type Provider,
 	ProviderRegistry,
@@ -197,6 +198,90 @@ afterEach(() => {
 });
 
 describe("handleProxy routing", () => {
+	it("preserves Claude Code server safeguards through a pooled OAuth request", async () => {
+		const provider = new ClaudeCodeProvider();
+		const account: Account = {
+			...createTestAccount(),
+			provider: "claude-code",
+			auth_method: "oauth",
+		};
+		const registry = new ProviderRegistry([provider], {
+			modelMaps: {
+				"claude-code": { "claude-sonnet-5-5": "claude-sonnet-5-5" },
+			},
+			providerPools: { "anthropic-messages": ["claude-code"] },
+		});
+		const upstreams: Request[] = [];
+		globalThis.fetch = mock(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				const upstream = new Request(input, init);
+				upstreams.push(upstream);
+				return Response.json({
+					type: "message",
+					id: "msg_123",
+					model: "claude-sonnet-5-5",
+					role: "assistant",
+					content: [{ type: "text", text: "Safe response" }],
+					stop_reason: "end_turn",
+					usage: { input_tokens: 3, output_tokens: 2 },
+					safeguard_results: {
+						decision: "allow",
+						applied: ["server-safeguards-2026-11-01"],
+					},
+				});
+			},
+		) as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"anthropic-beta": "server-safeguards-2026-11-01",
+					"anthropic-version": "2023-06-01",
+					"content-type": "application/json",
+					"x-api-key": "caller-must-not-leak",
+				},
+				body: JSON.stringify({
+					model: "claude-sonnet-5-5",
+					max_tokens: 32,
+					safeguards: {
+						mode: "server",
+						policies: ["filesystem-write"],
+					},
+					messages: [{ role: "user", content: "Say hello" }],
+				}),
+			}),
+			url,
+			createProxyContext([provider], [account], registry),
+		);
+
+		expect(upstreams).toHaveLength(1);
+		expect(upstreams[0]?.headers.get("authorization")).toBe(
+			"Bearer test-access-token",
+		);
+		expect(
+			upstreams[0]?.headers
+				.get("anthropic-beta")
+				?.split(",")
+				.map((value) => value.trim()),
+		).toEqual(["server-safeguards-2026-11-01", "oauth-2025-04-20"]);
+		expect(await upstreams[0]?.json()).toMatchObject({
+			safeguards: {
+				mode: "server",
+				policies: ["filesystem-write"],
+			},
+		});
+		expect(await response.json()).toMatchObject({
+			safeguard_results: {
+				decision: "allow",
+				applied: ["server-safeguards-2026-11-01"],
+			},
+		});
+	});
+
 	it("converts a canonical pooled Messages call at the Google provider edge", async () => {
 		const provider = new GoogleGeminiProvider();
 		provider.name = "gemini";
