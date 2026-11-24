@@ -15,6 +15,7 @@ import {
 	type ProviderRegistry,
 } from "@agent-smith/providers";
 import {
+	getCallerPoolStatus,
 	getPoolStatus,
 	getUsageWorker,
 	getUsageWorkerHealth,
@@ -30,6 +31,7 @@ import {
 	TeamRouter,
 	WindowWarmup,
 } from "@agent-smith/proxy";
+import { deviceKeyName } from "./device-keys";
 import { createExposureConfig, type ExposureConfig } from "./exposure";
 
 export type BootstrappedRuntime = {
@@ -172,6 +174,7 @@ export function bootstrapRuntime(
 	container.registerInstance(SERVICE_KEYS.PricingLogger, pricingLogger);
 	setPricingLogger(pricingLogger);
 
+	const exposureConfig = createExposureConfig(config);
 	const apiRouter = new APIRouter({
 		deploymentDrain,
 		enrollmentOrigin: process.env.AGENT_SMITH_ENROLLMENT_ORIGIN,
@@ -195,6 +198,14 @@ export function bootstrapRuntime(
 				runtime: runtimeConfig,
 				providerRegistry,
 			}),
+		getCallerPoolStatus: (pool, model, callerId) =>
+			getCallerPoolStatus(pool, model, callerId, {
+				dbOps,
+				runtime: runtimeConfig,
+				providerRegistry,
+			}),
+		callerForDeviceKey: (key) =>
+			deviceKeyName(key, exposureConfig.clientKeysFile),
 		getRuntimeHealth: () => ({
 			asyncWriter: {
 				healthy: asyncWriter.isHealthy(),
@@ -204,7 +215,6 @@ export function bootstrapRuntime(
 			usageWorker: getUsageWorkerHealth(),
 		}),
 	});
-	const exposureConfig = createExposureConfig(config);
 
 	const strategy = new SessionStrategy();
 	strategy.initialize(dbOps);

@@ -6,7 +6,9 @@ import type {
 	AccountProvider,
 	AccountSwitchThreshold,
 	AuthMethod,
+	CallerPoolStatus,
 	PoolStatus,
+	ProviderWire,
 	RuntimeHealth,
 } from "@agent-smith/types";
 
@@ -58,5 +60,11 @@ export interface APIContext {
 	getProviders: () => string[];
 	getRuntimeHealth?: () => RuntimeHealth;
 	getPoolStatus?: (provider: AccountProvider, model?: string) => PoolStatus;
+	getCallerPoolStatus?: (
+		pool: ProviderWire,
+		model: string | undefined,
+		callerId: string,
+	) => CallerPoolStatus | null;
+	callerForDeviceKey?: (key: string | null) => string | undefined;
 	getAccountAccessToken?: (account: Account) => Promise<string>;
 }

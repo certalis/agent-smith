@@ -103,6 +103,19 @@ export function isAllowlisted(
 	);
 }
 
+/** Only a registered device the private policy names may move on to later pool providers. */
+export function hasOrderedProviderFallback(
+	config: TeamRoutingConfig,
+	callerId: string | undefined,
+): boolean {
+	return (
+		config.enabled &&
+		callerId !== undefined &&
+		Object.hasOwn(config.callerProviderFallback, callerId) &&
+		config.callerProviderFallback[callerId] === "ordered"
+	);
+}
+
 /**
  * Small, proxy-owned state for W3 team routing. It intentionally knows nothing
  * about provider HTTP details or database SQL.

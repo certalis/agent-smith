@@ -1,3 +1,6 @@
+/** A registered device's own key, read only to name the caller of a pool read; it never leaves the pool. */
+export const DEVICE_KEY_HEADER = "x-agent-smith-device-key";
+
 /**
  * Sanitizes proxy headers by removing hop-by-hop headers that should not be forwarded
  * after Bun has automatically decompressed the response body.
@@ -20,7 +23,8 @@ export function sanitizeProxyHeaders(original: Headers): Headers {
  * from the ORIGINAL client request before it is persisted for analytics.
  *
  * Removes: accept-encoding, content-encoding, transfer-encoding, content-length,
- * authorization, proxy-authorization, x-api-key, api-key, cookie, set-cookie
+ * authorization, proxy-authorization, x-api-key, the device key, api-key,
+ * cookie, set-cookie
  */
 export function sanitizeRequestHeaders(original: Headers): Headers {
 	const h = new Headers(original);
@@ -31,6 +35,7 @@ export function sanitizeRequestHeaders(original: Headers): Headers {
 	h.delete("authorization");
 	h.delete("proxy-authorization");
 	h.delete("x-api-key");
+	h.delete(DEVICE_KEY_HEADER);
 	h.delete("api-key");
 	h.delete("cookie");
 	h.delete("set-cookie");

@@ -1,6 +1,6 @@
 import { ServiceUnavailableError, validateNumber } from "@agent-smith/core";
-import { errorResponse, NotFound } from "@agent-smith/http";
-import { isAccountProvider } from "@agent-smith/types";
+import { DEVICE_KEY_HEADER, errorResponse, NotFound } from "@agent-smith/http";
+import { isAccountProvider, isProviderWire } from "@agent-smith/types";
 import {
 	createAccountAddHandler,
 	createAccountPauseHandler,
@@ -64,6 +64,12 @@ function compilePattern(pattern: string): {
 		return "([^/]+)";
 	});
 	return { regex: new RegExp(`^${regexStr}$`), paramNames };
+}
+
+function isValidStatusModel(model: string | undefined): boolean {
+	return (
+		model === undefined || (model.trim().length > 0 && model.length <= 200)
+	);
 }
 
 /**
@@ -190,7 +196,7 @@ export class APIRouter {
 		this.staticHandlers.set("GET:/health", () => healthHandler());
 		this.staticHandlers.set("GET:/api/stats", () => statsHandler());
 		this.staticHandlers.set("GET:/api/status", () => fleetStatusHandler());
-		this.staticHandlers.set("GET:/api/pool-status", (_req, url) => {
+		this.staticHandlers.set("GET:/api/pool-status", (req, url) => {
 			if (this.context.deploymentDrain?.("status").draining) {
 				return errorResponse(
 					new ServiceUnavailableError(
@@ -200,13 +206,14 @@ export class APIRouter {
 					),
 				);
 			}
+			const pool = url.searchParams.get("pool");
+			if (pool !== null) return this.callerPoolStatus(req, url, pool);
 			const provider = url.searchParams.get("provider") ?? "";
 			const model = url.searchParams.get("model") ?? undefined;
 			if (
 				!isAccountProvider(provider) ||
 				!getProviders().includes(provider) ||
-				(model !== undefined &&
-					(model.trim().length === 0 || model.length > 200))
+				!isValidStatusModel(model)
 			) {
 				return Response.json(
 					{ error: "Invalid provider or model" },
@@ -349,6 +356,41 @@ export class APIRouter {
 			"/oauth/:provider/callback",
 			(req, url, params) => authCallbackHandler(req, params.provider, url),
 		);
+	}
+
+	private callerPoolStatus(req: Request, url: URL, pool: string): Response {
+		const model = url.searchParams.get("model") ?? undefined;
+		if (
+			!isProviderWire(pool) ||
+			url.searchParams.has("provider") ||
+			!isValidStatusModel(model)
+		) {
+			return Response.json({ error: "Invalid pool or model" }, { status: 400 });
+		}
+		const { callerForDeviceKey, getCallerPoolStatus } = this.context;
+		if (!callerForDeviceKey || !getCallerPoolStatus) {
+			return Response.json(
+				{ error: "Pool status unavailable" },
+				{ status: 503 },
+			);
+		}
+		const callerId = callerForDeviceKey(req.headers.get(DEVICE_KEY_HEADER));
+		if (!callerId) {
+			return Response.json(
+				{
+					error: `A registered device key is required in ${DEVICE_KEY_HEADER}`,
+				},
+				{ status: 401 },
+			);
+		}
+		const status = getCallerPoolStatus(pool, model, callerId);
+		if (!status) {
+			return Response.json(
+				{ error: "No provider in this pool serves the model" },
+				{ status: 400 },
+			);
+		}
+		return Response.json(status, { headers: { "cache-control": "no-store" } });
 	}
 
 	private addDynamicRoute(

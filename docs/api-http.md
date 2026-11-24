@@ -309,8 +309,8 @@ The response uses `Cache-Control: no-store` and has no account identities or cre
 ```
 
 Only available, allowlisted OAuth seats count. Quota thresholds and the default
-weekly ceiling reuse routing's eligibility rules; caller-specific ceilings are
-not exposed by this aggregate scheduling endpoint. Disabled routing reports
+weekly ceiling reuse routing's eligibility rules; caller-specific ceilings and
+fallback apply only to the caller read below. Disabled routing reports
 zero. Optional `model` includes that family's weekly quota; omission considers
 shared windows only.
 `retryAtMs` is, when no seat is eligible, the soonest a seat may serve again, in
@@ -319,6 +319,41 @@ ends. It is null when no seat is quota-blocked or no reset is known. It is a
 recheck hint, not guaranteed capacity; paused seats never count. Reads perform no admission,
 conversation pin, token refresh or quota probe. Invalid/missing provider or an
 empty/overlong model returns 400.
+
+#### Caller pool capacity
+
+`GET /api/pool-status?pool=anthropic-messages` answers for one registered
+device on a provider pool, for an unattended scheduler that sends its jobs to
+`/v1/pool/<wire>/*`. Send the forwarding key in `x-api-key` as above, and the
+device's own key in `x-agent-smith-device-key`. The device key only names the
+caller: it is matched against the device registry and never authorizes the
+read on its own. The pool strips this header from every request it forwards
+upstream and from stored request headers. A missing or unregistered device key
+returns 401 and is never echoed:
+
+```json
+{
+  "version": 1,
+  "pool": "anthropic-messages",
+  "provider": "claude-code",
+  "routingEnabled": true,
+  "eligibleAccounts": 1,
+  "retryAtMs": null,
+  "holdSeconds": 0,
+  "admissionWaitMs": 1000
+}
+```
+
+`provider` is the pool's first provider. Its allowlisted seats count under the
+caller's `caller_weekly_max_usage` ceiling. When the caller has
+`caller_provider_fallback: "ordered"`, every later provider of the pool counts
+too, as that caller's requests reach them: allowlisted seats, and API-key
+accounts that are neither paused nor cooling. `eligibleAccounts` is the total
+across those providers, and `retryAtMs` the soonest of their resets when it is
+zero. Optional `model` keeps only the providers that serve it, as routing does;
+without it a provider with a `models` map still counts. Disabled routing reports
+zero. An unknown wire, an empty/overlong model, a model no pool provider serves,
+or `pool` together with `provider` returns 400.
 
 ### Account Management
 

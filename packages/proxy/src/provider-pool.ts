@@ -26,7 +26,10 @@ import {
 	waitOrReturnProviderCapacity,
 } from "./pool/interactive-provider-pool";
 import { proxyPoolCandidates } from "./pool/provider-pool-attempts";
-import type { TeamRoutingRequest } from "./team-router";
+import {
+	hasOrderedProviderFallback,
+	type TeamRoutingRequest,
+} from "./team-router";
 
 const log = new Logger("Proxy");
 
@@ -63,19 +66,6 @@ function poolTeamRequest(
 		sessionId:
 			pool.providers[0]?.provider.getClientSessionId?.(req.headers) ?? null,
 	};
-}
-
-function hasOrderedCallerFallback(
-	ctx: ProxyContext,
-	callerId: string | undefined,
-): boolean {
-	const routing = ctx.runtime.teamRouting;
-	return (
-		routing.enabled &&
-		callerId !== undefined &&
-		Object.hasOwn(routing.callerProviderFallback, callerId) &&
-		routing.callerProviderFallback[callerId] === "ordered"
-	);
 }
 
 function prepareProviderPoolSelection(
@@ -172,7 +162,8 @@ function prepareProviderPoolSelection(
 		};
 	}
 	const orderedFallback =
-		!interactive && hasOrderedCallerFallback(ctx, callerId);
+		!interactive &&
+		hasOrderedProviderFallback(ctx.runtime.teamRouting, callerId);
 	return {
 		candidates: selectPoolProviders(
 			pool.providers,

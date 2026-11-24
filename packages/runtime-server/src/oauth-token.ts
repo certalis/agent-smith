@@ -1,9 +1,11 @@
+import { DEVICE_KEY_HEADER } from "@agent-smith/http";
 import { CLAUDE_CODE_OAUTH_TOKEN_URL } from "@agent-smith/providers";
 
 const PROXY_ONLY_HEADERS = [
 	"host",
 	"content-length",
 	"x-api-key",
+	DEVICE_KEY_HEADER,
 	"x-agent-smith-scenario-client-id",
 ] as const;
 
