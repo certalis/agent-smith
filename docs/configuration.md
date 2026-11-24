@@ -286,7 +286,22 @@ deployment scope.
 
 The `kimi-*` names use Kimi models supplied through Model Studio. They are not
 a direct Kimi Chat Completions API configuration, which Agent-smith does not
-translate.
+translate; a Kimi Code key goes direct, below.
+
+### Kimi Code
+
+[`kimi-code-providers.json`](../examples/config/kimi-code-providers.json)
+sends Claude Code and Codex to Kimi Code's own coding endpoint, which speaks
+both wires natively: `kimi-code-claude` uses the Anthropic Messages endpoint
+`https://api.kimi.ai/coding` and `kimi-code-codex` the OpenAI Responses
+endpoint `https://api.kimi.ai/coding/v1`. Each maps every model its client
+requests to `k3.1-pro`, the model Kimi's own Claude Code and Codex guides set,
+because Kimi Code rejects Claude and GPT model names. Add one API-key account
+per provider name with a key from the Kimi Code console; it needs a Kimi plan
+that includes Kimi Code. Both names spend that plan's shared quota and rolling
+five-hour limit, so the second name adds a wire, not capacity. A pool member
+here is an API-key provider like any other: under team routing, a person picks
+it in the Claude Code chooser.
 
 If you have separately enabled and are authorized to use the Claude Code or
 Codex subscription provider, put it first in its matching pool yourself. The
