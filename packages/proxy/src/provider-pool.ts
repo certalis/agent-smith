@@ -39,7 +39,6 @@ type ProviderPoolSelection = {
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
 	kind: "selection";
-	orderedFallback: boolean;
 	pinnedId: string | undefined;
 	providerPreference: ReturnType<ConversationProviderRouting["getPreference"]>;
 	requestedChoice: string | null;
@@ -179,7 +178,6 @@ function prepareProviderPoolSelection(
 		interactive,
 		interactiveInput,
 		kind: "selection",
-		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,
@@ -214,7 +212,6 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
-		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,
@@ -247,7 +244,6 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
-		orderedFallback,
 		pinnedId,
 		providerPreference,
 		requestedChoice,

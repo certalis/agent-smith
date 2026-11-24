@@ -10,9 +10,16 @@ import {
 	providerWaitRequested,
 } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
-import { createResolvedProxyContext, type ProxyContext } from "../handlers";
+import {
+	createResolvedProxyContext,
+	type ProxyContext,
+	type ResolvedProxyContext,
+} from "../handlers";
 import { prepareProxyRequest } from "../handlers/proxy-request";
-import type { TeamRoutingRequest } from "../team-router";
+import {
+	hasOrderedProviderFallback,
+	type TeamRoutingRequest,
+} from "../team-router";
 
 export type InteractivePoolRequest = {
 	body: ArrayBuffer | null;
@@ -33,6 +40,35 @@ export function configuredPoolChoices(
 		model: candidate.model ?? fallbackModel ?? "",
 		provider: candidate.provider.name,
 	}));
+}
+
+/**
+ * Allowlisted seats, plus API-key accounts for a device named in
+ * `caller_provider_fallback`, whether it walks the pool or chooses in Claude Code.
+ */
+export function admittedPoolAccounts(
+	accounts: Account[],
+	context: ResolvedProxyContext,
+	teamRequest: TeamRoutingRequest,
+): Account[] {
+	const pooled = context.teamRouter
+		? context.teamRouter.eligibleAccounts(
+				accounts,
+				teamRequest,
+				context.runtime.teamRouting,
+			)
+		: accounts;
+	if (
+		!hasOrderedProviderFallback(
+			context.runtime.teamRouting,
+			teamRequest.callerId,
+		)
+	) {
+		return pooled;
+	}
+	return accounts.filter(
+		(account) => account.auth_method === "api_key" || pooled.includes(account),
+	);
 }
 
 export function eligiblePoolProviders({
@@ -64,13 +100,11 @@ export function eligiblePoolProviders({
 			{ allowRevalidationProbe: false, applyTeamRouting: false },
 		);
 		if (prepared.request.thread || prepared.accounts.length === 0) continue;
-		const accounts = candidateContext.teamRouter
-			? candidateContext.teamRouter.eligibleAccounts(
-					prepared.accounts,
-					teamRequest,
-					candidateContext.runtime.teamRouting,
-				)
-			: prepared.accounts;
+		const accounts = admittedPoolAccounts(
+			prepared.accounts,
+			candidateContext,
+			teamRequest,
+		);
 		if (accounts.length > 0) eligibleProviders.add(candidate.provider.name);
 	}
 	return eligibleProviders;

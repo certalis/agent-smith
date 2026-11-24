@@ -525,6 +525,108 @@ describe("handleProxy routing", () => {
 		expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
 	});
 
+	describe("an interactive caller choosing an API-key provider", () => {
+		function interactivePool(providerChoice?: string) {
+			const qwen = createTestProvider("qwen-claude", {
+				category: "token-allocation",
+			});
+			const kimi = createTestProvider("kimi-claude");
+			const accounts = [
+				{
+					...createTestAccount(),
+					id: "qwen-account",
+					provider: "qwen-claude",
+					auth_method: "oauth",
+					account_uuid: "qwen-seat",
+				},
+				{
+					...createTestAccount(),
+					id: "kimi-account",
+					provider: "kimi-claude",
+					auth_method: "api_key",
+					api_key: "kimi-api-key",
+				},
+			] as Account[];
+			const urls: string[] = [];
+			globalThis.fetch = mock((url: string) => {
+				urls.push(url);
+				return Promise.resolve(
+					url.includes("qwen-claude")
+						? new Response("limited", { status: 429 })
+						: new Response("served by kimi"),
+				);
+			}) as unknown as typeof fetch;
+			const context = createProxyContext([qwen, kimi], accounts, {
+				"anthropic-messages": ["qwen-claude", "kimi-claude"],
+			});
+			Object.assign(context.runtime.teamRouting, {
+				enabled: true,
+				allowlistedAccountUuids: ["qwen-seat"],
+				callerProviderFallback: { "agents-box": "ordered" },
+			});
+			const request = (callerId: string) =>
+				handleProxy(
+					new Request(
+						"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+						{
+							method: "POST",
+							headers: {
+								"content-type": "application/json",
+								"x-agent-smith-interactive-provider-choice": "v1",
+								...(providerChoice && {
+									"x-agent-smith-provider-choice": providerChoice,
+								}),
+							},
+							body: '{"model":"claude-sonnet-4-5","messages":[]}',
+						},
+					),
+					new URL(
+						"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+					),
+					context,
+					callerId,
+				);
+			return { request, urls };
+		}
+
+		it("offers a named fallback device the API-key provider after a block", async () => {
+			const { request } = interactivePool();
+
+			const response = await request("agents-box");
+
+			expect(response.status).toBe(429);
+			expect(await response.json()).toMatchObject({
+				blockedProvider: "qwen-claude",
+				choices: [{ provider: "kimi-claude" }],
+			});
+		});
+
+		it("serves a named fallback device on the API-key provider it chose", async () => {
+			const { request, urls } = interactivePool("kimi-claude");
+
+			const response = await request("agents-box");
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("served by kimi");
+			expect(urls).toEqual(["https://kimi-claude.example.com/v1/messages"]);
+		});
+
+		it("never offers or serves an API-key account to an unnamed device", async () => {
+			const offer = interactivePool();
+			const offered = await offer.request("laptop-01");
+			expect(offered.status).toBe(429);
+			expect(await offered.json()).toMatchObject({
+				blockedProvider: "qwen-claude",
+				choices: [],
+			});
+
+			const chosen = interactivePool("kimi-claude");
+			const served = await chosen.request("laptop-01");
+			expect(served.status).not.toBe(200);
+			expect(chosen.urls).toEqual([]);
+		});
+	});
+
 	it("moves an ordered-fallback caller past a Claude seat at its weekly ceiling", async () => {
 		const claude = createTestProvider("claude-code");
 		claude.isWeeklyBucket = (bucket) => bucket === "unified7d";
