@@ -21,7 +21,10 @@ export function register(on) {
 	on("command.run", { command: "agent-smith-provider" }, ($) => {
 		openChoiceMenu = true;
 		$.ui.status("Agent-smith: choose a provider on your next turn.");
-		return { isTextDisplayOnly: true };
+		return {
+			isTextDisplayOnly: true,
+			text: "Agent-smith: send your next message to choose a provider.",
+		};
 	});
 	on("turn.complete", async (_$, event, next) => {
 		if (!event.agentId) completedMainTurns += 1;
