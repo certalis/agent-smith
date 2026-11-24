@@ -290,24 +290,16 @@ describe("README example configurations", () => {
 		});
 	});
 
-	it("sends every Claude and Codex model of a Kimi Code key to Kimi's coding endpoint", () => {
+	it("sends every Claude model of a Kimi Code key to Kimi's coding endpoint", () => {
 		const config = exampleConfig("kimi-code-providers.json");
 
 		expect(config.getProviderPool("anthropic-messages")).toEqual([
 			"kimi-code-claude",
 		]);
-		expect(config.getProviderPool("openai-responses")).toEqual([
-			"kimi-code-codex",
-		]);
 		expect(config.getProviderConfig("kimi-code-claude")).toMatchObject({
-			strategy: "anthropic-api",
+			strategy: "kimi-code-anthropic-api",
 			baseUrl: "https://api.kimi.ai/coding",
 			models: { "claude-*": "k3.1-pro" },
-		});
-		expect(config.getProviderConfig("kimi-code-codex")).toMatchObject({
-			strategy: "openai-api",
-			baseUrl: "https://api.kimi.ai/coding/v1",
-			models: { "gpt-*": "k3.1-pro" },
 		});
 	});
 

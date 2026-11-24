@@ -291,17 +291,21 @@ translate; a Kimi Code key goes direct, below.
 ### Kimi Code
 
 [`kimi-code-providers.json`](../examples/config/kimi-code-providers.json)
-sends Claude Code and Codex to Kimi Code's own coding endpoint, which speaks
-both wires natively: `kimi-code-claude` uses the Anthropic Messages endpoint
-`https://api.kimi.ai/coding` and `kimi-code-codex` the OpenAI Responses
-endpoint `https://api.kimi.ai/coding/v1`. Each maps every model its client
-requests to `k3.1-pro`, the model Kimi's own Claude Code and Codex guides set,
-because Kimi Code rejects Claude and GPT model names. Add one API-key account
-per provider name with a key from the Kimi Code console; it needs a Kimi plan
-that includes Kimi Code. Both names spend that plan's shared quota and rolling
-five-hour limit, so the second name adds a wire, not capacity. A pool member
-here is an API-key provider like any other: under team routing, a person picks
-it in the Claude Code chooser.
+sends Claude Code to Kimi Code's own Anthropic Messages endpoint,
+`https://api.kimi.ai/coding`, with the `kimi-code-anthropic-api` strategy. It
+maps every model Claude Code requests to `k3.1-pro`, the model Kimi's Claude
+Code guide sets, because Kimi Code rejects Claude model names. Add one API-key
+account with a key from the Kimi Code console; it needs a Kimi plan that
+includes Kimi Code, and spends that plan's quota and rolling five-hour limit.
+The strategy reads every Kimi 429 as a full provider: an ordered-fallback
+caller walks on to the next provider and an interactive one gets the chooser,
+instead of the request failing. Place it in the pool where it should rank,
+for example right after `claude-code`. Under team routing, a person picks it in
+the Claude Code chooser like any other API-key provider.
+
+Codex is not covered: Kimi's Codex guide gives Codex its own model catalog, and
+through a pool Codex sends tools for the GPT model it asked for, which Kimi
+rejects (`tool type "tool_search" is not supported`).
 
 If you have separately enabled and are authorized to use the Claude Code or
 Codex subscription provider, put it first in its matching pool yourself. The

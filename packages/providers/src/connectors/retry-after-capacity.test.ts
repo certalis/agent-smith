@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { classifyGoogleGeminiCapacityBlock } from "./google-gemini-capacity";
+import { classifyRetryAfterCapacityBlock } from "./retry-after-capacity";
 
-describe("classifyGoogleGeminiCapacityBlock", () => {
+describe("classifyRetryAfterCapacityBlock", () => {
 	it("classifies Google's documented RESOURCE_EXHAUSTED body without guessing a reset", async () => {
 		const response = new Response(
 			JSON.stringify({
@@ -14,7 +14,7 @@ describe("classifyGoogleGeminiCapacityBlock", () => {
 			{ status: 429, headers: { "content-type": "application/json" } },
 		);
 
-		expect(await classifyGoogleGeminiCapacityBlock(response)).toEqual({
+		expect(await classifyRetryAfterCapacityBlock(response)).toEqual({
 			category: "unknown",
 		});
 	});
@@ -31,7 +31,7 @@ describe("classifyGoogleGeminiCapacityBlock", () => {
 			},
 		);
 
-		expect(await classifyGoogleGeminiCapacityBlock(response, 10_000)).toEqual({
+		expect(await classifyRetryAfterCapacityBlock(response, 10_000)).toEqual({
 			category: "request-rate",
 			retryAt: 22_000,
 		});
@@ -39,7 +39,7 @@ describe("classifyGoogleGeminiCapacityBlock", () => {
 
 	it("does not classify unrelated server errors as capacity", async () => {
 		expect(
-			await classifyGoogleGeminiCapacityBlock(
+			await classifyRetryAfterCapacityBlock(
 				new Response(JSON.stringify({ error: { status: "INTERNAL" } }), {
 					status: 500,
 					headers: { "content-type": "application/json" },

@@ -1,0 +1,1 @@
+export { KimiCodeAnthropicProvider } from "./provider";

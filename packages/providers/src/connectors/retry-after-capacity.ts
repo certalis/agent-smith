@@ -1,8 +1,8 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 
-function retryAtFromHeader(
+export function retryAtFromHeader(
 	response: Response,
-	now: number,
+	now: number = Date.now(),
 ): number | undefined {
 	const retryAfter = response.headers.get("retry-after");
 	if (!retryAfter) return undefined;
@@ -13,11 +13,11 @@ function retryAtFromHeader(
 }
 
 /**
- * Google uses HTTP 429 for RESOURCE_EXHAUSTED but does not promise a useful
- * reset in its error body. Preserve the fact of the block and only label it as
- * a short request-rate limit when the upstream explicitly supplied a deadline.
+ * For a provider whose 429 body promises no useful reset (Google Gemini,
+ * Kimi Code): keep the fact of the block, and only label it a short
+ * request-rate limit when the upstream explicitly supplied a deadline.
  */
-export async function classifyGoogleGeminiCapacityBlock(
+export async function classifyRetryAfterCapacityBlock(
 	response: Response,
 	now: number = Date.now(),
 ): Promise<ProviderCapacityBlock | null> {

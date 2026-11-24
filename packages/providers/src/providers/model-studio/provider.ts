@@ -1,8 +1,6 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
-import {
-	classifyModelStudioCapacityBlock,
-	retryAtFromHeader,
-} from "../../connectors/model-studio-capacity";
+import { classifyModelStudioCapacityBlock } from "../../connectors/model-studio-capacity";
+import { retryAtFromHeader } from "../../connectors/retry-after-capacity";
 import type { RateLimitInfo } from "../../types";
 import { AnthropicProvider } from "../anthropic/provider";
 
