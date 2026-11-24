@@ -11,6 +11,7 @@ describe("toAccount", () => {
 		expect(ACCOUNT_PROVIDERS).toEqual([
 			"anthropic",
 			"openai",
+			"gemini",
 			"claude-code",
 			"codex",
 		]);

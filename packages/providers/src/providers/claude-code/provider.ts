@@ -22,6 +22,20 @@ const PROVIDER_NAME = "claude-code" as const;
 const DEFAULT_BASE_URL = getProviderDefaultBaseUrl(PROVIDER_NAME);
 const CHEAPEST_MODEL = "claude-haiku-5-5";
 const WINDOW_WARMUP_TIMEOUT_MS = 30_000;
+const CLAUDE_CODE_OAUTH_BETA = "oauth-2025-04-20";
+
+function addOAuthBeta(headers: Headers): void {
+	const betaValues = (headers.get("anthropic-beta") ?? "")
+		.split(",")
+		.map((value) => value.trim())
+		.filter(Boolean);
+
+	if (!betaValues.includes(CLAUDE_CODE_OAUTH_BETA)) {
+		betaValues.push(CLAUDE_CODE_OAUTH_BETA);
+	}
+
+	headers.set("anthropic-beta", betaValues.join(", "));
+}
 
 const CLAUDE_CODE_REFRESH_CONFIG: RefreshRequestConfig = {
 	tokenUrl: CLAUDE_CODE_OAUTH_TOKEN_URL,
@@ -81,7 +95,7 @@ export class ClaudeCodeProvider extends AnthropicProvider {
 			method: "POST",
 			headers: {
 				authorization: `Bearer ${accessToken}`,
-				"anthropic-beta": "oauth-2025-04-20",
+				"anthropic-beta": CLAUDE_CODE_OAUTH_BETA,
 				"anthropic-version": "2023-06-01",
 				"content-type": "application/json",
 			},
@@ -115,6 +129,7 @@ export class ClaudeCodeProvider extends AnthropicProvider {
 
 		if (account?.access_token) {
 			newHeaders.set("Authorization", `Bearer ${account.access_token}`);
+			addOAuthBeta(newHeaders);
 		}
 
 		// Remove api_key header -- Claude Code uses OAuth Bearer tokens

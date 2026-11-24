@@ -11,6 +11,7 @@
 		"test": "bun test ./src"
 	},
 	"dependencies": {
+		"@agent-smith/adapters": "workspace:*",
 		"@agent-smith/capacity": "workspace:*",
 		"@agent-smith/core": "workspace:*",
 		"@agent-smith/http": "workspace:*",

@@ -26,14 +26,16 @@ request to another provider.
 - **A pool of providers per client protocol.** Claude Code speaks
   `anthropic-messages`; Codex speaks `openai-responses`. Each protocol gets an
   ordered list of providers.
-- **Each provider is a built-in strategy** (`anthropic-api`, `openai-api`,
-  `claude-code`, `codex`). It knows how to authenticate, how to read its quota
-  signals, and how to choose between its own accounts.
+- **Each provider is a built-in strategy** (`anthropic-api`,
+  `model-studio-anthropic-api`, `google-gemini-api`, `openai-api`,
+  `claude-code`, `codex`). It knows how to authenticate,
+  how to read its quota signals, and how to choose between its own accounts.
 - **Each provider holds its accounts**: API keys, or subscription sign-ins once
   you enable them.
 
-Nothing is translated between protocols: a provider only serves clients that
-speak its protocol.
+The default is no cross-protocol translation. `google-gemini-api` is the first
+explicit adapter: it accepts the canonical Anthropic Messages client wire and
+converts supported requests/responses at the selected Google provider edge.
 
 ## Install
 
@@ -163,7 +165,7 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | Key | What it does |
 |---|---|
 | `providers.<name>.enabled` | Turns a provider's routes on or off. By default `anthropic` and `openai` are on, and `claude-code` and `codex` are off. |
-| `providers.<name>.strategy` | The built-in strategy: `anthropic-api`, `openai-api`, `claude-code` or `codex`. Required for a provider name you add yourself. |
+| `providers.<name>.strategy` | The built-in strategy: `anthropic-api`, `model-studio-anthropic-api`, `google-gemini-api`, `openai-api`, `claude-code` or `codex`. Required for a provider name you add yourself. |
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
 | `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
@@ -212,7 +214,26 @@ Each example is a complete config file, also in [`examples/config/`](examples/co
 }
 ```
 
-**An Anthropic-compatible provider choice**
+**Claude-compatible Gemini Developer API**
+([`google-gemini-anthropic-messages.json`](examples/config/google-gemini-anthropic-messages.json)).
+The configured client model maps to Gemini's native model name; add a Gemini
+Developer API key to the `gemini` account after starting Agent Smith.
+
+```json
+{
+  "providers": {
+    "gemini": {
+      "strategy": "google-gemini-api",
+      "models": { "claude-sonnet-*": "gemini-2.5-flash" }
+    }
+  },
+  "provider_pools": {
+    "anthropic-messages": ["gemini"]
+  }
+}
+```
+
+**An Anthropic-compatible endpoint as fallback**
 ([`compatible-endpoint-fallback.json`](examples/config/compatible-endpoint-fallback.json)).
 Requests go to Anthropic first. A wrapped Claude Code session can choose `acme`
 after Anthropic reports a capacity block; that choice sends Sonnet as

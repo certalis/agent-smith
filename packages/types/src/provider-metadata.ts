@@ -22,6 +22,14 @@ const PROVIDER_METADATA_MAP = {
 		defaultBaseUrl: "https://api.openai.com/v1",
 		specialRequirements: [],
 	},
+	gemini: {
+		displayLabel: "Google Gemini",
+		authMethod: "api_key",
+		supportsOAuth: false,
+		supportsWebSocket: false,
+		defaultBaseUrl: "https://generativelanguage.googleapis.com",
+		specialRequirements: [],
+	},
 	"claude-code": {
 		displayLabel: "Claude Code",
 		authMethod: "oauth",

@@ -4,7 +4,7 @@ import type {
 	AccountQuotaState,
 	ProviderWire,
 } from "@agent-smith/types";
-import type { Provider, RateLimitInfo } from "./types";
+import type { Provider, ProviderResponseContext, RateLimitInfo } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -178,6 +178,7 @@ export abstract class BaseProvider implements Provider {
 	async processResponse(
 		response: Response,
 		_account: Account | null,
+		_context?: ProviderResponseContext,
 	): Promise<Response> {
 		const headers = sanitizeProxyHeaders(response.headers);
 

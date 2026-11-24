@@ -1,6 +1,7 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import { ProviderRequestTransformError } from "@agent-smith/providers";
 import {
 	interactiveProviderChoiceRequested,
 	stripProviderChoiceHeaders,
@@ -52,6 +53,7 @@ type ProxyOperationInput = {
 	createBodyStream: BodyStreamFactory;
 	ctx: ResolvedProxyContext;
 	failoverAttempts: number;
+	mappedModel: string | undefined;
 	requestBody: ArrayBuffer | null;
 	requestMeta: RequestMeta;
 	req: Request;
@@ -100,9 +102,16 @@ export type ProxyAttempt =
 	  };
 
 function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
+	const transformed = input.ctx.provider.transformRequest?.({
+		body: input.requestBody,
+		headers: input.req.headers,
+		mappedModel: input.mappedModel,
+		query: input.url.search,
+		upstreamPath: input.ctx.upstreamPath,
+	});
 	const targetUrl = input.ctx.provider.buildUrl(
-		input.ctx.upstreamPath,
-		input.url.search,
+		transformed?.upstreamPath ?? input.ctx.upstreamPath,
+		transformed?.query ?? input.url.search,
 		input.account,
 	);
 	return async (token) => {
@@ -119,7 +128,7 @@ function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 			targetUrl,
 			input.req.method,
 			headers,
-			() => input.createBodyStream(input.requestBody),
+			() => input.createBodyStream(transformed?.body ?? input.requestBody),
 			!!input.req.body,
 			input.req.signal,
 		);
@@ -190,6 +199,7 @@ function createForwarder(
 				responseHeadersReceivedAt: upstream.responseHeadersReceivedAt,
 				retryAttempt: 0,
 				failoverAttempts: input.failoverAttempts,
+				preExtractedModel: input.mappedModel ?? input.requestMeta.model,
 			},
 			input.ctx,
 		);
@@ -326,6 +336,7 @@ export async function proxyWithAccount(
 		createBodyStream,
 		ctx,
 		failoverAttempts,
+		mappedModel,
 		requestBody: requestBodyBuffer
 			? rewriteRequestBody(
 					requestBodyBuffer,
@@ -352,6 +363,12 @@ export async function proxyWithAccount(
 	} catch (err) {
 		// A client cancellation is not a provider failure to retry elsewhere.
 		req.signal.throwIfAborted();
+		if (err instanceof ProviderRequestTransformError) {
+			return {
+				kind: "response",
+				response: new Response(err.message, { status: 400 }),
+			};
+		}
 		handleProxyError(err, account, log);
 		return err instanceof TokenRefreshError
 			? { kind: "failed" }

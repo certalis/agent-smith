@@ -15,10 +15,11 @@ describe("provider metadata", () => {
 		expect(ACCOUNT_PROVIDERS).toEqual([
 			"anthropic",
 			"openai",
+			"gemini",
 			"claude-code",
 			"codex",
 		]);
-		expect(API_KEY_PROVIDERS).toEqual(["anthropic", "openai"]);
+		expect(API_KEY_PROVIDERS).toEqual(["anthropic", "openai", "gemini"]);
 		expect(OAUTH_PROVIDERS).toEqual(["claude-code", "codex"]);
 		expect(isApiKeyProvider("anthropic")).toBe(true);
 		expect(isApiKeyProvider("claude-code")).toBe(false);
@@ -30,6 +31,7 @@ describe("provider metadata", () => {
 		expect(ACCOUNT_PROVIDER_OPTIONS).toEqual([
 			{ value: "anthropic", label: "Anthropic" },
 			{ value: "openai", label: "OpenAI" },
+			{ value: "gemini", label: "Google Gemini" },
 			{ value: "claude-code", label: "Claude Code" },
 			{ value: "codex", label: "Codex" },
 		]);
@@ -51,6 +53,15 @@ describe("provider metadata", () => {
 			supportsWebSocket: true,
 			defaultBaseUrl: "https://chatgpt.com/backend-api/codex",
 			specialRequirements: ["Requires Codex OAuth authentication"],
+		});
+		expect(getProviderMetadata("gemini")).toMatchObject({
+			canonicalName: "gemini",
+			displayLabel: "Google Gemini",
+			authMethod: "api_key",
+			supportsOAuth: false,
+			supportsWebSocket: false,
+			defaultBaseUrl: "https://generativelanguage.googleapis.com",
+			specialRequirements: [],
 		});
 	});
 });

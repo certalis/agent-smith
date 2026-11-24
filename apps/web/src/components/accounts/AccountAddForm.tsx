@@ -270,7 +270,9 @@ export function AccountAddForm({
 								placeholder={
 									selectedApiKeyProvider === "anthropic"
 										? "sk-ant-..."
-										: "sk-proj-..."
+										: selectedApiKeyProvider === "gemini"
+											? "AIza..."
+											: "sk-proj-..."
 								}
 							/>
 						</div>

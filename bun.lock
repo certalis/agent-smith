@@ -98,6 +98,10 @@
         "@types/react-dom": "^19.0.0",
       },
     },
+    "packages/adapters": {
+      "name": "@agent-smith/adapters",
+      "version": "0.1.0",
+    },
     "packages/api": {
       "name": "@agent-smith/api",
       "version": "0.1.0",
@@ -172,6 +176,7 @@
       "name": "@agent-smith/providers",
       "version": "0.1.0",
       "dependencies": {
+        "@agent-smith/adapters": "workspace:*",
         "@agent-smith/capacity": "workspace:*",
         "@agent-smith/core": "workspace:*",
         "@agent-smith/http": "workspace:*",
@@ -239,6 +244,8 @@
     "react": "^19.0.0",
   },
   "packages": {
+    "@agent-smith/adapters": ["@agent-smith/adapters@workspace:packages/adapters"],
+
     "@agent-smith/api": ["@agent-smith/api@workspace:packages/api"],
 
     "@agent-smith/capacity": ["@agent-smith/capacity@workspace:packages/capacity"],

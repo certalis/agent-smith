@@ -56,6 +56,22 @@ describe("ClaudeCodeProvider", () => {
 		]);
 	});
 
+	it("adds the OAuth beta without replacing or duplicating caller beta flags", () => {
+		const headers = provider.prepareHeaders(
+			new Headers({
+				"anthropic-beta": "server-safeguards-2026-11-01, oauth-2025-04-20",
+			}),
+			createOAuthAccount("claude-code"),
+		);
+
+		expect(
+			headers
+				.get("anthropic-beta")
+				?.split(",")
+				.map((value) => value.trim()),
+		).toEqual(["server-safeguards-2026-11-01", "oauth-2025-04-20"]);
+	});
+
 	it("inherits Anthropic quota rules and probes direct OAuth seats", () => {
 		expect(provider.quotaBucketsFor("claude-fable-1")).toEqual([
 			"unified",
