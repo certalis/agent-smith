@@ -395,6 +395,27 @@ describe("APIRouter", () => {
 		expect(unexpectedField.status).toBe(400);
 	});
 
+	it("accepts an API-key account for an enabled Gemini provider", async () => {
+		const { router } = createRouterContext({
+			providers: {
+				gemini: {
+					enabled: true,
+					strategy: "google-gemini-api",
+					models: { "claude-sonnet-*": "gemini-2.5-flash" },
+				},
+			},
+		});
+
+		const response = await apiRequest(router, "POST", "/api/accounts", {
+			name: "gemini-key",
+			provider: "gemini",
+			auth_method: "api_key",
+			api_key: "AIza-test",
+		});
+
+		expect(response.status).toBe(200);
+	});
+
 	it("refuses a subscription account until its provider is enabled in config", async () => {
 		const router = createRouterContext().router;
 
