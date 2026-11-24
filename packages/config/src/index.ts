@@ -562,7 +562,7 @@ function sanitizeTeamRouting(
 		if (
 			normalized.every(
 				([email, cap]) =>
-					email !== undefined && isFiniteNumber(cap) && cap > 0 && cap <= 0.95,
+					email !== undefined && isFiniteNumber(cap) && cap > 0 && cap <= 1,
 			) &&
 			new Set(normalized.map(([email]) => email)).size === entries.length
 		) {

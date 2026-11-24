@@ -32,6 +32,11 @@ type PoolStatusContext = Pick<
 
 const QUOTA_PROBE_INTERVAL_MS = 60_000;
 
+type PoolUsageCap = {
+	limit: number;
+	overridesFleetThreshold: boolean;
+};
+
 export type AccountSelectionOptions = {
 	allowRevalidationProbe?: boolean;
 	applyTeamRouting?: boolean;
@@ -45,12 +50,19 @@ function isQuotaBlocking(
 	fleetThreshold: number,
 	now: number,
 	model: string | undefined,
-	maxUsage: number | undefined,
+	maxUsage: PoolUsageCap | undefined,
 ): boolean {
-	const threshold = Math.min(
-		quotaThresholdFor(account, bucket, fleetThreshold),
-		maxUsage ?? Number.POSITIVE_INFINITY,
-	);
+	const accountThreshold =
+		account.switch_threshold === null || account.switch_threshold === undefined
+			? undefined
+			: quotaThresholdFor(account, bucket, fleetThreshold);
+	const threshold =
+		maxUsage?.overridesFleetThreshold === true
+			? Math.min(maxUsage.limit, accountThreshold ?? Number.POSITIVE_INFINITY)
+			: Math.min(
+					quotaThresholdFor(account, bucket, fleetThreshold),
+					maxUsage?.limit ?? Number.POSITIVE_INFINITY,
+				);
 	return (
 		(provider.quotaBucketsFor(model)?.includes(bucket) ?? true) &&
 		(maxUsage === undefined
@@ -67,11 +79,13 @@ function pooledMaxUsage(
 	bucket: string,
 	ctx: SeatPolicyContext,
 	callerId?: string,
-): number | undefined {
+): PoolUsageCap | undefined {
 	const teamRouting = ctx.runtime.teamRouting;
 	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
 		return undefined;
-	if (!provider.isWeeklyBucket(bucket)) return teamRouting.maxUsage;
+	if (!provider.isWeeklyBucket(bucket)) {
+		return { limit: teamRouting.maxUsage, overridesFleetThreshold: false };
+	}
 	const email = ctx.dbOps
 		.getEnrollmentContact(account.id)
 		?.email?.trim()
@@ -83,11 +97,13 @@ function pooledMaxUsage(
 		callerId && Object.hasOwn(teamRouting.callerWeeklyMaxUsage, callerId)
 			? teamRouting.callerWeeklyMaxUsage[callerId]
 			: undefined;
-	return Math.min(
-		teamRouting.weeklyMaxUsage,
-		accountOverride ?? Number.POSITIVE_INFINITY,
-		callerOverride ?? Number.POSITIVE_INFINITY,
-	);
+	return {
+		limit: Math.min(
+			accountOverride ?? teamRouting.weeklyMaxUsage,
+			callerOverride ?? Number.POSITIVE_INFINITY,
+		),
+		overridesFleetThreshold: accountOverride !== undefined,
+	};
 }
 
 function isQuotaEligible(
