@@ -1,5 +1,8 @@
 export { waitForProxyBackgroundTasks } from "./background-tasks";
-export { getPoolStatus } from "./handlers/account-selector";
+export {
+	getCallerPoolStatus,
+	getPoolStatus,
+} from "./handlers/account-selector";
 export { prepareRequestBody } from "./handlers/request-handler";
 export { getValidAccessToken } from "./handlers/token-manager";
 export { OutsideSpendTracker } from "./outside-spend";

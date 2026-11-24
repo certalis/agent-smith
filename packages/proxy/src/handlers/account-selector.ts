@@ -3,14 +3,20 @@ import type { Provider } from "@agent-smith/providers";
 import {
 	type Account,
 	type AccountProvider,
+	type CallerPoolStatus,
 	isCurrentQuotaWindow,
 	isOpenQuotaWindow,
 	type PoolStatus,
+	type ProviderWire,
 	quotaThresholdFor,
 	type RequestMeta,
 } from "@agent-smith/types";
 import { soonestWeeklyReset } from "../seat-usage";
-import { isAllowlisted, type TeamRoutingRequest } from "../team-router";
+import {
+	hasOrderedProviderFallback,
+	isAllowlisted,
+	type TeamRoutingRequest,
+} from "../team-router";
 import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 import { refreshBackoffUntil } from "./token-manager";
 
@@ -162,6 +168,19 @@ export function isServableSeat(
 ): boolean {
 	return (
 		isFleetSeat(account, ctx) &&
+		isServableNow(provider, account, model, ctx, now)
+	);
+}
+
+function isServableNow(
+	provider: Provider,
+	account: Account,
+	model: string | undefined,
+	ctx: SeatPolicyContext,
+	now: number,
+	callerId?: string,
+): boolean {
+	return (
 		cooldownEnd(account, now) === null &&
 		isQuotaEligible(
 			provider,
@@ -170,8 +189,29 @@ export function isServableSeat(
 			now,
 			model,
 			ctx,
+			callerId,
 		)
 	);
+}
+
+/**
+ * The accounts a caller's pool request may land on, as pool attempts admit
+ * them: allowlisted seats, and API-key accounts under ordered fallback.
+ */
+function callerPoolAccounts(
+	provider: AccountProvider,
+	ctx: EligibilityContext,
+	orderedFallback: boolean,
+): Account[] {
+	return ctx.dbOps
+		.getAccountsByProvider(provider)
+		.filter(
+			(account) =>
+				isFleetSeat(account, ctx) ||
+				(orderedFallback &&
+					!account.paused &&
+					account.auth_method === "api_key"),
+		);
 }
 
 function blockingResets(
@@ -356,6 +396,63 @@ export function getPoolStatus(
 				: null,
 		holdSeconds: config?.holdSeconds ?? 0,
 		admissionWaitMs: config?.admissionWaitMs ?? 0,
+	};
+}
+
+/**
+ * getPoolStatus for one registered caller on a provider pool: the first
+ * provider under the caller's weekly ceiling, later providers only under its
+ * ordered fallback. Null when no provider of the pool serves the model.
+ */
+export function getCallerPoolStatus(
+	wire: ProviderWire,
+	model: string | undefined,
+	callerId: string,
+	ctx: PoolStatusContext,
+): CallerPoolStatus | null {
+	const members = ctx.providerRegistry.poolCapacityMembers(wire, model);
+	const [first] = members;
+	if (!first) return null;
+	const config = ctx.runtime.teamRouting;
+	const orderedFallback = hasOrderedProviderFallback(config, callerId);
+	const now = Date.now();
+	const reachable = !config.enabled ? [] : orderedFallback ? members : [first];
+	const fleets = reachable.map((member) => ({
+		...member,
+		accounts: callerPoolAccounts(member.provider.name, ctx, orderedFallback),
+	}));
+	const eligibleAccounts = fleets.reduce(
+		(total, fleet) =>
+			total +
+			fleet.accounts.filter((account) =>
+				isServableNow(fleet.provider, account, fleet.model, ctx, now, callerId),
+			).length,
+		0,
+	);
+	const retryTimes =
+		eligibleAccounts === 0
+			? fleets.flatMap((fleet) => {
+					const at = soonestServableAt(
+						fleet.provider,
+						fleet.accounts,
+						fleet.accounts,
+						fleet.model,
+						ctx,
+						now,
+						callerId,
+					);
+					return at === null ? [] : [at];
+				})
+			: [];
+	return {
+		version: 1,
+		pool: wire,
+		provider: first.provider.name,
+		routingEnabled: config.enabled,
+		eligibleAccounts,
+		retryAtMs: retryTimes.length > 0 ? Math.min(...retryTimes) : null,
+		holdSeconds: config.holdSeconds,
+		admissionWaitMs: config.admissionWaitMs,
 	};
 }
 

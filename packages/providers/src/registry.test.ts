@@ -152,6 +152,35 @@ describe("ProviderRegistry", () => {
 		).toMatchObject({ providers: [{ provider: { name: "anthropic" } }] });
 	});
 
+	it("keeps a mapped provider in a capacity read that names no model", () => {
+		const registry = createConfiguredProviderRegistry(
+			[
+				{ name: "anthropic", enabled: true, strategy: "anthropic-api" },
+				{
+					name: "acme",
+					enabled: true,
+					strategy: "anthropic-api",
+					models: { "claude-sonnet-*": "acme-sonnet" },
+				},
+			],
+			{ "anthropic-messages": ["anthropic", "acme"] },
+		);
+
+		expect(
+			registry
+				.poolCapacityMembers("anthropic-messages", undefined)
+				.map(({ provider, model }) => [provider.name, model]),
+		).toEqual([
+			["anthropic", undefined],
+			["acme", undefined],
+		]);
+		expect(
+			registry
+				.poolCapacityMembers("anthropic-messages", "claude-opus-4")
+				.map(({ provider }) => provider.name),
+		).toEqual(["anthropic"]);
+	});
+
 	it("registers multiple providers and resolves a valid Anthropic path", () => {
 		const anthropic = createTestProvider("anthropic");
 		const openai = createTestProvider("openai");

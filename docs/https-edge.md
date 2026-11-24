@@ -79,7 +79,8 @@ under the actual workload before choosing production capacity.
 On Render, only the primary listener receives public traffic. A separate
 secondary port can be reached over the [private network](https://render.com/docs/private-network).
 An agents scheduler that needs `/api/pool-status` must use that private origin
-and the forwarding key. Device keys deliberately cannot read this endpoint.
+and the forwarding key. Device keys deliberately cannot read this endpoint; the
+caller read sends one in `x-agent-smith-device-key` only to name the caller.
 Never publish the private listener or give agents the administrator key.
 
 ### Deploy with less interruption

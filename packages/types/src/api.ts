@@ -3,6 +3,7 @@ import type {
 	AccountProvider,
 	AuthMethod,
 	OAuthProvider,
+	ProviderWire,
 } from "./provider-metadata";
 import type { HttpMethod } from "./request";
 import type { StrategyName } from "./strategy";
@@ -23,6 +24,11 @@ export interface PoolStatus {
 	retryAtMs: number | null;
 	holdSeconds: number;
 	admissionWaitMs: number;
+}
+
+/** One registered caller's view of a provider pool; `provider` is the pool's first provider. */
+export interface CallerPoolStatus extends PoolStatus {
+	pool: ProviderWire;
 }
 
 /**

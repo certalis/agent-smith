@@ -178,16 +178,45 @@ export class ProviderRegistry {
 		if (!match || !isProviderWire(match[1])) return null;
 		const wire = match[1];
 		const upstreamPath = match[2] || "/";
-		const providers = [...new Set(this.providerPools[wire] ?? [])].flatMap(
-			(name) => {
-				const provider = this.getProvider(name);
-				const model = this.modelFor(name, requestedModel);
-				return provider?.wire === wire && model !== undefined
-					? [{ provider, model }]
-					: [];
-			},
-		);
-		return { wire, upstreamPath, query, providers };
+		return {
+			wire,
+			upstreamPath,
+			query,
+			providers: this.poolMembers(wire, requestedModel),
+		};
+	}
+
+	/**
+	 * A capacity read's view of a pool. Without a requested model a mapped
+	 * provider still counts: some client model reaches it.
+	 */
+	poolCapacityMembers(
+		wire: ProviderWire,
+		requestedModel: string | undefined,
+	): ResolvedProviderPool["providers"] {
+		if (requestedModel !== undefined)
+			return this.poolMembers(wire, requestedModel);
+		return this.compatiblePoolProviders(wire).map((provider) => ({
+			provider,
+			model: undefined,
+		}));
+	}
+
+	private poolMembers(
+		wire: ProviderWire,
+		requestedModel: string | undefined,
+	): ResolvedProviderPool["providers"] {
+		return this.compatiblePoolProviders(wire).flatMap((provider) => {
+			const model = this.modelFor(provider.name, requestedModel);
+			return model === undefined ? [] : [{ provider, model }];
+		});
+	}
+
+	private compatiblePoolProviders(wire: ProviderWire): Provider[] {
+		return [...new Set(this.providerPools[wire] ?? [])].flatMap((name) => {
+			const provider = this.getProvider(name);
+			return provider?.wire === wire ? [provider] : [];
+		});
 	}
 
 	/**

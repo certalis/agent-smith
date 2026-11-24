@@ -573,7 +573,10 @@ are accepted only on this write path and are omitted from all API responses,
 including reads, so maintain the maps in the server's owner-only configuration
 file. Their keys must match names from the protected device-key registry; a
 header, session, provider identity or arbitrary caller label cannot select an
-override.
+override. A scheduler reads the capacity its own policy reaches with
+`GET /api/pool-status?pool=<wire>` and its device key in
+`x-agent-smith-device-key` ([API](./api-http.md#caller-pool-capacity)); the
+maps themselves stay unreadable.
 
 ### Runtime Update Behavior
 
