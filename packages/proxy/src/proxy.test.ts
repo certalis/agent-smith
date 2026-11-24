@@ -858,7 +858,7 @@ describe("handleProxy routing", () => {
 				allowlistedAccountUuids: ["qwen-seat"],
 				callerProviderFallback: { "agents-box": "ordered" },
 			});
-			const request = (callerId: string) =>
+			const request = (callerId: string, interactive = true) =>
 				handleProxy(
 					new Request(
 						"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
@@ -866,7 +866,9 @@ describe("handleProxy routing", () => {
 							method: "POST",
 							headers: {
 								"content-type": "application/json",
-								"x-agent-smith-interactive-provider-choice": "v1",
+								...(interactive && {
+									"x-agent-smith-interactive-provider-choice": "v1",
+								}),
 								...(providerChoice && {
 									"x-agent-smith-provider-choice": providerChoice,
 								}),
@@ -883,41 +885,37 @@ describe("handleProxy routing", () => {
 			return { request, urls };
 		}
 
-		it("offers a named fallback device the API-key provider after a block", async () => {
-			const { request } = interactivePool();
+		for (const callerId of ["agents-box", "laptop-01"]) {
+			it(`offers ${callerId} the API-key provider after a block`, async () => {
+				const { request } = interactivePool();
 
-			const response = await request("agents-box");
+				const response = await request(callerId);
 
-			expect(response.status).toBe(429);
-			expect(await response.json()).toMatchObject({
-				blockedProvider: "qwen-claude",
-				choices: [{ provider: "kimi-claude" }],
+				expect(response.status).toBe(429);
+				expect(await response.json()).toMatchObject({
+					blockedProvider: "qwen-claude",
+					choices: [{ provider: "kimi-claude" }],
+				});
 			});
-		});
 
-		it("serves a named fallback device on the API-key provider it chose", async () => {
+			it(`serves ${callerId} on the API-key provider it chose`, async () => {
+				const { request, urls } = interactivePool("kimi-claude");
+
+				const response = await request(callerId);
+
+				expect(response.status).toBe(200);
+				expect(await response.text()).toBe("served by kimi");
+				expect(urls).toEqual(["https://kimi-claude.example.com/v1/messages"]);
+			});
+		}
+
+		it("never moves an unnamed device onto an API-key provider without its choice", async () => {
 			const { request, urls } = interactivePool("kimi-claude");
 
-			const response = await request("agents-box");
+			const response = await request("laptop-01", false);
 
-			expect(response.status).toBe(200);
-			expect(await response.text()).toBe("served by kimi");
-			expect(urls).toEqual(["https://kimi-claude.example.com/v1/messages"]);
-		});
-
-		it("never offers or serves an API-key account to an unnamed device", async () => {
-			const offer = interactivePool();
-			const offered = await offer.request("laptop-01");
-			expect(offered.status).toBe(429);
-			expect(await offered.json()).toMatchObject({
-				blockedProvider: "qwen-claude",
-				choices: [],
-			});
-
-			const chosen = interactivePool("kimi-claude");
-			const served = await chosen.request("laptop-01");
-			expect(served.status).not.toBe(200);
-			expect(chosen.urls).toEqual([]);
+			expect(response.status).toBe(429);
+			expect(urls).toEqual(["https://qwen-claude.example.com/v1/messages"]);
 		});
 	});
 

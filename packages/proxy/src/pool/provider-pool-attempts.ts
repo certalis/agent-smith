@@ -299,7 +299,7 @@ function preparePoolCandidate(
 	const eligibleAccounts = admittedPoolAccounts(
 		prepared.accounts,
 		context,
-		input.teamRequest,
+		input,
 	);
 	return {
 		accounts: preferPinnedAccount(eligibleAccounts, pinnedId),

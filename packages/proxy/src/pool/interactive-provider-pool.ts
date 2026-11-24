@@ -5,6 +5,7 @@ import {
 	capacityChoices,
 	createProviderCapacityProblem,
 	createProviderChoiceProblem,
+	interactiveProviderChoiceRequested,
 	type ProviderChoice,
 	preferProviders,
 	providerWaitRequested,
@@ -43,13 +44,13 @@ export function configuredPoolChoices(
 }
 
 /**
- * Allowlisted seats, plus API-key accounts for a device named in
- * `caller_provider_fallback`, whether it walks the pool or chooses in Claude Code.
+ * Allowlisted seats, plus API-key accounts when a person picks the provider in
+ * Claude Code's chooser or the device walks the pool under `caller_provider_fallback`.
  */
 export function admittedPoolAccounts(
 	accounts: Account[],
 	context: ResolvedProxyContext,
-	teamRequest: TeamRoutingRequest,
+	{ req, teamRequest }: Pick<InteractivePoolRequest, "req" | "teamRequest">,
 ): Account[] {
 	const pooled = context.teamRouter
 		? context.teamRouter.eligibleAccounts(
@@ -58,29 +59,23 @@ export function admittedPoolAccounts(
 				context.runtime.teamRouting,
 			)
 		: accounts;
-	if (
-		!hasOrderedProviderFallback(
+	const reachesApiKeyAccounts =
+		interactiveProviderChoiceRequested(req.headers) ||
+		hasOrderedProviderFallback(
 			context.runtime.teamRouting,
 			teamRequest.callerId,
-		)
-	) {
-		return pooled;
-	}
+		);
+	if (!reachesApiKeyAccounts) return pooled;
 	return accounts.filter(
 		(account) => account.auth_method === "api_key" || pooled.includes(account),
 	);
 }
 
-export function eligiblePoolProviders({
-	body,
-	ctx,
-	manualAccountName,
-	meta,
-	pool,
-	req,
-	teamRequest,
-	url,
-}: InteractivePoolRequest): Set<string> {
+export function eligiblePoolProviders(
+	input: InteractivePoolRequest,
+): Set<string> {
+	const { body, ctx, manualAccountName, meta, pool, req, teamRequest, url } =
+		input;
 	const eligibleProviders = new Set<string>();
 	for (const candidate of pool.providers) {
 		const candidateContext = createResolvedProxyContext(
@@ -103,7 +98,7 @@ export function eligiblePoolProviders({
 		const accounts = admittedPoolAccounts(
 			prepared.accounts,
 			candidateContext,
-			teamRequest,
+			input,
 		);
 		if (accounts.length > 0) eligibleProviders.add(candidate.provider.name);
 	}

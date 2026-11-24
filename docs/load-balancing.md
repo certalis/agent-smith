@@ -93,9 +93,9 @@ wraps back to a higher-ranked provider. API-key accounts at those later provider
 keep their ordinary account rules; this policy does not add provider-specific
 ceilings. No other caller, including an interactive Claude Code session, gets an
 automatic provider switch. The same device in an interactive Claude Code session
-keeps the chooser instead of the automatic walk, and its chooser offers those
-API-key providers; under team routing they never serve another caller's pool
-request.
+keeps the chooser instead of the automatic walk. Under team routing, API-key
+providers serve only that walk and a person's pick in any interactive Claude
+Code chooser; an unattended caller without the policy never reaches them.
 
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one

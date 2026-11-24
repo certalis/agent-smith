@@ -325,8 +325,9 @@ they never silently move to another configured provider. The sole exception is
 a registered device listed in the private `caller_provider_fallback` map with
 the value `"ordered"`: it continues forward through the configured pool order
 after a block. This is server policy, not a request header a client can opt into.
-Under team routing, only that device's requests reach the pool's API-key accounts; when it runs a
-wrapped Claude Code session, it keeps the chooser and the chooser offers them.
+Under team routing, the pool's API-key accounts serve that device's walk and any
+wrapped Claude Code session whose person picks their provider in the chooser;
+that device keeps the chooser too when it runs a wrapped session.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and
 handing off the needed context yourself: the two clients use different request
 formats and Agent-smith does not convert chat history between them.
@@ -349,9 +350,8 @@ zero and no more than `0.95`. A private per-email ceiling may be as high as `1`.
 | `weekly_max_usage_by_email` | `{}` | Optional weekly ceilings by enrolled contact email. An entry replaces the 95% default for that account; e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner, while `1` permits the full window. |
 | `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
 | `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
-| `weekly_max_usage_by_email` | `{}` | Optional weekly ceilings by enrolled contact email. An entry replaces the 95% default for that account; e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner, while `1` permits the full window. |
 | `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses that account's email override or `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
-| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block, and only its requests reach the pool's API-key accounts (offered in its Claude Code chooser when interactive); no other caller can switch automatically. |
+| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block, reaching their API-key accounts unattended; no other caller can switch automatically. Any wrapped Claude Code session reaches API-key accounts only by picking their provider in its chooser. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
