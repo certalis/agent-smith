@@ -335,8 +335,8 @@ formats and Agent-smith does not convert chat history between them.
 
 `team_routing` is a single validated policy object. Unknown or invalid fields
 are rejected when changed through the API. `max_usage` must be greater than
-zero and no more than `0.9`; weekly ceilings must be greater than zero and no
-more than `0.95`.
+zero and no more than `0.9`; the default weekly ceiling must be greater than
+zero and no more than `0.95`. A private per-email ceiling may be as high as `1`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -346,11 +346,11 @@ more than `0.95`.
 | `allowlisted_account_uuids` | `[]` | Exact Claude Code OAuth seat UUIDs allowed in the pool. |
 | `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
 | `weekly_max_usage` | `0.95` | Hard weekly utilization ceiling, including applicable model-family weekly windows. |
-| `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
+| `weekly_max_usage_by_email` | `{}` | Optional weekly ceilings by enrolled contact email. An entry replaces the 95% default for that account; e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner, while `1` permits the full window. |
 | `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
 | `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
-| `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
-| `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
+| `weekly_max_usage_by_email` | `{}` | Optional weekly ceilings by enrolled contact email. An entry replaces the 95% default for that account; e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner, while `1` permits the full window. |
+| `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses that account's email override or `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
 | `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block, and only its requests reach the pool's API-key accounts (offered in its Claude Code chooser when interactive); no other caller can switch automatically. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
@@ -360,8 +360,8 @@ more than `0.95`.
 | `window_warmup` | off | Opt-in daily start of idle seats' five-hour windows; see below. |
 
 Email overrides use private enrollment contacts; set them before inviting future
-members if needed. Keys are trimmed/lowercased. A per-email value never raises
-the global weekly ceiling. The proxy-readable `GET /api/config/team-routing`
+members if needed. Keys are trimmed/lowercased. A per-email value replaces the
+default weekly ceiling for that account. The proxy-readable `GET /api/config/team-routing`
 omits these private maps. An administrator's POST preserves either map when its
 field is omitted; send an explicit empty object to clear it. These limits do not add
 accounts to the pool or resume manually paused accounts. Revalidation requests

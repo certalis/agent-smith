@@ -26,6 +26,16 @@ describe("weekly cap configuration", () => {
 			callerWeeklyMaxUsage: {},
 		});
 	});
+	it("accepts a 100% weekly cap for one enrolled account", () => {
+		expect(
+			configFrom({
+				weekly_max_usage_by_email: { "full@example.test": 1 },
+			}).config.getTeamRouting(),
+		).toMatchObject({
+			weeklyMaxUsage: 0.95,
+			weeklyMaxUsageByEmail: { "full@example.test": 1 },
+		});
+	});
 	it("normalizes private caps and preserves them across ordinary updates", () => {
 		const { config, path } = configFrom({
 			weekly_max_usage: 0.95,
@@ -72,7 +82,7 @@ describe("weekly cap configuration", () => {
 		...[0, -0.1, 0.951, Number.NaN, Infinity, "0.3", null].map((value) => ({
 			weekly_max_usage: value,
 		})),
-		...[0, -0.1, 0.951, Number.NaN, Infinity, "0.3", null].map((value) => ({
+		...[0, -0.1, 1.001, Number.NaN, Infinity, "0.3", null].map((value) => ({
 			weekly_max_usage_by_email: { "tech@example.test": value },
 		})),
 		...[0, -0.1, 0.951, Number.NaN, Infinity, "0.3", null].map((value) => ({

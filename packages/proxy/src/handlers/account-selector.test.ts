@@ -451,6 +451,135 @@ describe("selectAccountsForRequest", () => {
 		).toEqual([]);
 	});
 
+	it("uses a 100% account cap instead of the default weekly cap", () => {
+		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
+		const account = Object.assign(createAccount("a", "spent", "claude-code"), {
+			auth_method: "oauth" as const,
+			account_uuid: "seat",
+			quota_state: {
+				windows: {
+					unified7d: {
+						resetAt: now + 60_000,
+						seenAt: now,
+						status: "allowed" as const,
+						utilization: 0.99,
+					},
+				},
+			},
+		});
+		const ctx = {
+			providerName: "claude-code",
+			provider: {
+				quotaBucketsFor: () => undefined,
+				isWeeklyBucket: (bucket: string) => bucket === "unified7d",
+			},
+			runtime: {
+				quotaThreshold: 0.98,
+				teamRouting: {
+					enabled: true,
+					allowlistedAccountUuids: ["seat"],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.95,
+					weeklyMaxUsageByEmail: { "full@example.test": 1 },
+					callerWeeklyMaxUsage: { alice: 0.9 },
+				},
+			},
+			strategy: { select: (accounts: Account[]) => accounts },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => ({ email: "full@example.test" }),
+			},
+			teamRouter: { order: (accounts: Account[]) => accounts },
+		} as unknown as ResolvedProxyContext;
+
+		expect(
+			selectAccountsForRequest(
+				{
+					id: "full-account-cap",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
+			),
+		).toEqual([account]);
+		expect(
+			selectAccountsForRequest(
+				{
+					id: "caller-account-cap",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
+				{
+					body: null,
+					callerId: "alice",
+					contentType: null,
+					model: undefined,
+					provider: "claude-code",
+					sessionId: null,
+				},
+			),
+		).toEqual([]);
+	});
+
+	it("keeps the fleet threshold for ordinary pooled caps", () => {
+		const now = 1_700_000_000_000;
+		setSystemTime(new Date(now));
+		const account = Object.assign(createAccount("a", "spent", "claude-code"), {
+			auth_method: "oauth" as const,
+			account_uuid: "seat",
+			quota_state: {
+				windows: {
+					unified5h: {
+						resetAt: now + 60_000,
+						seenAt: now,
+						status: "allowed" as const,
+						utilization: 0.85,
+					},
+				},
+			},
+		});
+		const ctx = {
+			providerName: "claude-code",
+			provider: {
+				quotaBucketsFor: () => undefined,
+				isWeeklyBucket: () => false,
+			},
+			runtime: {
+				quotaThreshold: 0.8,
+				teamRouting: {
+					enabled: true,
+					allowlistedAccountUuids: ["seat"],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.95,
+					weeklyMaxUsageByEmail: {},
+					callerWeeklyMaxUsage: {},
+				},
+			},
+			strategy: { select: (accounts: Account[]) => accounts },
+			dbOps: {
+				getAvailableAccountsByProvider: () => [account],
+				getEnrollmentContact: () => undefined,
+			},
+			teamRouter: { order: (accounts: Account[]) => accounts },
+		} as unknown as ResolvedProxyContext;
+
+		expect(
+			selectAccountsForRequest(
+				{
+					id: "fleet-threshold",
+					method: "POST",
+					path: "/v1/claude-code/v1/messages",
+					timestamp: now,
+				},
+				ctx,
+			),
+		).toEqual([]);
+	});
+
 	it("does not use a caller-capped weekly family for revalidation", () => {
 		const now = 1_700_000_000_000;
 		setSystemTime(new Date(now));

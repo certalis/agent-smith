@@ -75,8 +75,9 @@ effect. The same rule applies to Claude Code and Codex pinned conversations.
 
 Pooled seats keep their `max_usage` ceiling (never above `0.9`) for 5-hour and
 other non-weekly windows. Weekly windows use `weekly_max_usage` (default `0.95`)
-and can only be lowered by either private map: `weekly_max_usage_by_email` for
-one account, or `caller_weekly_max_usage` for one named authenticated device.
+unless `weekly_max_usage_by_email` sets an explicit ceiling for one account.
+`caller_weekly_max_usage` remains an additional, lower ceiling for one named
+authenticated device.
 For example, Alice at `0.70` skips a seat at 70% weekly use while an
 unconfigured caller may still use that seat through 95%; a lower account cap
 still applies to both. These are eligibility rules, not separate spend counters.

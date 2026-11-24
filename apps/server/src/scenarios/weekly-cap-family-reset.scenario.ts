@@ -14,7 +14,6 @@ export default defineScenario({
 			enabled: true,
 			allowlisted_account_uuids: ["tech"],
 			weekly_max_usage: 0.3,
-			weekly_max_usage_by_email: { "tech@example.test": 0.95 },
 		},
 	},
 	fleet: [
