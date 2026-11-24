@@ -32,6 +32,7 @@ import {
 	prepareProxyRequest,
 } from "../handlers/proxy-request";
 import {
+	admittedPoolAccounts,
 	configuredPoolChoices,
 	eligiblePoolChoices,
 	eligiblePoolProviders,
@@ -50,7 +51,6 @@ type ProviderPoolCandidateInput = {
 	conversationKey: string | undefined;
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
-	orderedFallback: boolean;
 	pinnedId: string | undefined;
 	providerPreference: ConversationProviderPreference | null;
 	requestedChoice: string | null;
@@ -275,7 +275,6 @@ function preparePoolCandidate(
 	input: InteractivePoolRequest,
 	candidate: ResolvedPoolCandidate,
 	pinnedId: string | undefined,
-	orderedFallback: boolean,
 ): {
 	accounts: Account[];
 	context: ReturnType<typeof createResolvedProxyContext>;
@@ -297,19 +296,11 @@ function preparePoolCandidate(
 		candidate.model,
 		{ allowRevalidationProbe: false, applyTeamRouting: false },
 	);
-	const pooledAccounts = context.teamRouter
-		? context.teamRouter.eligibleAccounts(
-				prepared.accounts,
-				input.teamRequest,
-				context.runtime.teamRouting,
-			)
-		: prepared.accounts;
-	const eligibleAccounts = orderedFallback
-		? prepared.accounts.filter(
-				(account) =>
-					account.auth_method === "api_key" || pooledAccounts.includes(account),
-			)
-		: pooledAccounts;
+	const eligibleAccounts = admittedPoolAccounts(
+		prepared.accounts,
+		context,
+		input.teamRequest,
+	);
 	return {
 		accounts: preferPinnedAccount(eligibleAccounts, pinnedId),
 		context,
@@ -322,7 +313,6 @@ export async function proxyPoolCandidates({
 	conversationKey,
 	interactive,
 	interactiveInput,
-	orderedFallback,
 	pinnedId,
 	providerPreference,
 	requestedChoice,
@@ -353,7 +343,6 @@ export async function proxyPoolCandidates({
 			interactiveInput,
 			candidate,
 			pinnedId,
-			orderedFallback,
 		);
 		if (accounts.length === 0) {
 			recordUnserved(request);

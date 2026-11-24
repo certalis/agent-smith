@@ -312,6 +312,8 @@ they never silently move to another configured provider. The sole exception is
 a registered device listed in the private `caller_provider_fallback` map with
 the value `"ordered"`: it continues forward through the configured pool order
 after a block. This is server policy, not a request header a client can opt into.
+Under team routing, only that device's requests reach the pool's API-key accounts; when it runs a
+wrapped Claude Code session, it keeps the chooser and the chooser offers them.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and
 handing off the needed context yourself: the two clients use different request
 formats and Agent-smith does not convert chat history between them.
@@ -336,7 +338,7 @@ more than `0.95`.
 | `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
 | `weekly_max_usage_by_email` | `{}` | Optional lower weekly ceilings by enrolled contact email, e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner. |
 | `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
-| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block; no other caller can switch automatically. |
+| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block, and only its requests reach the pool's API-key accounts (offered in its Claude Code chooser when interactive); no other caller can switch automatically. |
 | `admission_cap` | `5` | Per-account active-request limit. |
 | `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
 | `admission_wait_ms` | `30000` | Maximum admission wait. |
