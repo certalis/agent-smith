@@ -15,6 +15,7 @@ describe("forwardOAuthTokenRequest", () => {
 			expect(_url).toBe(CLAUDE_CODE_OAUTH_TOKEN_URL);
 			const headers = new Headers(init.headers);
 			expect(headers.get("x-api-key")).toBeNull();
+			expect(headers.get("x-agent-smith-device-key")).toBeNull();
 			expect(headers.get("host")).toBeNull();
 			expect(headers.get("authorization")).toBe("Basic client-credentials");
 			expect(await new Response(init.body).text()).toBe(
@@ -32,6 +33,7 @@ describe("forwardOAuthTokenRequest", () => {
 					"Content-Type": "application/json",
 					Host: "localhost:8080",
 					"x-api-key": "proxy-key",
+					"x-agent-smith-device-key": "synthetic-caller-device-key-0003",
 				},
 				body: '{"grant_type":"refresh_token"}',
 			}),

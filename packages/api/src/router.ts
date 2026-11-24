@@ -1,5 +1,5 @@
 import { ServiceUnavailableError, validateNumber } from "@agent-smith/core";
-import { errorResponse, NotFound } from "@agent-smith/http";
+import { DEVICE_KEY_HEADER, errorResponse, NotFound } from "@agent-smith/http";
 import { isAccountProvider, isProviderWire } from "@agent-smith/types";
 import {
 	createAccountAddHandler,
@@ -65,9 +65,6 @@ function compilePattern(pattern: string): {
 	});
 	return { regex: new RegExp(`^${regexStr}$`), paramNames };
 }
-
-/** Names the caller of a pool read; the forwarding key stays in `x-api-key`. */
-const DEVICE_KEY_HEADER = "x-agent-smith-device-key";
 
 function isValidStatusModel(model: string | undefined): boolean {
 	return (

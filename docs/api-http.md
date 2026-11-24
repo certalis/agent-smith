@@ -327,8 +327,9 @@ device on a provider pool, for an unattended scheduler that sends its jobs to
 `/v1/pool/<wire>/*`. Send the forwarding key in `x-api-key` as above, and the
 device's own key in `x-agent-smith-device-key`. The device key only names the
 caller: it is matched against the device registry and never authorizes the
-read on its own. A missing or unregistered device key returns 401 and is never
-echoed:
+read on its own. The pool strips this header from every request it forwards
+upstream and from stored request headers. A missing or unregistered device key
+returns 401 and is never echoed:
 
 ```json
 {

@@ -1,4 +1,4 @@
-import { sanitizeProxyHeaders } from "@agent-smith/http";
+import { DEVICE_KEY_HEADER, sanitizeProxyHeaders } from "@agent-smith/http";
 import type {
 	Account,
 	AccountQuotaState,
@@ -37,6 +37,7 @@ const CLIENT_CREDENTIAL_HEADERS_TO_DELETE = [
 	"cookie",
 	"proxy-authorization",
 	"x-api-key",
+	DEVICE_KEY_HEADER,
 ] as const;
 
 /**
