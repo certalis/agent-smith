@@ -20,6 +20,27 @@ function fetchResult(value: Record<string, unknown>, sendIndex = 0) {
 	return { sendIndex, value };
 }
 
+test("confirms that the manual provider command is armed", () => {
+	const handlers = new Map();
+	register((event, _matcher, handler) => {
+		handlers.set(event, handler ?? _matcher);
+		return { catch() {} };
+	});
+	const statuses: string[] = [];
+
+	const response = handlers.get("command.run")({
+		ui: { status: (value: string) => statuses.push(value) },
+	});
+
+	expect(response).toEqual({
+		isTextDisplayOnly: true,
+		text: "Agent-smith: send your next message to choose a provider.",
+	});
+	expect(statuses).toEqual([
+		"Agent-smith: choose a provider on your next turn.",
+	]);
+});
+
 test("recognizes Agent-smith's versioned capacity response before a turn is retried", () => {
 	expect(
 		classifyCapacityResponse(429, {
