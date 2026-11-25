@@ -21,6 +21,7 @@ export {
 } from "./response-handler";
 export { SeatAlerts } from "./seat-alerts";
 export { SessionStrategy } from "./strategies";
+export { createSupplyExecutorFactory } from "./supply-executor";
 export {
 	type AdmissionPermit,
 	TeamAdmission,

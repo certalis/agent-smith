@@ -56,7 +56,7 @@ export class ProviderRegistry {
 		}
 	}
 
-	private modelFor(
+	mapModel(
 		providerName: string,
 		requested: string | undefined,
 	): string | undefined {
@@ -207,7 +207,7 @@ export class ProviderRegistry {
 		requestedModel: string | undefined,
 	): ResolvedProviderPool["providers"] {
 		return this.compatiblePoolProviders(wire).flatMap((provider) => {
-			const model = this.modelFor(provider.name, requestedModel);
+			const model = this.mapModel(provider.name, requestedModel);
 			return model === undefined ? [] : [{ provider, model }];
 		});
 	}

@@ -4,6 +4,7 @@ import type { QuotaHold } from "../quota-hold";
 import type { UsageWorkerTransport } from "../usage-worker";
 
 export interface ProxyContext extends PoolContext {
+	routedProviders?: Map<string, import("@agent-smith/pool").ProviderSupply>;
 	quotaHold?: QuotaHold;
 	usageWorker: UsageWorkerTransport;
 }

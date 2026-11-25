@@ -184,7 +184,7 @@ export function isServableSeat(
 	);
 }
 
-function isServableNow(
+export function isServableNow(
 	provider: Provider,
 	account: Account,
 	model: string | undefined,

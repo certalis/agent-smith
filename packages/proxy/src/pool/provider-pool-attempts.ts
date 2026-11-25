@@ -77,7 +77,10 @@ async function proxyPoolCandidate(
 	accounts: Account[],
 	allowNextProvider: boolean,
 ): Promise<PoolCandidateResult> {
-	const result = await serveSelectedAccounts(request, accounts, "pool-route");
+	const supply = request.ctx.routedProviders?.get(request.ctx.providerName);
+	const result = supply
+		? await supply.servePrepared(request, accounts, "pool-route")
+		: await serveSelectedAccounts(request, accounts, "pool-route");
 	if (result.kind === "final") {
 		return {
 			kind: "response",

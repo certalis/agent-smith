@@ -231,7 +231,10 @@ export async function handleProxy(
 		`Selected ${accounts.length} accounts: ${accounts.map((a) => a.name).join(", ")}`,
 	);
 	log.info(`Request: ${req.method} ${url.pathname}`);
-	const outcome = await serveSelectedAccounts(request, accounts, "direct");
+	const supply = ctx.routedProviders?.get(requestContext.providerName);
+	const outcome = supply
+		? await supply.servePrepared(request, accounts, "direct")
+		: await serveSelectedAccounts(request, accounts, "direct");
 	if (outcome.kind === "final") return outcome.response;
 	if (outcome.forward) return await outcome.forward();
 	if (outcome.reason === "transport")

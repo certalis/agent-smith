@@ -12,14 +12,15 @@
 		"typecheck": "bunx tsc --noEmit"
 	},
 	"dependencies": {
+		"@agent-smith/api": "workspace:*",
 		"@agent-smith/config": "workspace:*",
 		"@agent-smith/core": "workspace:*",
-		"@agent-smith/web": "workspace:*",
 		"@agent-smith/database": "workspace:*",
-		"@agent-smith/api": "workspace:*",
 		"@agent-smith/http": "workspace:*",
 		"@agent-smith/logger": "workspace:*",
+		"@agent-smith/pool": "workspace:*",
 		"@agent-smith/providers": "workspace:*",
-		"@agent-smith/proxy": "workspace:*"
+		"@agent-smith/proxy": "workspace:*",
+		"@agent-smith/web": "workspace:*"
 	}
 }

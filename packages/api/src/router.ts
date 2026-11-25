@@ -196,7 +196,7 @@ export class APIRouter {
 		this.staticHandlers.set("GET:/health", () => healthHandler());
 		this.staticHandlers.set("GET:/api/stats", () => statsHandler());
 		this.staticHandlers.set("GET:/api/status", () => fleetStatusHandler());
-		this.staticHandlers.set("GET:/api/pool-status", (req, url) => {
+		this.staticHandlers.set("GET:/api/pool-status", async (req, url) => {
 			if (this.context.deploymentDrain?.("status").draining) {
 				return errorResponse(
 					new ServiceUnavailableError(
@@ -226,7 +226,7 @@ export class APIRouter {
 					{ status: 503 },
 				);
 			}
-			return Response.json(this.context.getPoolStatus(provider, model), {
+			return Response.json(await this.context.getPoolStatus(provider, model), {
 				headers: { "cache-control": "no-store" },
 			});
 		});

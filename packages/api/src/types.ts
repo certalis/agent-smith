@@ -59,7 +59,10 @@ export interface APIContext {
 	providerRegistry: ProviderRegistry;
 	getProviders: () => string[];
 	getRuntimeHealth?: () => RuntimeHealth;
-	getPoolStatus?: (provider: AccountProvider, model?: string) => PoolStatus;
+	getPoolStatus?: (
+		provider: AccountProvider,
+		model?: string,
+	) => PoolStatus | Promise<PoolStatus>;
 	getCallerPoolStatus?: (
 		pool: ProviderWire,
 		model: string | undefined,

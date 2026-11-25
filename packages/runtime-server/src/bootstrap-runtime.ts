@@ -10,11 +10,13 @@ import {
 import type { DatabaseOperations } from "@agent-smith/database";
 import { AsyncDbWriter, DatabaseFactory } from "@agent-smith/database";
 import { Logger } from "@agent-smith/logger";
+import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
 import {
 	createConfiguredProviderRegistry,
 	type ProviderRegistry,
 } from "@agent-smith/providers";
 import {
+	createSupplyExecutorFactory,
 	getCallerPoolStatus,
 	getPoolStatus,
 	getUsageWorker,
@@ -82,6 +84,7 @@ function wireStrategyHotReload(
 	runtimeConfig: RuntimeConfig,
 	quotaProbe: QuotaProbe,
 	windowWarmup: WindowWarmup,
+	poolContext: PoolContext,
 ): void {
 	config.on("change", (change: { key?: string }) => {
 		if (change.key === "lb_strategy") {
@@ -91,6 +94,7 @@ function wireStrategyHotReload(
 				const strategy = new SessionStrategy();
 				strategy.initialize(dbOps);
 				proxyContext.strategy = strategy;
+				poolContext.strategy = strategy;
 			}
 		}
 		if (change.key === "data_retention_days") {
@@ -192,12 +196,46 @@ export function bootstrapRuntime(
 				upstreamPath: "/",
 			});
 		},
-		getPoolStatus: (provider, model) =>
-			getPoolStatus(provider, model, {
-				dbOps,
-				runtime: runtimeConfig,
-				providerRegistry,
-			}),
+		getPoolStatus: async (provider, model) => {
+			const supply = proxyContext.routedProviders?.get(provider);
+			if (!supply)
+				return getPoolStatus(provider, model, {
+					dbOps,
+					runtime: runtimeConfig,
+					providerRegistry,
+				});
+			const url = new URL(`http://localhost/v1/${provider}/`);
+			const status = await supply.status({
+				scope: { kind: "direct", provider },
+				edge: {
+					method: "GET",
+					url,
+					headers: new Headers(),
+					body: null,
+					meta: {
+						id: "pool-status",
+						method: "GET",
+						path: url.pathname,
+						timestamp: Date.now(),
+					},
+				},
+				model,
+				sessionId: null,
+				openingDigest: null,
+				apiKeyAccounts: false,
+				inlineRateLimitRetry: false,
+				signal: new AbortController().signal,
+			});
+			return {
+				version: 1,
+				provider,
+				routingEnabled: runtimeConfig.teamRouting.enabled,
+				eligibleAccounts: status.servableSeats,
+				retryAtMs: status.retryAt,
+				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				admissionWaitMs: status.admissionWaitMs,
+			};
+		},
 		getCallerPoolStatus: (pool, model, callerId) =>
 			getCallerPoolStatus(pool, model, callerId, {
 				dbOps,
@@ -240,6 +278,25 @@ export function bootstrapRuntime(
 		asyncWriter,
 		usageWorker: getUsageWorker(),
 	};
+	const poolContext: PoolContext = { ...proxyContext };
+	const createExecutor = createSupplyExecutorFactory(proxyContext);
+	proxyContext.routedProviders = new Map(
+		providerRegistry.listProviders().flatMap((name) => {
+			const provider = providerRegistry.getProvider(name);
+			if (!provider) return [];
+			return [
+				[
+					name,
+					new ProviderSupply(provider, poolContext, {
+						mapModel: (model) =>
+							providerRegistry.mapModel(name, model) ??
+							(model === undefined ? undefined : null),
+						createExecutor,
+					}),
+				] as const,
+			];
+		}),
+	);
 	const { quotaProbe, windowWarmup } = startSeatSchedulers(
 		config,
 		proxyContext,
@@ -254,6 +311,7 @@ export function bootstrapRuntime(
 		runtimeConfig,
 		quotaProbe,
 		windowWarmup,
+		poolContext,
 	);
 
 	return {

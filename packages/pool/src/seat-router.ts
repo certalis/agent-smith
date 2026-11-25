@@ -15,6 +15,7 @@ export type TeamRoutingRequest = {
 	model: string | undefined;
 	pinBucket?: string;
 	pinScope?: string;
+	lookupOpeningDigest?: string | null;
 	provider: AccountProvider;
 	sessionId: string | null;
 };
@@ -69,7 +70,10 @@ function pinKey(
 	provider: Provider,
 ): string | null {
 	if (!request.sessionId) return null;
-	const digest = openingDigest(request, provider) ?? "no-opening";
+	const digest =
+		(request.lookupOpeningDigest !== undefined
+			? request.lookupOpeningDigest
+			: openingDigest(request, provider)) ?? "no-opening";
 	return createHash("sha256")
 		.update(
 			[
@@ -223,7 +227,9 @@ export class TeamRouter {
 		now: number = Date.now(),
 	): void {
 		if (!config.enabled || request?.manualAccountName) return;
-		const key = request ? pinKey(request, provider) : null;
+		const key = request
+			? pinKey({ ...request, lookupOpeningDigest: undefined }, provider)
+			: null;
 		if (key) this.touchPin(key, accountId, now, store);
 	}
 
