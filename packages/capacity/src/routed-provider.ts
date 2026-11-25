@@ -21,6 +21,8 @@ export type RouteRequest = {
 	callerId?: string;
 	sessionId: string | null;
 	openingDigest: string | null;
+	/** Opaque identity shared by provider candidates for this request. */
+	seatPinLookup?: object;
 	seatHint?: string;
 	apiKeyAccounts: boolean;
 	inlineRateLimitRetry: boolean;

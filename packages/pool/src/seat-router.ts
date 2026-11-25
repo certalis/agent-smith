@@ -16,6 +16,7 @@ export type TeamRoutingRequest = {
 	pinBucket?: string;
 	pinScope?: string;
 	lookupOpeningDigest?: string | null;
+	seatPinLookup?: object;
 	provider: AccountProvider;
 	sessionId: string | null;
 };
@@ -105,6 +106,11 @@ export function isAllowlisted(
 export class TeamRouter {
 	private readonly inFlight = new Map<string, number>();
 	private readonly pins = new Map<string, ConversationPin>();
+	private readonly pinLookups = new WeakMap<
+		object,
+		{ accountId: string | undefined }
+	>();
+	private readonly cleanedLookups = new WeakSet<object>();
 
 	order(
 		accounts: Account[],
@@ -115,7 +121,7 @@ export class TeamRouter {
 		now: number = Date.now(),
 	): Account[] {
 		if (!config.enabled || !request) return accounts;
-		this.removeExpiredPins(now, store);
+		this.removeExpiredPinsOnce(request, now, store);
 
 		const eligible = this.eligibleAccounts(accounts, request, config);
 		if (eligible.length === 0) return [];
@@ -185,11 +191,16 @@ export class TeamRouter {
 		if (!config.enabled || !request?.sessionId || request.manualAccountName) {
 			return undefined;
 		}
-		this.removeExpiredPins(now, store);
+		const lookup = request.seatPinLookup;
+		const cached = lookup ? this.pinLookups.get(lookup) : undefined;
+		if (cached) return cached.accountId;
+		this.removeExpiredPinsOnce(request, now, store);
 		const key = this.getConversationPinKey(request, config, provider);
-		return key
+		const accountId = key
 			? (this.pins.get(key) ?? store?.getConversationPin(key))?.accountId
 			: undefined;
+		if (lookup) this.pinLookups.set(lookup, { accountId });
+		return accountId;
 	}
 
 	/** Returns the durable, opaque conversation key for account-seat pins. */
@@ -264,11 +275,18 @@ export class TeamRouter {
 		)[0] as Account;
 	}
 
-	private removeExpiredPins(now: number, store?: ConversationPinStore): void {
+	private removeExpiredPinsOnce(
+		request: TeamRoutingRequest,
+		now: number,
+		store?: ConversationPinStore,
+	): void {
+		const lookup = request.seatPinLookup;
+		if (lookup && this.cleanedLookups.has(lookup)) return;
 		for (const [key, pin] of this.pins) {
 			if (now - pin.lastSeenAt > PIN_TTL_MS) this.pins.delete(key);
 		}
 		store?.deleteExpiredConversationPins(now - PIN_TTL_MS);
+		if (lookup) this.cleanedLookups.add(lookup);
 	}
 
 	private touchPin(

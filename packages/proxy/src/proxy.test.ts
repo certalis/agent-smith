@@ -1762,11 +1762,38 @@ it("parses the first provider opening once while building a pool chooser", async
 		return (value as { messages?: unknown }).messages ?? null;
 	};
 	const accounts = [
-		{ ...createTestAccount(), id: "first-seat", provider: "first" },
-		{ ...createTestAccount(), id: "second-seat", provider: "second" },
+		{
+			...createTestAccount(),
+			id: "first-seat",
+			provider: "first",
+			auth_method: "oauth",
+			account_uuid: "first",
+		},
+		{
+			...createTestAccount(),
+			id: "second-seat",
+			provider: "second",
+			auth_method: "oauth",
+			account_uuid: "second",
+		},
 	] as Account[];
 	const context = createProxyContext([first, second], accounts, {
 		"anthropic-messages": ["first", "second"],
+	});
+	context.runtime.teamRouting.enabled = true;
+	context.runtime.teamRouting.allowlistedAccountUuids = ["first", "second"];
+	Object.assign(context.dbOps, {
+		deleteExpiredConversationPins() {},
+		getConversationPin() {
+			return null;
+		},
+		countConversationPinsByAccount() {
+			return new Map();
+		},
+		upsertConversationPin() {},
+		getAccount() {
+			return null;
+		},
 	});
 	const url = new URL(
 		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
@@ -1796,13 +1823,38 @@ it("reuses the first opening digest when an interactive wait retries", async () 
 		retryAt,
 	});
 	let parses = 0;
+	let lookups = 0;
+	let cleanups = 0;
 	provider.getConversationOpening = (value: unknown) => {
 		parses += 1;
 		return (value as { messages?: unknown }).messages ?? null;
 	};
-	const seat = { ...createTestAccount(), provider: "qwen-claude" } as Account;
+	const seat = {
+		...createTestAccount(),
+		provider: "qwen-claude",
+		auth_method: "oauth",
+		account_uuid: "seat",
+	} as Account;
 	const ctx = createProxyContext([provider], [seat], {
 		"anthropic-messages": ["qwen-claude"],
+	});
+	ctx.runtime.teamRouting.enabled = true;
+	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {
+			cleanups += 1;
+		},
+		getConversationPin() {
+			lookups += 1;
+			return null;
+		},
+		countConversationPinsByAccount() {
+			return new Map();
+		},
+		upsertConversationPin() {},
+		getAccount() {
+			return null;
+		},
 	});
 	ctx.quotaHold = { waitUntil: async () => {} } as unknown as NonNullable<
 		typeof ctx.quotaHold
@@ -1827,6 +1879,189 @@ it("reuses the first opening digest when an interactive wait retries", async () 
 		});
 	await handleProxy(request(false), url, ctx);
 	parses = 0;
+	lookups = 0;
+	cleanups = 0;
 	await handleProxy(request(true), url, ctx);
 	expect(parses).toBe(1);
+	expect(lookups).toBe(1);
+	expect(cleanups).toBe(1);
+});
+
+it.each([
+	["direct", false, "session"],
+	["pool", false, "session"],
+	["direct", true, null],
+	["pool", true, null],
+] as const)("does not parse an opening for %s when routing or the session is absent", async (route, enabled, sessionId) => {
+	const provider = createTestProvider("first");
+	let parses = 0;
+	provider.getConversationOpening = () => {
+		parses += 1;
+		return "opening";
+	};
+	const seat = {
+		...createTestAccount(),
+		provider: "first",
+		auth_method: "oauth",
+		account_uuid: "seat",
+	} as Account;
+	const ctx = createProxyContext([provider], [seat], {
+		"anthropic-messages": ["first"],
+	});
+	ctx.runtime.teamRouting.enabled = enabled;
+	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {},
+		getConversationPin() {
+			return null;
+		},
+		countConversationPinsByAccount() {
+			return new Map();
+		},
+		upsertConversationPin() {},
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(Response.json({ ok: true })),
+	) as unknown as typeof fetch;
+	const path =
+		route === "direct"
+			? "/v1/first/v1/messages"
+			: "/v1/pool/anthropic-messages/v1/messages";
+	const url = new URL(`http://localhost:8080${path}`);
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				...(sessionId ? { "x-claude-code-session-id": sessionId } : {}),
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}]}',
+		}),
+		url,
+		ctx,
+	);
+	expect(response.status).toBe(200);
+	expect(parses).toBe(0);
+});
+
+it("looks up and cleans a pooled seat pin once across chooser checks", async () => {
+	const first = createTestProvider("first", { category: "request-rate" });
+	const second = createTestProvider("second");
+	const accounts = [
+		{
+			...createTestAccount(),
+			id: "first-seat",
+			name: "first-seat",
+			provider: "first",
+			auth_method: "oauth",
+			account_uuid: "first",
+		},
+		{
+			...createTestAccount(),
+			id: "second-seat",
+			name: "second-seat",
+			provider: "second",
+			auth_method: "oauth",
+			account_uuid: "second",
+		},
+	] as Account[];
+	const ctx = createProxyContext([first, second], accounts, {
+		"anthropic-messages": ["first", "second"],
+	});
+	ctx.runtime.teamRouting.enabled = true;
+	ctx.runtime.teamRouting.allowlistedAccountUuids = ["first", "second"];
+	let cleanups = 0;
+	let lookups = 0;
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {
+			cleanups += 1;
+		},
+		getConversationPin() {
+			lookups += 1;
+			return { accountId: "first-seat", lastSeenAt: Date.now() };
+		},
+		getAccount(id: string) {
+			return accounts.find((account) => account.id === id) ?? null;
+		},
+		countConversationPinsByAccount() {
+			return new Map();
+		},
+		upsertConversationPin() {},
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("limited", { status: 429 })),
+	) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-agent-smith-interactive-provider-choice": "v1",
+				"x-claude-code-session-id": "session",
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}]}',
+		}),
+		url,
+		ctx,
+	);
+	expect(response.status).toBe(429);
+	expect(await response.json()).toMatchObject({
+		blockedProvider: "first",
+		choices: expect.arrayContaining([
+			expect.objectContaining({ provider: "second" }),
+		]),
+	});
+	expect(lookups).toBe(1);
+	expect(cleanups).toBe(1);
+});
+
+it("cleans a direct seat pin once when selecting an account", async () => {
+	const provider = createTestProvider("first");
+	const seat = {
+		...createTestAccount(),
+		id: "seat",
+		provider: "first",
+		auth_method: "oauth",
+		account_uuid: "seat",
+	} as Account;
+	const ctx = createProxyContext([provider], [seat]);
+	ctx.runtime.teamRouting.enabled = true;
+	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	let cleanups = 0;
+	let lookups = 0;
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {
+			cleanups += 1;
+		},
+		getConversationPin() {
+			lookups += 1;
+			return { accountId: "seat", lastSeenAt: Date.now() };
+		},
+		countConversationPinsByAccount() {
+			return new Map();
+		},
+		upsertConversationPin() {},
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(Response.json({ ok: true })),
+	) as unknown as typeof fetch;
+	const url = new URL("http://localhost:8080/v1/first/v1/messages");
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-claude-code-session-id": "session",
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}]}',
+		}),
+		url,
+		ctx,
+	);
+	expect(response.status).toBe(200);
+	expect(lookups).toBe(1);
+	expect(cleanups).toBe(1);
 });

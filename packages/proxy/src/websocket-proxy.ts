@@ -730,6 +730,7 @@ export async function handleWebSocketUpgradeRequest(
 		callerId,
 		sessionId: teamRequest.sessionId,
 		openingDigest: null,
+		seatPinLookup: {},
 		apiKeyAccounts: false,
 		inlineRateLimitRetry: false,
 		signal: req.signal,

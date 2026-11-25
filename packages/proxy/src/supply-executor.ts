@@ -5,6 +5,7 @@ import type {
 } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
 import { proxyWithAccount } from "./handlers/proxy-operations";
+import { getOriginalRequest } from "./handlers/proxy-request";
 import type { ProxyContext } from "./handlers/proxy-types";
 
 /** Bind the HTTP executor while the pool owns account choice and reported facts. */
@@ -13,7 +14,7 @@ export function createSupplyExecutorFactory(
 ): SupplyExecutorFactory {
 	return (route, request) => (account, failoverAttempts, report) =>
 		proxyWithAccount(
-			request.req,
+			getOriginalRequest(route) ?? request.req,
 			request.url,
 			account,
 			request.meta,

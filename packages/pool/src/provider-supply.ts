@@ -234,6 +234,7 @@ export class ProviderSupply implements RoutedProvider {
 			manualAccountName: route.seatHint,
 			model: route.model,
 			lookupOpeningDigest: route.openingDigest,
+			seatPinLookup: route.seatPinLookup,
 			provider:
 				route.scope.kind === "direct" ? this.name : `pool:${route.scope.wire}`,
 			sessionId: route.sessionId,

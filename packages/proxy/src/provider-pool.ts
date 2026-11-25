@@ -1,7 +1,6 @@
 import { ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import {
-	getOpeningDigest,
 	quotaExhaustionResponse,
 	type TeamRoutingRequest,
 } from "@agent-smith/pool";
@@ -70,8 +69,6 @@ function poolTeamRequest(
 		sessionId:
 			pool.providers[0]?.provider.getClientSessionId?.(req.headers) ?? null,
 	};
-	const first = pool.providers[0]?.provider;
-	request.lookupOpeningDigest = first ? getOpeningDigest(request, first) : null;
 	return request;
 }
 
