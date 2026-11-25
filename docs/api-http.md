@@ -53,6 +53,24 @@ All API responses are in JSON format with `Content-Type: application/json`.
 
 ## Endpoints
 
+### Pool and Router configuration
+
+| Method / path | Purpose |
+|---|---|
+| `GET /api/config/providers/:name/pool` | Read public pool settings for a provider. |
+| `POST /api/config/providers/:name/pool` | Update snake_case pool fields; omitted top-level fields are preserved. |
+| `DELETE /api/config/providers/:name/pool` | Remove the provider’s pool block. |
+| `GET /api/config/routing` | Read public Router settings. |
+| `POST /api/config/routing` | Update snake_case Router fields; omitted top-level fields are preserved. |
+
+Writes require the admin key and take effect live. Pool GET returns public
+camelCase fields including `enabled`, `allowlistedAccountUuids`, `maxUsage`
+and `blockWhenAllFull`; Router GET returns `routes`, `apiKeyAccounts` and
+`holdSeconds`. Email ceilings, caller ceilings and `routing.callers` are
+write-only and are omitted from responses. The old team-routing endpoint is
+removed. See [configuration](configuration.md#provider-pools) for fields,
+examples and the staged migration.
+
 ### Manual Codex usage resets (private, administrator only)
 
 These controls use limited reset grants saved on a direct Codex subscription.
@@ -346,14 +364,18 @@ returns 401 and is never echoed:
 
 `provider` is the pool's first provider. Its allowlisted seats count under the
 caller's `caller_weekly_max_usage` ceiling. When the caller has
-`caller_provider_fallback: "ordered"`, every later provider of the pool counts
+`routing.callers.<device>.allow_fallbacks: true`, every later provider of the pool counts
 too, as that caller's requests reach them: allowlisted seats, and API-key
 accounts that are neither paused nor cooling. `eligibleAccounts` is the total
 across those providers, and `retryAtMs` the soonest of their resets when it is
 zero. Optional `model` keeps only the providers that serve it, as routing does;
-without it a provider with a `models` map still counts. Disabled routing reports
-zero. An unknown wire, an empty/overlong model, a model no pool provider serves,
-or `pool` together with `provider` returns 400.
+without it a provider with a `models` map still counts. `routingEnabled` is true
+when at least one provider reachable by this caller has an enabled subscription
+pool. A provider without a pool can still contribute reachable personal seats
+or API-key accounts, so `eligibleAccounts` can be nonzero when it is false.
+`admissionWaitMs` comes from the route's first reachable provider. An unknown
+wire, an empty/overlong model, a model no route provider serves, or `pool`
+together with `provider` returns 400.
 
 ### Account Management
 

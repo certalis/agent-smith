@@ -41,11 +41,11 @@ failures instead exclude it for the existing 60-second refresh backoff; capacity
 status uses the same exclusion. Backoff is a credential failure, not a transport
 failure that starts a sibling's admission ramp.
 
-## Team routing (opt-in)
+## Provider pools (opt-in)
 
-`team_routing.enabled` is off by default. When enabled, only OAuth seats whose
-stored account UUID is on `allowlisted_account_uuids` can receive pooled
-traffic. A protected seat is never a fallback.
+Each `providers.<name>.pool` opts that provider into sharing. It is off when
+absent or when `enabled: false`; otherwise only OAuth seats whose stored UUID
+is in that pool’s `members` are eligible. A protected seat is never a fallback.
 
 For Claude Code traffic, a conversation pin is the named caller (when one is
 authenticated), session ID and a hashed digest of its opening, scoped to the
@@ -84,18 +84,18 @@ still applies to both. These are eligibility rules, not separate spend counters.
 They cover applicable model-family weekly windows, ordinary selection and the
 once-per-minute revalidation path. If every pooled seat is spent for that
 caller, a request normally receives a 429 with the nearest reset; setting
-`hold_seconds` lets a request wait only for a reset within that bounded period.
+`routing.hold_seconds` lets a request wait only for a reset within that bounded period.
 
-`caller_provider_fallback` is a separate private policy for a named unattended
-device. With the value `"ordered"`, it starts at the current provider and may
+`routing.callers.<device>.allow_fallbacks` is a separate private policy for a
+named unattended device. When `true`, it starts at the current provider and may
 continue only to later providers in the configured order after a block; it never
 wraps back to a higher-ranked provider. API-key accounts at those later providers
 keep their ordinary account rules; this policy does not add provider-specific
 ceilings. No other caller, including an interactive Claude Code session, gets an
 automatic provider switch. The same device in an interactive Claude Code session
-keeps the chooser instead of the automatic walk. Under team routing, API-key
-providers serve only that walk and a person's pick in any interactive Claude
-Code chooser; an unattended caller without the policy never reaches them.
+keeps the chooser instead of the automatic walk. With `routing.api_key_accounts: "chooser_or_fallback"`, API-key accounts serve
+that walk and chooser-capable requests; an unattended caller without the
+policy cannot reach them. The `everyone` setting allows ordinary key reach.
 
 The admission gate is per account: it has a configured concurrent-request cap,
 FIFO bounded queue, and bounded wait. A quota failover opens its sibling at one
@@ -124,9 +124,9 @@ credentials. It moves no conversation and changes no account order; it only
 shifts when each idle seat's window resets. Options:
 [configuration](configuration.md#window-warm-up).
 
-## Provider pools
+## Ordered provider routes
 
-`provider_pools` is an ordered list of enabled providers for one wire protocol:
+`routing.routes` holds an ordered list of enabled providers for one wire protocol:
 `anthropic-messages` or `openai-responses`. A pool never translates between
 those protocols. Each provider may optionally declare the client model names it
 serves and the upstream name to send. Selecting that provider changes only the
@@ -171,7 +171,7 @@ The selected account is tried first. Failover is deliberately bounded:
 For a pool route, an ordinary caller receives the current provider's capacity
 or error response instead of silently moving to another provider. A wrapped
 Claude Code session may make that move only after the person chooses it. A
-named unattended device with `caller_provider_fallback: "ordered"` may continue
+named unattended device with `allow_fallbacks: true` may continue
 only to later configured providers after a block. A per-minute 429 always
 remains on its current provider.
 
@@ -185,4 +185,4 @@ session. `session_duration_ms` is likewise retained as a legacy configuration
 field and does not affect account choice. Do not use either setting to infer
 conversation affinity.
 
-The compatibility strategy name remains unrelated to team routing.
+The compatibility strategy name remains unrelated to provider-pool sharing.

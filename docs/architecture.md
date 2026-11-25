@@ -31,6 +31,7 @@ graph LR
     subgraph "Core Services"
         ROUTING[routing]
         CAPACITY[capacity]
+        POOL[pool]
         PROVIDERS[providers]
         OAUTH[oauth-flow]
         DB[(SQLite via database)]
@@ -49,6 +50,9 @@ graph LR
     API --> OAUTH
     PROXY --> ROUTING
     ROUTING --> CAPACITY
+    CAPACITY --> POOL
+    POOL --> PROVIDERS
+    POOL --> DB
     PROXY --> DB
     PROXY --> PROVIDERS
     PROVIDERS --> CAPACITY
@@ -73,6 +77,7 @@ agent-smith/
 │   ├── http/                # Shared HTTP client/response/header utilities
 │   ├── logger/              # Structured logging and log bus
 │   ├── oauth-flow/          # OAuth account onboarding flow
+│   ├── pool/                # Provider seats, quota, admission and pin state
 │   ├── providers/           # Provider registry and provider implementations
 │   ├── proxy/               # Forwarding, retries, event emission, worker handoff
 │   ├── routing/              # Conversation provider-choice policy and protocol
@@ -81,6 +86,23 @@ agent-smith/
 │   └── ui/                  # Shared presenters, display helpers, components
 └── docs/
 ```
+
+## Router and Pool
+
+`packages/routing` owns provider order, authenticated caller fallback, wait and
+conversation preference. `packages/pool` owns each provider’s seat membership,
+quota eligibility, admission, credential execution and account pins. They are
+separate modules in the same distribution and process. The Router sees a
+`RoutedProvider` interface from `packages/capacity`: availability, status,
+serve and session operations provide facts and outcomes. Provider connectors
+implement `CapacitySource` where they can classify upstream capacity responses.
+Neither the Pool nor a connector chooses the Router’s next provider.
+
+Each provider may have a `providers.<name>.pool`; `routing` owns routes and
+caller policy. Runtime settings stay separate too: the Router reads its own
+policy, and each Pool reads that provider’s membership, limits and admission
+settings. Quota probes and warm-up jobs use the same per-provider settings. See [configuration](configuration.md#migration-and-rollback)
+for automatic migration, staged rewriting and rollback.
 
 ## Runtime Composition
 
