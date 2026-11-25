@@ -171,3 +171,33 @@ test("partial updates preserve pool and routing settings and reject invalid rout
 		rmSync(directory, { recursive: true, force: true });
 	}
 });
+
+test("partial pool creation stays disabled while existing and explicit enablement stay intact", () => {
+	const directory = mkdtempSync(join(tmpdir(), "agent-smith-pool-default-"));
+	try {
+		const path = join(directory, "config.json");
+		writeFileSync(
+			path,
+			JSON.stringify({
+				providers: { "claude-code": { enabled: true }, openai: { pool: {} } },
+			}),
+		);
+		const config = new Config(path);
+		config.setProviderPool("claude-code", { window_warmup: { enabled: true } });
+		expect(config.getProviderPoolConfig("claude-code")).toMatchObject({
+			enabled: false,
+			window_warmup: { enabled: true },
+		});
+		expect(new Config(path).getTeamRouting("claude-code").enabled).toBe(false);
+		config.setProviderPool("claude-code", { enabled: true });
+		expect(new Config(path).getTeamRouting("claude-code").enabled).toBe(true);
+		config.setProviderPool("claude-code", { max_usage: 0.8 });
+		expect(config.getTeamRouting("claude-code").enabled).toBe(true);
+		config.setProviderPool("openai", { max_usage: 0.8 });
+		expect(config.getTeamRouting("openai").enabled).toBe(true);
+		config.setProviderPool("anthropic", { enabled: true });
+		expect(config.getTeamRouting("anthropic").enabled).toBe(true);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});

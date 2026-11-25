@@ -1168,7 +1168,7 @@ export class Config extends EventEmitter {
 			)
 		)
 			throw new Error("Invalid admission field");
-		const old = this.getProviderPoolConfig(name);
+		const old = this.getProviderPoolConfig(name) ?? { enabled: false };
 		this.persistStrictly("providers", {
 			...this.data.providers,
 			[name]: {
@@ -1239,10 +1239,7 @@ export class Config extends EventEmitter {
 		provider: string,
 		accountUuids: string[],
 	): void {
-		const pool = this.getProviderPoolConfig(provider) ?? {
-			enabled: false,
-		};
-		this.setProviderPool(provider, { ...pool, members: accountUuids });
+		this.setProviderPool(provider, { members: accountUuids });
 	}
 
 	getEnrollmentEmails(): string[] {
