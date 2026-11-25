@@ -1653,3 +1653,88 @@ describe("handleProxy routing", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("pool pin parser compatibility", () => {
+	it("looks up the second provider with the first parser, then rebinds with the serving parser", async () => {
+		const first = createTestProvider("first-parser");
+		const second = createTestProvider("second-parser");
+		second.getConversationOpening = (value: unknown) =>
+			typeof value === "object" && value !== null
+				? ((value as { alternate?: unknown }).alternate ?? null)
+				: null;
+		const accounts = [
+			{
+				...createTestAccount(),
+				id: "first-seat",
+				provider: "first-parser",
+				auth_method: "oauth",
+				account_uuid: "first-uuid",
+			},
+			{
+				...createTestAccount(),
+				id: "second-seat",
+				provider: "second-parser",
+				auth_method: "oauth",
+				account_uuid: "second-uuid",
+			},
+		] as Account[];
+		const ctx = createProxyContext([first, second], accounts, {
+			"anthropic-messages": ["first-parser", "second-parser"],
+		});
+		ctx.runtime.teamRouting = {
+			...ctx.runtime.teamRouting,
+			enabled: true,
+			allowlistedAccountUuids: ["first-uuid", "second-uuid"],
+			callerWeeklyMaxUsage: {},
+			callerProviderFallback: {},
+		};
+		const pins = new Map([
+			[
+				"cdd09933e1e8dd79417c5f52f8cf61e5b3c2d122854fdc2c24a60abad3d2516a",
+				{ accountId: "second-seat", lastSeenAt: Date.now() },
+			],
+		]);
+		ctx.dbOps = {
+			...ctx.dbOps,
+			getAccount: (id: string) =>
+				accounts.find((account) => account.id === id) ?? null,
+			getConversationPin: (key: string) => pins.get(key) ?? null,
+			upsertConversationPin: (
+				key: string,
+				accountId: string,
+				lastSeenAt: number,
+			) => {
+				pins.set(key, { accountId, lastSeenAt });
+			},
+			deleteExpiredConversationPins: () => undefined,
+			countConversationPinsByAccount: () => new Map<string, number>(),
+		} as unknown as typeof ctx.dbOps;
+		const urls: string[] = [];
+		globalThis.fetch = mock((url: string) => {
+			urls.push(url);
+			return Promise.resolve(Response.json({ ok: true }));
+		}) as unknown as typeof fetch;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-claude-code-session-id": "session-1",
+				},
+				body: '{"model":"claude-opus-4-5","messages":[{"role":"user","content":"hello"}],"alternate":"other"}',
+			}),
+			url,
+			ctx,
+		);
+		expect(response.status).toBe(200);
+		expect(urls).toEqual(["https://second-parser.example.com/v1/messages"]);
+		expect(
+			pins.get(
+				"5a1899acb2f1d6c6bf7b02f467c004530d05edde13f3e7ffa6a87838fd31ce20",
+			)?.accountId,
+		).toBe("second-seat");
+	});
+});
