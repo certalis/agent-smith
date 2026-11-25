@@ -1,8 +1,5 @@
-import type {
-	ProviderSupply,
-	SupplyExecutorFactory,
-	SupplySessionExecutor,
-} from "@agent-smith/pool";
+import type { RoutedProvider } from "@agent-smith/capacity";
+import type { SupplyExecutorFactory } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
 import { proxyWithAccount } from "./handlers/proxy-operations";
 import { getOriginalRequest } from "./handlers/proxy-request";
@@ -39,10 +36,8 @@ export function createSupplyExecutorFactory(
 export function getProviderSupply(
 	proxy: ProxyContext,
 	provider: Provider,
-	sessionExecutor?: SupplySessionExecutor,
-): ProviderSupply {
+): RoutedProvider {
 	const supply = proxy.routedProviders.get(provider.name);
 	if (!supply) throw new Error(`Provider supply unavailable: ${provider.name}`);
-	if (sessionExecutor) supply.setSessionExecutor(sessionExecutor);
 	return supply;
 }

@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { PoolConversationProviderRoutingStore } from "./conversation-provider-routing-store";
+import { SqliteConversationProviderRoutingStore } from "./conversation-provider-routing-store";
 
 test("adapts database provider state to routing without leaking SQL into policy", () => {
 	const writes: unknown[][] = [];
-	const store = new PoolConversationProviderRoutingStore({
+	const store = new SqliteConversationProviderRoutingStore({
 		deleteConversationProviderBlock() {},
 		getConversationProviderBlock() {
 			return {

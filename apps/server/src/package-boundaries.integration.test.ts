@@ -213,3 +213,14 @@ describe("workspace package boundaries", () => {
 		);
 	});
 });
+
+it("keeps Pool request memoization and implementation types out of the provider interface", async () => {
+	const routeInterface = await Bun.file(
+		join(REPO_ROOT, "packages/capacity/src/routed-provider.ts"),
+	).text();
+	const proxyContext = await Bun.file(
+		join(REPO_ROOT, "packages/proxy/src/handlers/proxy-types.ts"),
+	).text();
+	expect(routeInterface).not.toContain("seatPinLookup");
+	expect(proxyContext).not.toContain("ProviderSupply");
+});

@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
-import type { TeamRoutingConfig } from "@agent-smith/config";
-import type { TeamRoutingRequest } from "@agent-smith/pool";
+
+type TeamRoutingRequest = {
+	sessionId: string | null;
+	manualAccountName?: string;
+	pinScope?: string;
+	provider: string;
+};
+type TeamRoutingConfig = {
+	enabled: boolean;
+	callerProviderFallback: Record<string, string>;
+};
 
 export function providerConversationKey(
 	request: TeamRoutingRequest,

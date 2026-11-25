@@ -712,11 +712,7 @@ export async function handleWebSocketUpgradeRequest(
 		sessionId:
 			requestContext.provider.getClientSessionId?.(req.headers) ?? null,
 	};
-	const supply = getProviderSupply(
-		ctx,
-		requestContext.provider,
-		createWebSocketSupplyAttempt(ctx),
-	);
+	const supply = getProviderSupply(ctx, requestContext.provider);
 	const route: import("@agent-smith/capacity").RouteRequest = {
 		scope: { kind: "direct", provider: requestContext.providerName },
 		edge: {
@@ -730,14 +726,13 @@ export async function handleWebSocketUpgradeRequest(
 		callerId,
 		sessionId: teamRequest.sessionId,
 		openingDigest: null,
-		seatPinLookup: {},
-		apiKeyAccounts: false,
+		apiKeyAccounts: !requestContext.runtime.teamRouting?.enabled,
 		inlineRateLimitRetry: false,
 		signal: req.signal,
 	};
-	const outcome = await supply.openSession(route);
-	if (outcome.kind !== "prepared") {
-		supply.alertFleetFull(route, 0);
+	const outcome = await supply.openSession?.(route);
+	if (outcome?.kind !== "prepared") {
+		ctx.onProviderFull?.(route, 0);
 		log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);
 		return errorResponse(
 			new ServiceUnavailableError(

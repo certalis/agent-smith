@@ -1,6 +1,5 @@
 import type {
 	Availability,
-	ProviderCapacityBlock,
 	ProviderStatus,
 	RoutedProvider,
 	RouteRequest,
@@ -35,8 +34,17 @@ import {
 	parseMessageThreadRequest,
 } from "./handlers/message-thread";
 import type { PoolContext, ResolvedPoolContext } from "./pool-context";
-import { alertWhenFleetFull } from "./seat-alerts";
 import { isAllowlisted, type TeamRoutingRequest } from "./seat-router";
+
+// Provider candidates share the body, but their session identifiers can differ.
+const threadBodies = new WeakMap<
+	RouteRequest,
+	Map<string, { continues: string | null } | null>
+>();
+const conversationPins = new WeakMap<
+	PoolContext,
+	WeakMap<RouteRequest, string | null>
+>();
 
 /** Serve one provider without deciding whether the router should try another. */
 export async function serveSelectedAccounts(
@@ -172,10 +180,6 @@ export type SupplySessionExecutor = (
 
 /** Per-provider seat state and upstream executor, shared across requests. */
 export class ProviderSupply implements RoutedProvider {
-	private readonly preparedRoutes = new WeakMap<
-		RouteRequest,
-		{ request: PoolAttemptRequest; accounts: Account[] }
-	>();
 	readonly name: string;
 	readonly wire: ProviderWire;
 
@@ -190,14 +194,6 @@ export class ProviderSupply implements RoutedProvider {
 	) {
 		this.name = provider.name;
 		this.wire = provider.wire;
-	}
-
-	setSessionExecutor(executor: SupplySessionExecutor): void {
-		this.options.createSessionAttempt ??= executor;
-	}
-
-	supportsConversationPins(): boolean {
-		return this.context.teamRouter !== undefined;
 	}
 
 	mapModel(model: string | undefined): string | undefined | null {
@@ -232,9 +228,10 @@ export class ProviderSupply implements RoutedProvider {
 			callerId: route.callerId,
 			contentType: route.edge.headers.get("content-type"),
 			manualAccountName: route.seatHint,
+			apiKeyAccounts: route.scope.kind === "direct" && route.apiKeyAccounts,
 			model: route.model,
 			lookupOpeningDigest: route.openingDigest,
-			seatPinLookup: route.seatPinLookup,
+			seatPinLookup: route,
 			provider:
 				route.scope.kind === "direct" ? this.name : `pool:${route.scope.wire}`,
 			sessionId: route.sessionId,
@@ -250,12 +247,28 @@ export class ProviderSupply implements RoutedProvider {
 		let threadAccount: string | null = null;
 		const getThread = () => {
 			if (thread === undefined) {
-				thread = parseMessageThreadRequest(
-					route.edge.body,
-					ctx.upstreamPath,
-					route.edge.headers.get("content-type"),
-					this.provider.getClientSessionId?.(route.edge.headers) ?? null,
-				);
+				const sessionId =
+					this.provider.getClientSessionId?.(route.edge.headers) ?? null;
+				if (!sessionId) return null;
+				let byPath = threadBodies.get(route);
+				if (!byPath) {
+					byPath = new Map();
+					threadBodies.set(route, byPath);
+				}
+				if (!byPath.has(ctx.upstreamPath)) {
+					const parsed = parseMessageThreadRequest(
+						route.edge.body,
+						ctx.upstreamPath,
+						route.edge.headers.get("content-type"),
+						sessionId,
+					);
+					byPath.set(
+						ctx.upstreamPath,
+						parsed ? { continues: parsed.continues } : null,
+					);
+				}
+				const parsed = byPath.get(ctx.upstreamPath);
+				thread = parsed ? { ...parsed, sessionId } : null;
 			}
 			return thread;
 		};
@@ -326,6 +339,10 @@ export class ProviderSupply implements RoutedProvider {
 				? { allowRevalidationProbe: false, applyTeamRouting: false }
 				: {},
 		);
+		if (!route.apiKeyAccounts)
+			accounts = accounts.filter(
+				(candidate) => candidate.auth_method !== "api_key",
+			);
 		if (route.scope.kind === "pool-route") {
 			const pooled =
 				ctx.teamRouter?.eligibleAccounts(
@@ -358,112 +375,45 @@ export class ProviderSupply implements RoutedProvider {
 		return { request, accounts };
 	}
 
-	/** Temporary adapter for the existing proxy's hold and provider-selection flow. */
-	prepareRoute(route: RouteRequest): {
-		hasAccounts: boolean;
-		attemptedAccounts: number;
-		block: ProviderCapacityBlock | null;
-		retryAt: number | null;
-		fleetFull: boolean;
-		fleetResetAt: number | null;
-	} {
-		if (
-			route.scope.kind === "pool-route" &&
-			this.mapModel(route.model) === null
-		) {
-			return {
-				hasAccounts: false,
-				attemptedAccounts: 0,
-				block: null,
-				retryAt: null,
-				fleetFull: false,
-				fleetResetAt: null,
-			};
+	async conversationAffinity(
+		route: RouteRequest,
+	): Promise<{ holdsConversation: boolean; hasConversationPin: boolean }> {
+		let pins = conversationPins.get(this.context);
+		if (!pins) {
+			pins = new WeakMap();
+			conversationPins.set(this.context, pins);
 		}
-		const prepared = this.prepare(route);
-		this.preparedRoutes.set(route, prepared);
-		const { accounts } = prepared;
-		if (accounts.length > 0)
-			return {
-				hasAccounts: true,
-				attemptedAccounts: accounts.length,
-				block: null,
-				retryAt: null,
-				fleetFull: false,
-				fleetResetAt: null,
-			};
+		if (!pins.has(route)) {
+			const { ctx, teamRequest } = this.requestView(route);
+			const pinnedId = ctx.teamRouter?.getPinnedAccountId(
+				teamRequest,
+				ctx.runtime.teamRouting,
+				ctx.provider,
+				ctx.dbOps,
+			);
+			pins.set(
+				route,
+				pinnedId ? (ctx.dbOps.getAccount?.(pinnedId)?.provider ?? null) : null,
+			);
+		}
+		const provider = pins.get(route);
 		return {
-			hasAccounts: false,
-			attemptedAccounts: 0,
-			...this.unservedFacts(route),
+			holdsConversation: provider === this.name,
+			hasConversationPin: !!provider,
 		};
-	}
-
-	unservedFacts(route: RouteRequest): {
-		block: ProviderCapacityBlock | null;
-		retryAt: number | null;
-		fleetFull: boolean;
-		fleetResetAt: number | null;
-	} {
-		const view = this.requestView(route);
-		const { ctx, seatsFor } = view;
-		const model =
-			route.scope.kind === "pool-route"
-				? (this.mapModel(route.model) ?? undefined)
-				: route.model;
-		const meta = { ...route.edge.meta, model };
-		view.getThreadAccount();
-		return {
-			block: getQuotaCapacityBlock(meta, ctx, seatsFor, route.callerId),
-			retryAt: getSoonestQuotaReset(meta, ctx, seatsFor, route.callerId),
-			fleetFull: isEveryAccountQuotaBlocked(meta, ctx),
-			fleetResetAt: getSoonestQuotaReset(meta, ctx),
-		};
-	}
-
-	alertFleetFull(route: RouteRequest, holdSeconds: number): void {
-		alertWhenFleetFull(route.edge.meta, this.contextFor(route), holdSeconds);
-	}
-
-	alertAllFull(scope: string, resetAt: number): void {
-		this.context.seatAlerts?.allAccountsFull(scope, resetAt, {
-			blocked: true,
-			holdSeconds: 0,
-		});
-	}
-
-	/** Provider holding the existing seat pin, without exposing the seat. */
-	holdingProvider(route: RouteRequest): string | undefined {
-		const { ctx, teamRequest } = this.requestView(route);
-		const pinnedId = ctx.teamRouter?.getPinnedAccountId(
-			teamRequest,
-			ctx.runtime.teamRouting,
-			ctx.provider,
-			ctx.dbOps,
-		);
-		return pinnedId ? ctx.dbOps.getAccount(pinnedId)?.provider : undefined;
 	}
 
 	async availability(route: RouteRequest): Promise<Availability> {
 		const view = this.requestView(route);
-		const { ctx, teamRequest, seatsFor } = view;
+		const { ctx, seatsFor } = view;
 		const mappedModel =
 			route.scope.kind === "pool-route"
 				? this.mapModel(route.model)
 				: route.model;
 		const model = mappedModel === null ? undefined : mappedModel;
 		const meta = { ...route.edge.meta, model };
-		const pinnedId = ctx.teamRouter?.getPinnedAccountId(
-			teamRequest,
-			ctx.runtime.teamRouting,
-			ctx.provider,
-			ctx.dbOps,
-		);
-		const holdsConversation =
-			pinnedId !== undefined &&
-			ctx.dbOps
-				.getAccountsByProvider(this.name)
-				.some((account) => account.id === pinnedId);
+		const { holdsConversation, hasConversationPin } =
+			await this.conversationAffinity(route);
 		const threadRequest = view.getThread() !== null;
 		const threadAccount = view.getThreadAccount();
 		const hasAvailableAccount = ctx.dbOps
@@ -472,13 +422,12 @@ export class ProviderSupply implements RoutedProvider {
 				if (threadAccount && account.id !== threadAccount) return false;
 				const teamEnabled = ctx.runtime.teamRouting.enabled;
 				const pooled =
-					!teamEnabled ||
-					(isAllowlisted(account, ctx.runtime.teamRouting) &&
-						(!route.seatHint || account.name === route.seatHint));
+					account.auth_method !== "api_key" &&
+					(!teamEnabled ||
+						(isAllowlisted(account, ctx.runtime.teamRouting) &&
+							(!route.seatHint || account.name === route.seatHint)));
 				const keyReached =
-					route.scope.kind === "pool-route" &&
-					route.apiKeyAccounts &&
-					account.auth_method === "api_key";
+					route.apiKeyAccounts && account.auth_method === "api_key";
 				return (
 					(pooled || keyReached) &&
 					isServableNow(
@@ -495,19 +444,19 @@ export class ProviderSupply implements RoutedProvider {
 			return {
 				capacity: { state: "available" },
 				holdsConversation,
+				hasConversationPin,
 				threadRequest,
 			};
 		const block = getQuotaCapacityBlock(meta, ctx, seatsFor, route.callerId);
 		return {
-			capacity: block
-				? {
-						state: "blocked",
-						block,
-						fleetFull: isEveryAccountQuotaBlocked(meta, ctx),
-						fleetResetAt: getSoonestQuotaReset(meta, ctx),
-					}
-				: { state: "unknown" },
+			capacity: {
+				state: "blocked",
+				block: block ?? { category: "unknown" },
+				fleetFull: isEveryAccountQuotaBlocked(meta, ctx),
+				fleetResetAt: getSoonestQuotaReset(meta, ctx),
+			},
 			holdsConversation,
+			hasConversationPin,
 			threadRequest,
 		};
 	}
@@ -590,8 +539,7 @@ export class ProviderSupply implements RoutedProvider {
 		) {
 			return { kind: "exhausted", reason: "no-eligible-account" };
 		}
-		const prepared = this.preparedRoutes.get(route) ?? this.prepare(route);
-		this.preparedRoutes.delete(route);
+		const prepared = this.prepare(route);
 		const { request, accounts } = prepared;
 		if (accounts.length > 0) {
 			route.beforeAttempt?.();
@@ -604,11 +552,7 @@ export class ProviderSupply implements RoutedProvider {
 			accounts,
 			route.scope.kind,
 		);
-		if (
-			outcome.kind !== "exhausted" ||
-			outcome.reason !== "no-eligible-account"
-		)
-			return outcome;
+		if (outcome.kind !== "exhausted") return outcome;
 		const view = this.requestView(route, request);
 		view.getThreadAccount();
 		const block = getQuotaCapacityBlock(
@@ -617,6 +561,18 @@ export class ProviderSupply implements RoutedProvider {
 			view.seatsFor,
 			route.callerId,
 		);
-		return block ? { ...outcome, block } : outcome;
+		return {
+			...outcome,
+			block: outcome.block ?? block ?? undefined,
+			retryAt: getSoonestQuotaReset(
+				request.meta,
+				request.ctx,
+				view.seatsFor,
+				route.callerId,
+			),
+			fleetFull: isEveryAccountQuotaBlocked(request.meta, request.ctx),
+			fleetResetAt: getSoonestQuotaReset(request.meta, request.ctx),
+			attemptedAccounts: accounts.length,
+		};
 	}
 }

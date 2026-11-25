@@ -13,7 +13,9 @@ import {
 	type Provider,
 	ProviderRegistry,
 } from "@agent-smith/providers";
+import { Router } from "@agent-smith/routing";
 import type { Account } from "@agent-smith/types";
+import { SqliteConversationProviderRoutingStore } from "./conversation-provider-routing-store";
 import { createProviderSupplies } from "./provider-supply-factory";
 import { handleProxy, type ProxyContext } from "./proxy";
 
@@ -200,6 +202,9 @@ function createProxyContext(
 		testPool,
 		routedProviders: new Map<string, ProviderSupply>(),
 	};
+	context.router = new Router(
+		new SqliteConversationProviderRoutingStore(context.dbOps),
+	);
 	context.routedProviders = createProviderSupplies(testPool, context);
 	return context;
 }
@@ -2064,4 +2069,344 @@ it("cleans a direct seat pin once when selecting an account", async () => {
 	expect(response.status).toBe(200);
 	expect(lookups).toBe(1);
 	expect(cleanups).toBe(1);
+});
+
+it("does not offer an empty provider in the interactive chooser", async () => {
+	const first = createTestProvider("first", { category: "request-rate" });
+	const empty = createTestProvider("empty");
+	const account = { ...createTestAccount(), provider: "first" } as Account;
+	const ctx = createProxyContext([first, empty], [account], {
+		"anthropic-messages": ["first", "empty"],
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("limited", { status: 429 })),
+	) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-agent-smith-interactive-provider-choice": "v1",
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[]}',
+		}),
+		url,
+		ctx,
+	);
+	expect(response.status).toBe(429);
+	expect(((await response.json()) as { choices: unknown[] }).choices).toEqual(
+		[],
+	);
+});
+
+it("logs the original direct manual-pin request path", async () => {
+	const { logBus } = await import("@agent-smith/logger");
+	const provider = createTestProvider("first");
+	const account = {
+		...createTestAccount(),
+		name: "seat",
+		provider: "first",
+	} as Account;
+	const ctx = createProxyContext([provider], [account]);
+	Object.assign(ctx.dbOps, {
+		getAccountByName: (name: string) => (name === "seat" ? account : null),
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("ok")),
+	) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/tc-acct/seat/v1/first/v1/messages",
+	);
+	const logs: string[] = [];
+	const onLog = (event: { msg: string }) => logs.push(event.msg);
+	logBus.on("log", onLog);
+	try {
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: '{"model":"claude-sonnet-4-5","messages":[]}',
+			}),
+			url,
+			ctx,
+		);
+		expect(response.status).toBe(200);
+		expect(logs).toContain("Request: POST /tc-acct/seat/v1/first/v1/messages");
+	} finally {
+		logBus.off("log", onLog);
+	}
+});
+
+it("parses the thread body once across pooled providers", async () => {
+	const first = createTestProvider("first");
+	const second = createTestProvider("second");
+	const accounts = [
+		{ ...createTestAccount(), provider: "first" },
+		{ ...createTestAccount(), id: "seat-two", provider: "second" },
+	] as Account[];
+	const ctx = createProxyContext([first, second], accounts, {
+		"anthropic-messages": ["first", "second"],
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("ok")),
+	) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const body = '{"model":"claude-sonnet-4-5","messages":[]}';
+	const original = JSON.parse;
+	let count = 0;
+	JSON.parse = ((
+		text: string,
+		reviver?: (this: unknown, key: string, value: unknown) => unknown,
+	) => {
+		if (text === body) count++;
+		return original(text, reviver);
+	}) as typeof JSON.parse;
+	try {
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-claude-code-session-id": "session",
+				},
+				body,
+			}),
+			url,
+			ctx,
+		);
+		expect(response.status).toBe(200);
+		// Model read, one shared thread parse, and the existing body rewrite.
+		expect(count).toBe(3);
+	} finally {
+		JSON.parse = original;
+	}
+});
+
+it("the provider honors the Router's API-key reach on a direct route", async () => {
+	const provider = createTestProvider("first");
+	const key = {
+		...createTestAccount(),
+		provider: "first",
+		auth_method: "api_key",
+		api_key: "synthetic",
+	} as Account;
+	const ctx = createProxyContext([provider], [key]);
+	Object.assign(ctx.runtime.teamRouting, {
+		enabled: true,
+		allowlistedAccountUuids: [],
+	});
+	Object.assign(ctx.dbOps, { deleteExpiredConversationPins() {} });
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("ok")),
+	) as unknown as typeof fetch;
+	const url = new URL("http://localhost:8080/v1/first/v1/messages");
+	const route = {
+		scope: { kind: "direct" as const, provider: "first" },
+		edge: {
+			url,
+			method: "POST",
+			headers: new Headers({ "content-type": "application/json" }),
+			body: new TextEncoder().encode('{"model":"model","messages":[]}').buffer,
+			meta: {
+				id: "r",
+				method: "POST" as const,
+				path: url.pathname,
+				timestamp: Date.now(),
+			},
+		},
+		model: "model",
+		sessionId: null,
+		openingDigest: null,
+		apiKeyAccounts: true,
+		inlineRateLimitRetry: false,
+		signal: new AbortController().signal,
+	};
+	const supply = ctx.routedProviders.get("first");
+	if (!supply) throw new Error("missing provider");
+	expect((await supply.serve(route)).kind).toBe("final");
+	expect((await supply.serve({ ...route, apiKeyAccounts: false })).kind).toBe(
+		"exhausted",
+	);
+});
+
+it("ordered fallback starts at the first provider when a saved pin belongs to a removed provider", async () => {
+	const first = createTestProvider("first");
+	const second = createTestProvider("second");
+	const accounts = [
+		{
+			...createTestAccount(),
+			id: "one",
+			provider: "first",
+			auth_method: "oauth",
+			account_uuid: "one",
+		},
+		{
+			...createTestAccount(),
+			id: "two",
+			provider: "second",
+			auth_method: "oauth",
+			account_uuid: "two",
+		},
+		{
+			...createTestAccount(),
+			id: "old",
+			provider: "removed",
+			auth_method: "oauth",
+			account_uuid: "old",
+		},
+	] as Account[];
+	const ctx = createProxyContext([first, second], accounts, {
+		"anthropic-messages": ["first", "second"],
+	});
+	Object.assign(ctx.runtime.teamRouting, {
+		enabled: true,
+		allowlistedAccountUuids: ["one", "two", "old"],
+		callerProviderFallback: { box: "ordered" },
+	});
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {},
+		getConversationPin() {
+			return { accountId: "old", lastSeenAt: Date.now() };
+		},
+		getAccount(id: string) {
+			return accounts.find((account) => account.id === id) ?? null;
+		},
+		getConversationProviderPreference() {
+			return {
+				provider: "second",
+				promotionDeclined: false,
+				lastSeenAt: Date.now(),
+			};
+		},
+		deleteConversationProviderBlock() {},
+		upsertConversationPin() {},
+	});
+	const seen: string[] = [];
+	globalThis.fetch = mock((url: string) => {
+		seen.push(url);
+		return Promise.resolve(new Response("ok"));
+	}) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-claude-code-session-id": "session",
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[]}',
+		}),
+		url,
+		ctx,
+		"box",
+	);
+	expect(response.status).toBe(200);
+	expect(seen).toEqual(["https://first.example.com/v1/messages"]);
+});
+
+it("finds a pinned provider once without scanning provider seats", async () => {
+	const first = createTestProvider("first");
+	const second = createTestProvider("second");
+	const seat = {
+		...createTestAccount(),
+		id: "pinned",
+		provider: "second",
+		auth_method: "oauth",
+		account_uuid: "seat",
+	} as Account;
+	const ctx = createProxyContext([first, second], [seat], {
+		"anthropic-messages": ["first", "second"],
+	});
+	ctx.runtime.teamRouting.enabled = true;
+	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	let reads = 0;
+	Object.assign(ctx.dbOps, {
+		deleteExpiredConversationPins() {},
+		getConversationPin: () => ({ accountId: "pinned", lastSeenAt: Date.now() }),
+		getAccount: () => {
+			reads++;
+			return seat;
+		},
+		getAccountsByProvider: () => {
+			throw new Error("unexpected seat scan");
+		},
+		getAvailableAccountsByProvider: () => {
+			throw new Error("unexpected seat scan");
+		},
+	});
+	const url = new URL(
+		"http://localhost/v1/pool/anthropic-messages/v1/messages",
+	);
+	const route = {
+		scope: { kind: "pool-route" as const, wire: "anthropic-messages" as const },
+		edge: {
+			method: "POST",
+			url,
+			headers: new Headers(),
+			body: null,
+			meta: {
+				id: "r",
+				method: "POST" as const,
+				path: url.pathname,
+				timestamp: 0,
+			},
+		},
+		sessionId: "session",
+		openingDigest: null,
+		apiKeyAccounts: false,
+		inlineRateLimitRetry: false,
+		signal: new AbortController().signal,
+	};
+	const candidates = [
+		ctx.routedProviders.get("first"),
+		ctx.routedProviders.get("second"),
+	];
+	if (!candidates[0] || !candidates[1]) throw new Error("missing providers");
+	const states = await Promise.all(
+		candidates.map((provider) => provider?.conversationAffinity(route)),
+	);
+	expect(states.map((state) => state?.holdsConversation)).toEqual([
+		false,
+		true,
+	]);
+	expect(reads).toBe(1);
+});
+
+it("reuses the Router held by the proxy context for every request", async () => {
+	const provider = createTestProvider("first");
+	const seat = { ...createTestAccount(), provider: "first" } as Account;
+	const ctx = createProxyContext([provider], [seat]);
+	let calls = 0;
+	Object.assign(ctx, {
+		router: {
+			route: async () => {
+				calls++;
+				return new Response("shared router");
+			},
+		},
+	});
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("unexpected upstream")),
+	) as unknown as typeof fetch;
+	const url = new URL("http://localhost/v1/first/v1/messages");
+	for (let i = 0; i < 2; i++) {
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: '{"messages":[]}',
+			}),
+			url,
+			ctx,
+		);
+		expect(await response.text()).toBe("shared router");
+	}
+	expect(calls).toBe(2);
 });
