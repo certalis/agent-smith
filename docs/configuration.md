@@ -57,7 +57,7 @@ The configuration file is stored at:
 {
   "lb_strategy": "session",
   "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-	"max_body_bytes": 67108864,
+  "max_body_bytes": 67108864,
   "retry_attempts": 3,
   "retry_delay_ms": 1000,
   "retry_backoff": 2,
@@ -65,39 +65,49 @@ The configuration file is stored at:
   "session_duration_ms": 18000000,
   "port": 8080,
   "providers": {
-    "anthropic": { "enabled": true },
-    "openai": { "enabled": true },
-    "claude-code": { "enabled": false },
-    "codex": { "enabled": false }
+    "anthropic": {
+      "enabled": true
+    },
+    "openai": {
+      "enabled": true
+    },
+    "claude-code": {
+      "enabled": false,
+      "pool": {
+        "enabled": false,
+        "members": [],
+        "distribution_enabled": true,
+        "prefer_expiring_quota": false,
+        "max_usage": 0.9,
+        "weekly_max_usage": 0.95,
+        "weekly_max_usage_by_email": {},
+        "caller_weekly_max_usage": {},
+        "quota_probe_seconds": 0,
+        "window_warmup": {
+          "enabled": false,
+          "times": [
+            "06:00"
+          ],
+          "time_zone": "Europe/Paris",
+          "weekdays_only": true
+        },
+        "admission": {
+          "cap": 5,
+          "queue_limit": 25,
+          "wait_ms": 30000
+        },
+        "block_when_all_full": true
+      }
+    },
+    "codex": {
+      "enabled": false
+    }
   },
   "client": {
     "enabled": false,
     "base_url": "http://127.0.0.1:18181",
     "proxy_key_file": "~/.config/agent-smith/team-pool.key"
   },
-  "team_routing": {
-    "enabled": false,
-    "distribution_enabled": true,
-    "prefer_expiring_quota": false,
-    "allowlisted_account_uuids": [],
-    "max_usage": 0.9,
-    "weekly_max_usage": 0.95,
-    "weekly_max_usage_by_email": {},
-    "caller_weekly_max_usage": {},
-    "caller_provider_fallback": {},
-    "admission_cap": 5,
-    "admission_queue_limit": 25,
-    "admission_wait_ms": 30000,
-    "hold_seconds": 0,
-    "quota_probe_seconds": 0,
-    "window_warmup": {
-      "enabled": false,
-      "times": ["06:00"],
-      "time_zone": "Europe/Paris",
-      "weekdays_only": true
-    }
-  },
-  "block_when_all_full": true,
   "alerts": {
     "slack_webhook_url": "",
     "slack_bot_token": "",
@@ -105,6 +115,12 @@ The configuration file is stored at:
     "email": "",
     "email_from": "",
     "resend_api_key": ""
+  },
+  "routing": {
+    "routes": {},
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
   }
 }
 ```
@@ -126,12 +142,11 @@ The configuration file is stored at:
 | `port` | number | `8080` | HTTP server port |
 | `host` | string | `"127.0.0.1"` | Interface to bind; use `AGENT_SMITH_HOST` for deployment overrides |
 | `trust_loopback` | boolean | `true` | Allow direct loopback requests without a key; set `false` behind a same-host reverse proxy that does not forward client-address headers |
-| `team_routing` | object | disabled | Opt-in pooled-seat routing; see below. |
-| `block_when_all_full` | boolean | `true` | When every account is full, refuse every request with a 429 until the soonest reset. `false` lets one request a minute through to revalidate, and that request may spend extra usage. |
+| `providers.<name>.pool` | object | absent | Per-provider subscription pool membership and capacity policy; see below. |
 | `alerts` | object | every channel off | Where seat alerts go; see [Alerts](#alerts). |
 | `enrollment_emails` | string[] | `[]` | Addresses or exact-domain rules (`*@example.test`) the stable `/pool-enroll` link admits (lowercased, at most 200 entries). Domain rules do not include subdomains. Edit through `POST /api/enrollment-emails`, which applies live. |
 | `providers` | object | see below | Enabled routes and their built-in protocol strategy. |
-| `provider_pools` | object | none | Ordered provider-selection routes, keyed by wire protocol. Requests start with the first provider and never switch providers without an explicit interactive choice. |
+| `routing` | object | defaults | Ordered provider routes, API-key reach, caller fallback and hold policy. |
 | `client` | object | absent | The endpoint and forwarding key for wrappers installed on this machine. It does not configure providers or change the server's pool. |
 
 ### Client wrappers
@@ -208,7 +223,7 @@ reuse the Anthropic API strategy:
 
 This enables `/v1/acme/*` and `/v1/claude-code/*`. A disabled provider keeps
 saved accounts visible but cannot be selected. Subscription pool membership is
-controlled by `team_routing.allowlisted_account_uuids`; there is no provider
+controlled by that provider’s `pool.members`; there is no provider
 account-count setting.
 
 `google-gemini-api` is a named, API-key-only provider strategy for the Gemini
@@ -224,7 +239,7 @@ stream options return a client error rather than being silently omitted.
 
 ### Provider pools and model maps
 
-`provider_pools` creates one client route for an ordered list of providers that
+`routing.routes` creates one client route for an ordered list of providers that
 speak the same client-facing protocol. The two wire names are
 `anthropic-messages` and `openai-responses`; a provider on the other wire is
 ignored. `google-gemini-api` is the explicit native adapter exception: it joins
@@ -234,16 +249,25 @@ selected. `pool` is reserved and cannot be a provider name.
 ```json
 {
   "providers": {
-    "claude-code": { "enabled": true },
+    "claude-code": {
+      "enabled": true
+    },
     "acme": {
       "enabled": true,
       "strategy": "anthropic-api",
       "base_url": "https://api.acme.example",
-      "models": { "claude-sonnet-*": "acme-large" }
+      "models": {
+        "claude-sonnet-*": "acme-large"
+      }
     }
   },
-  "provider_pools": {
-    "anthropic-messages": ["claude-code", "acme"]
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "claude-code",
+        "acme"
+      ]
+    }
   }
 }
 ```
@@ -259,7 +283,8 @@ there: a wrapped Claude Code user must choose another provider, or a named
 unattended device must have the private ordered-fallback policy. A provider
 move loses prompt-cache warmth and may change model behavior or cost. A
 per-minute 429 never moves providers, and a direct `/v1/<provider>/*` route
-never uses a pool. If no pool provider serves a model, the proxy returns `400`
+never traverses the ordered route; the provider’s seat pool still applies. If no
+route provider serves a model, the proxy returns `400`
 naming `provider_pools.<wire>`; add a compatible provider/model map or use a
 direct route intentionally.
 
@@ -300,7 +325,7 @@ includes Kimi Code, and spends that plan's quota and rolling five-hour limit.
 The strategy reads every Kimi 429 as a full provider: an ordered-fallback
 caller walks on to the next provider and an interactive one gets the chooser,
 instead of the request failing. Place it in the pool where it should rank,
-for example right after `claude-code`. Under team routing, a person picks it in
+for example right after `claude-code`. With restricted API-key reach, a person picks it in
 the Claude Code chooser like any other API-key provider.
 
 Codex is not covered: Kimi's Codex guide gives Codex its own model catalog, and
@@ -329,7 +354,7 @@ The block text distinguishes five-hour and weekly pool limits, request rate,
 token allocation, traffic burst, temporary capacity, and an unknown upstream
 limit. It shows a retry time only when the upstream supplied one. **Wait**
 holds the request only when that time falls inside the configured
-`team_routing.hold_seconds`; outside that window it returns the same truthful
+`routing.hold_seconds`; outside that window it returns the same truthful
 block without a duplicate upstream retry. An unknown limit never gets a
 made-up countdown or a duplicate retry. A higher-ranked provider is offered
 once only after a known retry time or local pool availability says it may be
@@ -341,50 +366,128 @@ turn. Message-thread continuations never switch providers.
 Unwrapped or unattended clients stay on their current provider. A capacity block
 returns `429`, with `Retry-After` only when the provider supplied a retry time;
 they never silently move to another configured provider. The sole exception is
-a registered device listed in the private `caller_provider_fallback` map with
-the value `"ordered"`: it continues forward through the configured pool order
+a registered device with private `routing.callers.<device>.allow_fallbacks`
+set to `true`: it continues forward through the configured pool order
 after a block. This is server policy, not a request header a client can opt into.
-Under team routing, the pool's API-key accounts serve that device's walk and any
-wrapped Claude Code session whose person picks their provider in the chooser;
+With `routing.api_key_accounts: "chooser_or_fallback"`, API-key accounts serve
+that device’s walk and chooser-capable requests;
 that device keeps the chooser too when it runs a wrapped session.
 Switching from a Claude Code chat to Codex means starting a new Codex chat and
 handing off the needed context yourself: the two clients use different request
 formats and Agent-smith does not convert chat history between them.
 
-### Team routing
+### Provider pools
 
-`team_routing` is a single validated policy object. Unknown or invalid fields
-are rejected when changed through the API. `max_usage` must be greater than
-zero and no more than `0.9`; the default weekly ceiling must be greater than
-zero and no more than `0.95`. A private per-email ceiling may be as high as `1`.
+A `providers.<name>.pool` block supplies membership and capacity settings for
+that provider. Its presence enables sharing by default; `enabled: false` keeps
+its settings while sharing is off. Without a pool block, sharing is off. A
+provider’s `enabled` flag separately controls whether that provider is available.
+Unknown or invalid fields in a management update are rejected.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enabled` | `false` | Enables pooled-seat routing; only UUIDs on the allowlist are eligible. |
-| `distribution_enabled` | `true` | Disabling it drains existing conversation pins and stops placing new ones. |
-| `prefer_expiring_quota` | `false` | For new pinned chats, prefer fresh applicable 5h quota resetting within 1 hour or weekly quota within 24 hours, earliest reset first. Preserves priority tiers, existing pins, allowlist and hard caps. Requires team routing and distribution enabled. |
-| `allowlisted_account_uuids` | `[]` | Exact Claude Code OAuth seat UUIDs allowed in the pool. |
-| `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
-| `weekly_max_usage` | `0.95` | Hard weekly utilization ceiling, including applicable model-family weekly windows. |
-| `weekly_max_usage_by_email` | `{}` | Optional weekly ceilings by enrolled contact email. An entry replaces the 95% default for that account; e.g. `{"tech@example.com": 0.3}` leaves 70% for that account's owner, while `1` permits the full window. |
-| `max_usage` | `0.9` | Hard utilization ceiling for pooled seats' 5-hour and other non-weekly windows. |
-| `weekly_max_usage` | `0.95` | Hard weekly ceiling, including applicable model-family weekly windows. |
-| `caller_weekly_max_usage` | `{}` | Private map from a registered device name to that caller's weekly ceiling. A device absent from the map uses that account's email override or `weekly_max_usage`. This is eligibility only, not a per-user usage meter. |
-| `caller_provider_fallback` | `{}` | Private map from a registered unattended device name to `"ordered"`. That caller may continue only to later configured providers after a block, reaching their API-key accounts unattended; no other caller can switch automatically. Any wrapped Claude Code session reaches API-key accounts only by picking their provider in its chooser. |
-| `admission_cap` | `5` | Per-account active-request limit. |
-| `admission_queue_limit` | `25` | Per-account FIFO queue limit. |
-| `admission_wait_ms` | `30000` | Maximum admission wait. |
-| `hold_seconds` | `0` | Wait only this long for a known quota reset; `0` returns 429 immediately. |
-| `quota_probe_seconds` | `0` | Opt-in interval for a zero-spend OAuth quota refresh; `0` disables it. |
-| `window_warmup` | off | Opt-in daily start of idle seats' five-hour windows; see below. |
+| `enabled` | `true` when the block exists | Enable sharing for this provider. |
+| `members` | `[]` | Exact OAuth seat UUIDs allowed in this provider’s pool. |
+| `distribution_enabled` | `true` | Disabling drains existing conversation pins and stops placing new ones. |
+| `prefer_expiring_quota` | `false` | Prefer fresh quota close to reset for new pins; hard caps and existing pins remain. |
+| `max_usage` | `0.9` | Non-weekly hard utilization ceiling, greater than zero and at most `0.9`. |
+| `weekly_max_usage` | `0.95` | Weekly hard ceiling, greater than zero and at most `0.95`. |
+| `weekly_max_usage_by_email` | `{}` | Private per-enrolled-email weekly ceilings, up to `1`. |
+| `caller_weekly_max_usage` | `{}` | Private registered-device weekly ceilings; an eligibility rule, not a usage meter. |
+| `admission.cap` | `5` | Per-account active-request limit. |
+| `admission.queue_limit` | `25` | Per-account FIFO queue limit. |
+| `admission.wait_ms` | `30000` | Maximum admission wait. |
+| `quota_probe_seconds` | `0` | Opt-in zero-spend OAuth quota refresh interval. |
+| `window_warmup` | off | Optional daily start of idle seats’ five-hour windows. |
+| `block_when_all_full` | `true` | When false, allow one real revalidation per minute when full; it may spend extra usage. |
 
-Email overrides use private enrollment contacts; set them before inviting future
-members if needed. Keys are trimmed/lowercased. A per-email value replaces the
-default weekly ceiling for that account. The proxy-readable `GET /api/config/team-routing`
-omits these private maps. An administrator's POST preserves either map when its
-field is omitted; send an explicit empty object to clear it. These limits do not add
-accounts to the pool or resume manually paused accounts. Revalidation requests
-cannot bypass the hard caps, and stale known usage stays blocking until reset.
+Email overrides use private enrollment contacts and do not add accounts or
+resume paused accounts. `GET /api/config/providers/<name>/pool` omits the two
+private maps. POST preserves omitted top-level fields; supplying `admission` replaces that
+nested object. A POST that creates the block saves `enabled: false` unless it
+sends `enabled`, so tuning a provider never turns its sharing on. Use an explicit empty object to clear a private map. The corresponding `DELETE` removes the
+pool block. Changes apply live.
+
+### Router settings
+
+`routing.routes` maps a wire to an ordered list of provider names.
+`routing.api_key_accounts` is `everyone` by default or
+`chooser_or_fallback` to limit key-account reach to a chooser or an ordered
+caller. `routing.callers.<device>.allow_fallbacks: true` lets a registered
+unattended device advance through the route after a capacity block. The
+private caller map is omitted from API responses. `routing.hold_seconds`
+sets the maximum wait for a known reset. Ordered fallback works even when no
+provider has a subscription pool. For example:
+
+```json
+{
+  "providers": {
+    "claude-code": {
+      "enabled": true,
+      "pool": { "members": ["seat-uuid"], "max_usage": 0.8 }
+    },
+    "anthropic": { "enabled": true }
+  },
+  "routing": {
+    "routes": { "anthropic-messages": ["claude-code", "anthropic"] },
+    "api_key_accounts": "chooser_or_fallback",
+    "callers": { "build-box": { "allow_fallbacks": true } },
+    "hold_seconds": 30
+  }
+}
+```
+
+### Migration and rollback
+
+On first start, Agent Smith automatically rewrites supported legacy
+`team_routing`, `provider_pools` and root `block_when_all_full` settings. It
+atomically replaces the config and keeps the original as
+`<config-path>.backup`, mode `0600`; the startup log names both files. For a
+symlink, the backup sits beside the resolved target, and the link stays intact.
+Later starts leave both files unchanged. Backups are never overwritten. If the
+backup already contains the same private file, it is reused. If it differs, a
+new backup is saved as `<config-path>.backup-<UTC timestamp>`; the log or manual
+command names the backup used. A number is added if that name cannot be reused.
+
+The migration refuses with a reason and `agent-smith config rewrite` if it
+cannot safely proceed, for example if the config is read-only, has unknown
+legacy settings, or mixes old and new routing. Do not edit the file while a
+rewrite is in progress.
+
+The manual command remains available for an in-place rewrite:
+
+```bash
+agent-smith config rewrite
+```
+
+For a staged server switch, write a separate file instead:
+
+```bash
+agent-smith config rewrite old-config.json new-config.json
+```
+
+The command reads and writes JSON only, does not access the database or network,
+and refuses to overwrite an existing output. It copies the old global pool
+policy conservatively to all configured and built-in providers because it
+cannot inspect account inventory; review the result and remove unnecessary
+pools. Disabled legacy sharing becomes a disabled pool when settings must be
+retained. Per the migration rule, ordered callers are carried over only when
+legacy team routing was enabled; review dormant caller policy before enabling
+sharing later.
+
+To roll back an automatically migrated config, restore the backup to the config
+path and run the previous Agent Smith version. For the standalone pool, pause
+auto-deploy and stage a separate rewritten file before merging the switch. Test
+a copy of the database only against a fake upstream, with probes and warm-up
+disabled; real refreshes can rotate production tokens. Deploy with
+`AGENT_SMITH_CONFIG_PATH` set to the new file, check the seats and approved
+canaries, then resume auto-deploy. Roll back by pointing the path to the old
+file and redeploying the previous commit. Coordinate the operator-script
+update as described in the split plan before the switch.
+
+The server does not watch a hand-edited config file; restart it after editing.
+Management API updates apply live, and client launchers reread their config on
+each launch.
 
 #### Window warm-up
 
@@ -402,15 +505,15 @@ milliseconds, `null` while off).
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enabled` | `false` | Turns the warm-up on; team routing must be on as well. |
+| `enabled` | `false` | Turns the warm-up on; that provider’s pool must be enabled as well. |
 | `times` | `["06:00"]` | Local `HH:MM` times, 24-hour. |
 | `time_zone` | `"Europe/Paris"` | IANA time zone the times are read in, daylight saving included. |
 | `weekdays_only` | `true` | Skips Saturday and Sunday. |
 | `model` | the provider's cheapest | Model of the warm-up message; Claude Code uses `claude-haiku-5-5`. |
 
 One unknown or invalid field rejects the whole `window_warmup` object through
-the API, and drops it (warm-up off) from a hand-edited file. A team-routing
-`POST` that omits `window_warmup` turns the warm-up off.
+the API, and drops it (warm-up off) from a hand-edited file. A pool `POST`
+that omits `window_warmup` preserves the existing schedule.
 
 ### Alerts
 
@@ -451,7 +554,7 @@ wrappers route to the loopback proxy and work while the TUI is running.
 The generated Claude wrapper also copies and loads Agent-smith's own companion
 plugin under its private wrapper directory. It does not modify Claude Code's
 global plugin list, status line, Zed, or any other editor.
-When a matching `provider_pools` entry is configured, the Claude and Codex
+When a matching `routing.routes` entry is configured, the Claude and Codex
 wrappers use its protocol route; without one, they retain their direct provider
 routes.
 
@@ -590,27 +693,26 @@ Response:
 
 **Note:** `"session"` remains the only accepted compatibility name. It does not create a five-hour sticky session; W2 routing uses quota and priority.
 
-#### Read or update team routing
+#### Read or update pool and Router settings
 
 ```http
-GET /api/config/team-routing
-POST /api/config/team-routing
+GET /api/config/providers/claude-code/pool
+POST /api/config/providers/claude-code/pool
+DELETE /api/config/providers/claude-code/pool
+GET /api/config/routing
+POST /api/config/routing
 x-api-key: <admin key>
 Content-Type: application/json
 ```
 
-`POST` replaces the policy object using the snake_case fields shown above and
-takes effect for subsequent selection without a server restart. Management
-writes require `AGENT_SMITH_ADMIN_KEY` through `x-api-key`; do not put that key in the
-configuration file. `caller_weekly_max_usage` and `caller_provider_fallback`
-are accepted only on this write path and are omitted from all API responses,
-including reads, so maintain the maps in the server's owner-only configuration
-file. Their keys must match names from the protected device-key registry; a
-header, session, provider identity or arbitrary caller label cannot select an
-override. A scheduler reads the capacity its own policy reaches with
-`GET /api/pool-status?pool=<wire>` and its device key in
-`x-agent-smith-device-key` ([API](./api-http.md#caller-pool-capacity)); the
-maps themselves stay unreadable.
+Management writes require `AGENT_SMITH_ADMIN_KEY`. POST accepts the snake_case
+file fields above, preserves omitted fields, and applies live. Pool GET and
+POST responses expose public values in camelCase; Router responses expose
+`routes`, `apiKeyAccounts` and `holdSeconds`. Private email ceilings, caller
+ceilings and Router callers are write-only. Their keys must match the protected
+device-key registry; a request header alone cannot grant an override. A
+scheduler can read its own reachable capacity via
+`GET /api/pool-status?pool=<wire>` and its device key.
 
 ### Runtime Update Behavior
 
@@ -756,23 +858,21 @@ If migrating from environment variables to file-based configuration:
 #### Pre-1.0 to Current
 
 1. **Configuration location**: Move from `~/.agent-smith/config.json` to platform-specific paths
-2. **Field naming**: Update any deprecated field names (none currently deprecated)
+2. **Field naming**: Follow [Migration and rollback](#migration-and-rollback) for legacy routing fields
 3. **Strategy names**: Only `"session"` strategy is available (must be lowercase)
 
 ### Configuration Backup
 
-Always backup your configuration before upgrades:
-
-```bash
-cp ~/.config/agent-smith/agent-smith.json ~/.config/agent-smith/agent-smith.json.backup
-```
+Keep a private copy of the configuration before upgrades. Automatic migration
+and the in-place `agent-smith config rewrite` keep `<config-path>.backup` or,
+if that backup differs, a new timestamped backup beside it.
 
 ### Rollback Procedure
 
 If issues occur after configuration changes:
 
 1. **Via API**: Revert strategy changes using the runtime API
-2. **File restoration**: Restore from backup configuration file
+2. **File restoration**: Restore the backup and run the previous Agent Smith version
 3. **Environment override**: Use environment variables to override problematic settings
 
 ## Troubleshooting

@@ -135,20 +135,23 @@ the pool.
 ```json
 {
   "providers": {
-    "claude-code": { "enabled": true }
-  },
-  "team_routing": {
-    "enabled": true,
-    "allowlisted_account_uuids": [
-      "pooled-seat-1",
-      "pooled-seat-2",
-      "pooled-seat-3",
-      "pooled-seat-4",
-      "pooled-seat-5"
-    ]
+    "claude-code": {
+      "enabled": true,
+      "pool": {
+        "members": [
+          "pooled-seat-1",
+          "pooled-seat-2",
+          "pooled-seat-3",
+          "pooled-seat-4",
+          "pooled-seat-5"
+        ]
+      }
+    }
   }
 }
 ```
+
+For an existing deployment, follow the [staged config switch and rollback](configuration.md#migration-and-rollback).
 
 Keep protected and personal seats out of that list. Enabling a subscription
 provider is the operator's responsibility under that provider's terms.

@@ -31,7 +31,7 @@
     },
     "apps/tui": {
       "name": "@certalis/agent-smith",
-      "version": "0.1.21",
+      "version": "0.2.0",
       "bin": {
         "agent-smith": "dist/bin.js",
       },

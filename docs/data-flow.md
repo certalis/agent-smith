@@ -28,6 +28,7 @@ graph TD
     PROXY[proxy]
     ROUTING[routing]
     CAPACITY[capacity]
+    POOL[pool]
     DB[(SQLite)]
     PROVIDERS[providers]
     WORKER[post-processor worker]
@@ -39,6 +40,9 @@ graph TD
     API --> DB
     PROXY --> ROUTING
     ROUTING --> CAPACITY
+    CAPACITY --> POOL
+    POOL --> PROVIDERS
+    POOL --> DB
     PROXY --> PROVIDERS
     PROXY --> DB
     PROVIDERS --> CAPACITY
@@ -64,20 +68,30 @@ Examples:
 - `/api/logs/stream`
 - `/api/requests`
 
+## Router and Pool boundary
+
+The Router in `packages/routing` chooses the ordered provider, wait or fallback
+policy and conversation preference. Each `ProviderSupply` in `packages/pool`
+owns that provider’s eligible seats, admission, quota facts and account pins.
+The Router talks to it through `RoutedProvider` in `packages/capacity`: it can
+ask for availability or status and request a serve/session attempt. A
+connector’s `CapacitySource` translates an upstream response into a capacity
+fact. The Router decides what to do with that fact. Configuration updates
+replace settings in the running runtime without discarding its live state.
+
 ## Proxy Request Flow
 
 Provider-native requests follow this path:
 
-1. request arrives at `/v1/{provider}/...`
-2. runtime server routes it to the proxy layer
-3. proxy resolves the provider implementation
-4. routing validates any explicit conversation-provider choice and reads its
-   opaque preference/block state
-5. proxy/session strategy selects candidate accounts only for that provider
-6. provider connector prepares upstream URL and headers
-7. request is forwarded upstream
-8. connector capacity facts and response metadata are normalized
-9. request events and persistence work are scheduled
+1. A request arrives at a direct provider path or `/v1/pool/<wire>/...`.
+2. The edge resolves the provider or ordered route and gives the Router the
+   request and configured policy.
+3. The Router asks the relevant `RoutedProvider` for affinity and availability,
+   then decides whether to serve, wait, offer a choice or move forward.
+4. That provider’s Pool selects eligible accounts and applies admission.
+5. Its connector prepares the upstream request; the Pool executes the attempt.
+6. Connector capacity facts and the result return to the Router, which decides the
+   next step. Request events and persistence work are scheduled.
 
 ### Proxy Forwarding Sequence
 
@@ -85,24 +99,26 @@ Provider-native requests follow this path:
 sequenceDiagram
     participant Client
     participant Runtime
-    participant Proxy
-    participant Strategy
+    participant Router
+    participant Pool
     participant DB
-    participant Provider
+    participant Connector
     participant Upstream
 
-    Client->>Runtime: /v1/{provider}/...
-    Runtime->>Proxy: handle proxy request
-    Proxy->>Provider: resolve provider implementation
-    Proxy->>Strategy: select candidate accounts
-    Strategy->>DB: read account state
-    DB-->>Strategy: available accounts
-    Strategy-->>Proxy: ordered candidates
-    Proxy->>Provider: prepare URL + headers
-    Proxy->>Upstream: forward request
-    Upstream-->>Proxy: response
-    Proxy-->>Runtime: proxied response
-    Runtime-->>Client: proxied response
+    Client->>Runtime: direct provider or ordered route request
+    Runtime->>Router: request and configured policy
+    Router->>Pool: affinity and availability
+    Pool->>DB: read provider seat state
+    DB-->>Pool: eligible seats and pins
+    Pool-->>Router: capacity facts
+    Router->>Pool: serve selected provider
+    Pool->>Connector: prepare upstream request
+    Connector->>Upstream: forward request
+    Upstream-->>Connector: response
+    Connector-->>Pool: response and capacity fact
+    Pool-->>Router: serve outcome
+    Router-->>Runtime: response or next decision
+    Runtime-->>Client: response
 ```
 
 ## Interactive Claude provider choice
@@ -116,8 +132,8 @@ removes all chooser controls before upstream forwarding. A successful response
 returns the factual provider/model for the companion's status row. Unwrapped
 clients stay on their current provider and receive its capacity response; the
 proxy never silently moves them to a lower-ranked provider. A private
-`caller_provider_fallback` policy is the one exception for a named unattended
-device: `"ordered"` moves only forward through configured providers after a
+`routing.callers.<device>.allow_fallbacks` policy is the one exception for a named unattended
+device: `true` moves only forward through configured providers after a
 block. It is decided from the authenticated device identity, never a client
 header.
 

@@ -70,8 +70,12 @@ startServer({
 
    ```json
    {
-     "provider_pools": {
-       "anthropic-messages": ["anthropic"]
+     "routing": {
+       "routes": {
+         "anthropic-messages": [
+           "anthropic"
+         ]
+       }
      }
    }
    ```
@@ -159,8 +163,10 @@ The config file is JSON, read at startup from:
   on macOS and Linux,
 - or the path in `AGENT_SMITH_CONFIG_PATH`.
 
-Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
-`block_when_all_full`.
+Pool and Router management API updates apply live. Restart after hand-editing the configuration file.
+On first start, Agent Smith automatically rewrites supported old configs and
+keeps a private `<config-path>.backup` (or a timestamped backup if one already
+differs). See the [migration and rollback guide](docs/configuration.md#migration-and-rollback).
 
 | Key | What it does |
 |---|---|
@@ -168,16 +174,16 @@ Restart agent-smith after changing `providers`, `provider_pools`, `alerts` or
 | `providers.<name>.strategy` | The built-in strategy: `anthropic-api`, `model-studio-anthropic-api`, `kimi-code-anthropic-api`, `google-gemini-api`, `openai-api`, `claude-code` or `codex`. Required for a provider name you add yourself. |
 | `providers.<name>.base_url` | The upstream URL, for an endpoint compatible with one of the strategies. |
 | `providers.<name>.models` | The models a provider serves, as `"client model": "provider model"`. A trailing `*` matches a prefix. Without it, the provider serves every model name unchanged. |
-| `provider_pools.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
+| `routing.routes.<protocol>` | The ordered providers for `anthropic-messages` or `openai-responses`. Clients reach it at `/v1/pool/<protocol>/*`, and the local wrappers use it automatically. |
 | `client` | This machine's shared-pool switch, origin and forwarding-key file. Use `agent-smith client on`, `off` or `status`; it does not define providers or a separate pool. |
-| `team_routing` | Which subscription accounts may share a pool, and their usage caps. See the [configuration guide](docs/configuration.md#team-routing). |
+| `providers.<name>.pool` | Membership, usage caps and admission for that provider’s subscription pool. See the [configuration guide](docs/configuration.md#provider-pools). |
 | `alerts` | A Slack webhook or bot token and/or an email address that hear when a seat spends extra usage and when every account is full. A filled value turns its channel on. See [Alerts](docs/configuration.md#alerts). |
-| `block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
+| `providers.<name>.pool.block_when_all_full` | `true` by default: when every account is full, every request is refused until the soonest reset, so none spends extra usage. |
 
-To use capacity before renewal, enable `team_routing.prefer_expiring_quota`:
+To use capacity before renewal, enable `providers.<name>.pool.prefer_expiring_quota`:
 new pinned chats may favor a fresh quota window close to its reset. Existing
 chats and hard caps stay unchanged; this option is off by default. See
-[load balancing](docs/load-balancing.md#team-routing-opt-in).
+[load balancing](docs/load-balancing.md#provider-pools-opt-in).
 
 For direct Codex subscription accounts, the private dashboard's **Accounts →
 Usage resets** lists available reset grants and their expiration. Using one
@@ -197,8 +203,12 @@ Each example is a complete config file, also in [`examples/config/`](examples/co
 
 ```json
 {
-  "provider_pools": {
-    "anthropic-messages": ["anthropic"]
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "anthropic"
+      ]
+    }
   }
 }
 ```
@@ -208,8 +218,12 @@ Each example is a complete config file, also in [`examples/config/`](examples/co
 
 ```json
 {
-  "provider_pools": {
-    "openai-responses": ["openai"]
+  "routing": {
+    "routes": {
+      "openai-responses": [
+        "openai"
+      ]
+    }
   }
 }
 ```
@@ -224,11 +238,17 @@ Developer API key to the `gemini` account after starting Agent Smith.
   "providers": {
     "gemini": {
       "strategy": "google-gemini-api",
-      "models": { "claude-sonnet-*": "gemini-2.5-flash" }
+      "models": {
+        "claude-sonnet-*": "gemini-2.5-flash"
+      }
     }
   },
-  "provider_pools": {
-    "anthropic-messages": ["gemini"]
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "gemini"
+      ]
+    }
   }
 }
 ```
@@ -247,11 +267,18 @@ never moved to `acme` automatically. `acme` serves no other model.
       "enabled": true,
       "strategy": "anthropic-api",
       "base_url": "https://api.acme.example",
-      "models": { "claude-sonnet-*": "acme-large" }
+      "models": {
+        "claude-sonnet-*": "acme-large"
+      }
     }
   },
-  "provider_pools": {
-    "anthropic-messages": ["anthropic", "acme"]
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "anthropic",
+        "acme"
+      ]
+    }
   }
 }
 ```
@@ -300,8 +327,8 @@ share that organisation's limits, so adding them adds no capacity.
 - A conversation stays on its account while that account is eligible. Moving
   provider loses the prompt cache and can change model behaviour and cost.
 - If no provider in the pool serves the requested model, agent-smith returns
-  `400` naming `provider_pools.<protocol>`.
-- Direct routes, `/v1/<provider>/*`, never use a pool.
+  `400`; its current error text refers to `provider_pools.<protocol>`.
+- Direct routes, `/v1/<provider>/*`, do not traverse the ordered provider route; the selected provider’s seat pool still applies.
 
 Details: [load balancing](docs/load-balancing.md).
 
@@ -403,7 +430,7 @@ and [Usage Policy](https://www.anthropic.com/legal/aup), and OpenAI's
 ```
 
 Both examples enable a single sign-in. Putting several sign-ins in one pool
-with `team_routing.allowlisted_account_uuids` is the use the quoted terms most
+with `providers.<name>.pool.members` is the use the quoted terms most
 clearly forbid.
 
 ## Advanced use
