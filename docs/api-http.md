@@ -58,7 +58,7 @@ All API responses are in JSON format with `Content-Type: application/json`.
 | Method / path | Purpose |
 |---|---|
 | `GET /api/config/providers/:name/pool` | Read public pool settings for a provider. |
-| `POST /api/config/providers/:name/pool` | Update snake_case pool fields; omitted top-level fields are preserved. |
+| `POST /api/config/providers/:name/pool` | Update snake_case pool fields; omitted top-level fields are preserved, and a new block keeps sharing off unless `enabled` is sent. |
 | `DELETE /api/config/providers/:name/pool` | Remove the provider’s pool block. |
 | `GET /api/config/routing` | Read public Router settings. |
 | `POST /api/config/routing` | Update snake_case Router fields; omitted top-level fields are preserved. |

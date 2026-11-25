@@ -404,7 +404,8 @@ Unknown or invalid fields in a management update are rejected.
 Email overrides use private enrollment contacts and do not add accounts or
 resume paused accounts. `GET /api/config/providers/<name>/pool` omits the two
 private maps. POST preserves omitted top-level fields; supplying `admission` replaces that
-nested object. Use an explicit empty object to clear a private map. The corresponding `DELETE` removes the
+nested object. A POST that creates the block saves `enabled: false` unless it
+sends `enabled`, so tuning a provider never turns its sharing on. Use an explicit empty object to clear a private map. The corresponding `DELETE` removes the
 pool block. Changes apply live.
 
 ### Router settings
