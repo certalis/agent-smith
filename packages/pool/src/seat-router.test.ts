@@ -5,7 +5,7 @@ import {
 } from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
-import { TeamRouter, type TeamRoutingRequest } from "./team-router";
+import { TeamRouter, type TeamRoutingRequest } from "./seat-router";
 
 const config: TeamRoutingConfig = {
 	admissionCap: 5,

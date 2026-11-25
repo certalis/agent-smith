@@ -1,11 +1,13 @@
 import { ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import type { Account } from "@agent-smith/types";
-import { type AdmissionPermit, TeamAdmissionError } from "../team-admission";
-import { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
-import type { ProxyRequest } from "./proxy-request";
-import { ERROR_MESSAGES } from "./proxy-types";
-import { MAX_INLINE_RATE_LIMIT_RETRY_MS } from "./response-processor";
+import { applyAccountFact } from "./account-facts";
+import {
+	MAX_INLINE_RATE_LIMIT_RETRY_MS,
+	type PoolAttemptRequest,
+	type ProxyAttempt,
+} from "./attempt-executor";
+import { type AdmissionPermit, TeamAdmissionError } from "./team-admission";
 
 const log = new Logger("Proxy");
 
@@ -16,11 +18,6 @@ function admissionRetrySeconds(req: Request): number | undefined {
 	if (!/^\d+$/.test(count)) return 1;
 	const ordinal = Number(count);
 	return ordinal === 0 ? 1 : ordinal === 1 ? 10 : 30;
-}
-
-function createBodyStream(body: ArrayBuffer | null) {
-	if (!body) return undefined;
-	return new Response(body).body ?? undefined;
 }
 
 function releaseAfterResponse(
@@ -77,7 +74,7 @@ export function quotaExhaustionResponse(resetAt: number): Response {
 }
 
 export async function attemptAccount(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	account: Account,
 	failoverAttempts: number,
 ): Promise<ProxyAttempt> {
@@ -110,17 +107,8 @@ export async function attemptAccount(
 		request.ctx.outsideSpendTracker?.end(account.id);
 	};
 	try {
-		const attempt = await proxyWithAccount(
-			request.req,
-			request.url,
-			account,
-			request.meta,
-			request.body,
-			(body) => createBodyStream(body),
-			request.thread,
-			failoverAttempts,
-			request.mappedModel,
-			request.ctx,
+		const attempt = await request.execute(account, failoverAttempts, (fact) =>
+			applyAccountFact(account, request.ctx, fact),
 		);
 		if (attempt.kind === "response") {
 			const spentExtraUsage =
@@ -147,7 +135,7 @@ export async function attemptAccount(
 }
 
 export async function resolvePerMinuteRateLimit(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	account: Account,
 	failoverAttempts: number,
 	attempt: Extract<ProxyAttempt, { kind: "per-minute-rate-limit" }>,
@@ -175,7 +163,7 @@ export async function resolvePerMinuteRateLimit(
 }
 
 export async function resolveRequestScopedRateLimit(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	accounts: Account[],
 	index: number,
 	attempt: Extract<ProxyAttempt, { kind: "request-scoped-rate-limit" }>,
@@ -220,7 +208,7 @@ export async function resolveRequestScopedRateLimit(
 }
 
 export async function resolveQuotaRateLimit(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	accounts: Account[],
 	index: number,
 	attempt: Extract<ProxyAttempt, { kind: "quota-rate-limit" }>,
@@ -255,7 +243,7 @@ export async function resolveQuotaRateLimit(
 }
 
 export async function resolveUpstreamFailure(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	accounts: Account[],
 	index: number,
 	attempt: Extract<ProxyAttempt, { kind: "upstream-failure" }>,
@@ -300,7 +288,7 @@ export async function discardAttempt(
 }
 
 export async function resolveTransportFailure(
-	request: ProxyRequest,
+	request: PoolAttemptRequest,
 	accounts: Account[],
 	index: number,
 ): Promise<Response> {
@@ -318,54 +306,4 @@ export async function resolveTransportFailure(
 		default:
 			return new Response("Bad Gateway", { status: 502 });
 	}
-}
-
-export async function proxySelectedAccounts(
-	request: ProxyRequest,
-	accounts: Account[],
-): Promise<Response> {
-	for (let index = 0; index < accounts.length; index += 1) {
-		const attempt = await attemptAccount(
-			request,
-			accounts[index] as Account,
-			index,
-		);
-		if (attempt.kind === "response") return attempt.response;
-		if (attempt.kind === "authentication-failure") {
-			return new Response("Bad Gateway", { status: 502 });
-		}
-		if (attempt.kind === "provider-capacity-block") {
-			return await attempt.forward();
-		}
-		if (attempt.kind === "per-minute-rate-limit") {
-			return await resolvePerMinuteRateLimit(
-				request,
-				accounts[index] as Account,
-				index,
-				attempt,
-			);
-		}
-		if (attempt.kind === "request-scoped-rate-limit") {
-			return await resolveRequestScopedRateLimit(
-				request,
-				accounts,
-				index,
-				attempt,
-			);
-		}
-		if (attempt.kind === "quota-rate-limit") {
-			return await resolveQuotaRateLimit(request, accounts, index, attempt);
-		}
-		if (attempt.kind === "upstream-failure") {
-			return await resolveUpstreamFailure(request, accounts, index, attempt);
-		}
-		if (attempt.kind === "transport-failure") {
-			return await resolveTransportFailure(request, accounts, index);
-		}
-	}
-
-	throw new ServiceUnavailableError(
-		`${ERROR_MESSAGES.ALL_ACCOUNTS_FAILED} (${accounts.length} attempted)`,
-		request.ctx.providerName,
-	);
 }

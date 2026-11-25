@@ -37,7 +37,7 @@ describe("WebSocket proxy behavior", () => {
 					data: WebSocketProxyData;
 			  }
 			| undefined;
-		const upgradeResponse = handleWebSocketUpgradeRequest(
+		const upgradeResponse = await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				method: "GET",
 				headers: {
@@ -146,7 +146,7 @@ describe("WebSocket proxy behavior", () => {
 					data: WebSocketProxyData;
 			  }
 			| undefined;
-		handleWebSocketUpgradeRequest(
+		await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				method: "GET",
 				headers: {
@@ -221,7 +221,7 @@ describe("WebSocket proxy behavior", () => {
 						data: WebSocketProxyData;
 				  }
 				| undefined;
-			handleWebSocketUpgradeRequest(
+			await handleWebSocketUpgradeRequest(
 				new Request(url, {
 					method: "GET",
 					headers: {
@@ -393,7 +393,7 @@ describe("WebSocket proxy behavior", () => {
 });
 
 describe("WebSocket failover characterization", () => {
-	function startWithSeats() {
+	async function startWithSeats() {
 		const first = createCodexAccount("first");
 		const second = {
 			...createCodexAccount("second"),
@@ -420,13 +420,13 @@ describe("WebSocket failover characterization", () => {
 		};
 		let admissionCalls = 0;
 		let inFlightCalls = 0;
-		ctx.teamAdmission = {
+		ctx.testPool.teamAdmission = {
 			acquire() {
 				admissionCalls++;
 				throw new Error("unexpected admission");
 			},
-		} as unknown as NonNullable<typeof ctx.teamAdmission>;
-		ctx.teamRouter = {
+		} as unknown as NonNullable<typeof ctx.testPool.teamAdmission>;
+		ctx.testPool.teamRouter = {
 			order(accounts: ReturnType<typeof createCodexAccount>[]) {
 				return accounts;
 			},
@@ -436,10 +436,10 @@ describe("WebSocket failover characterization", () => {
 			end() {
 				inFlightCalls++;
 			},
-		} as unknown as NonNullable<typeof ctx.teamRouter>;
+		} as unknown as NonNullable<typeof ctx.testPool.teamRouter>;
 		const url = new URL("http://localhost:8080/v1/codex/responses");
 		let data: WebSocketProxyData | undefined;
-		const response = handleWebSocketUpgradeRequest(
+		const response = await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				headers: { connection: "Upgrade", upgrade: "websocket" },
 			}),
@@ -471,7 +471,7 @@ describe("WebSocket failover characterization", () => {
 		}
 		globalThis.WebSocket =
 			FailFirstWebSocket as unknown as typeof globalThis.WebSocket;
-		const { downstream, calls } = startWithSeats();
+		const { downstream, calls } = await startWithSeats();
 		const second = await waitFor(
 			() => FakeUpstreamWebSocket.captures[1] ?? null,
 			(value): value is FakeUpstreamCapture => value !== null,
@@ -496,7 +496,7 @@ describe("WebSocket failover characterization", () => {
 	it("does not retry a failure immediately after opening, before any messages", async () => {
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
-		const { downstream, calls } = startWithSeats();
+		const { downstream, calls } = await startWithSeats();
 		const first = await waitFor(
 			() => FakeUpstreamWebSocket.captures[0] ?? null,
 			(value): value is FakeUpstreamCapture => value !== null,
@@ -521,7 +521,7 @@ describe("WebSocket failover characterization", () => {
 	it("does not retry a websocket after the upstream has opened", async () => {
 		globalThis.WebSocket =
 			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
-		const { downstream, calls } = startWithSeats();
+		const { downstream, calls } = await startWithSeats();
 		const first = await waitFor(
 			() => FakeUpstreamWebSocket.captures[0] ?? null,
 			(value): value is FakeUpstreamCapture => value !== null,
@@ -554,4 +554,69 @@ describe("WebSocket failover characterization", () => {
 		expect(downstream.closeCalls[0]?.reason).toBe("upstream failed");
 		expect(calls()).toEqual({ admissionCalls: 0, inFlightCalls: 0 });
 	});
+});
+
+it("disconnecting during a failed refresh does not try a second websocket account", async () => {
+	globalThis.WebSocket =
+		FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
+	const first = {
+		...createCodexAccount("first"),
+		id: "first-refresh",
+		expires_at: 0,
+	};
+	const second = {
+		...createCodexAccount("second"),
+		id: "second-refresh",
+		expires_at: 0,
+	};
+	const ctx = createInMemoryProxyContext([first, second]);
+	const provider = ctx.providerRegistry.getProvider("codex");
+	if (!provider) throw new Error("provider missing");
+	let calls = 0;
+	let rejectRefresh: ((reason: Error) => void) | undefined;
+	provider.refreshToken = async () => {
+		calls += 1;
+		return await new Promise((_resolve, reject) => {
+			rejectRefresh = reject;
+		});
+	};
+	ctx.testPool.dbOps.getAccount = (id: string) =>
+		[first, second].find((account) => account.id === id) ?? null;
+	const url = new URL("http://localhost:8080/v1/codex/responses");
+	let data: WebSocketProxyData | undefined;
+	await handleWebSocketUpgradeRequest(
+		new Request(url, {
+			headers: { connection: "Upgrade", upgrade: "websocket" },
+		}),
+		url,
+		ctx,
+		{
+			upgrade(_req: Request, options: { data: WebSocketProxyData }) {
+				data = options.data;
+				return true;
+			},
+		} as unknown as Bun.Server<WebSocketProxyData>,
+	);
+	if (!data) throw new Error("upgrade did not happen");
+	const downstream = new FakeServerWebSocket(data);
+	websocketProxyHandler.open?.(
+		downstream as unknown as Bun.ServerWebSocket<WebSocketProxyData>,
+	);
+	await waitFor(
+		() => calls,
+		(count) => count === 1,
+	);
+	websocketProxyHandler.close?.(
+		downstream as unknown as Bun.ServerWebSocket<WebSocketProxyData>,
+		1000,
+		"closed",
+	);
+	if (!rejectRefresh) throw new Error("refresh did not start");
+	rejectRefresh(new Error("refresh failed"));
+	await waitFor(
+		() => ctx.testPool.refreshInFlight.size,
+		(count) => count === 0,
+	);
+	expect(calls).toBe(1);
+	expect(FakeUpstreamWebSocket.captures).toHaveLength(0);
 });

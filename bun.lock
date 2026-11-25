@@ -22,6 +22,7 @@
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
+        "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/proxy": "workspace:*",
         "@agent-smith/runtime-server": "workspace:*",
@@ -30,7 +31,7 @@
     },
     "apps/tui": {
       "name": "@certalis/agent-smith",
-      "version": "0.1.19",
+      "version": "0.1.21",
       "bin": {
         "agent-smith": "dist/bin.js",
       },
@@ -119,6 +120,9 @@
     "packages/capacity": {
       "name": "@agent-smith/capacity",
       "version": "0.1.0",
+      "dependencies": {
+        "@agent-smith/types": "workspace:*",
+      },
     },
     "packages/config": {
       "name": "@agent-smith/config",
@@ -172,6 +176,19 @@
         "@agent-smith/types": "workspace:*",
       },
     },
+    "packages/pool": {
+      "name": "@agent-smith/pool",
+      "version": "0.1.0",
+      "dependencies": {
+        "@agent-smith/capacity": "workspace:*",
+        "@agent-smith/config": "workspace:*",
+        "@agent-smith/core": "workspace:*",
+        "@agent-smith/database": "workspace:*",
+        "@agent-smith/logger": "workspace:*",
+        "@agent-smith/providers": "workspace:*",
+        "@agent-smith/types": "workspace:*",
+      },
+    },
     "packages/providers": {
       "name": "@agent-smith/providers",
       "version": "0.1.0",
@@ -194,6 +211,7 @@
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
+        "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/routing": "workspace:*",
         "@agent-smith/types": "workspace:*",
@@ -217,6 +235,7 @@
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
+        "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/proxy": "workspace:*",
         "@agent-smith/web": "workspace:*",
@@ -261,6 +280,8 @@
     "@agent-smith/logger": ["@agent-smith/logger@workspace:packages/logger"],
 
     "@agent-smith/oauth-flow": ["@agent-smith/oauth-flow@workspace:packages/oauth-flow"],
+
+    "@agent-smith/pool": ["@agent-smith/pool@workspace:packages/pool"],
 
     "@agent-smith/providers": ["@agent-smith/providers@workspace:packages/providers"],
 
@@ -988,7 +1009,7 @@
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
-    "@agent-smith/web/@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
+    "@agent-smith/web/@types/bun": ["@types/bun@1.4.5", "", { "dependencies": { "bun-types": "1.4.5" } }, "sha512-DpgwNI9z0L1S0gtb45QLCWgwCUcMLnsHYMJHQvpNj7erGiCGBvpggltAIeARrtobNMKMuy0UP7i56tKKgwFs/Q=="],
 
     "@certalis/agent-smith/@types/node": ["@types/node@20.19.9", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-cuVNgarYWZqxRJDQHEB58GEONhOK79QVR/qYx4S7kcUObQvUwvFnYxJuuHUKm2aieN9X3yZB4LZsuYNU1Qphsw=="],
 
@@ -998,6 +1019,6 @@
 
     "react-devtools-core/ws": ["ws@7.5.10", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ=="],
 
-    "@agent-smith/web/@types/bun/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
+    "@agent-smith/web/@types/bun/bun-types": ["bun-types@1.4.5", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-ECHn+9dhL3wv0G6u0+7dQvrnaimXiRDxxerYBmhTaLyJEEuvTPWk2Fye3XIf5Y++JIIiHKfQw4Z7V5D8KuiXbg=="],
   }
 }

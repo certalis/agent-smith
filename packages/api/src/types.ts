@@ -59,12 +59,15 @@ export interface APIContext {
 	providerRegistry: ProviderRegistry;
 	getProviders: () => string[];
 	getRuntimeHealth?: () => RuntimeHealth;
-	getPoolStatus?: (provider: AccountProvider, model?: string) => PoolStatus;
+	getPoolStatus?: (
+		provider: AccountProvider,
+		model?: string,
+	) => PoolStatus | Promise<PoolStatus>;
 	getCallerPoolStatus?: (
 		pool: ProviderWire,
 		model: string | undefined,
 		callerId: string,
-	) => CallerPoolStatus | null;
+	) => CallerPoolStatus | null | Promise<CallerPoolStatus | null>;
 	callerForDeviceKey?: (key: string | null) => string | undefined;
 	getAccountAccessToken?: (account: Account) => Promise<string>;
 }

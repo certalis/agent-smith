@@ -1,9 +1,11 @@
+import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import type {
 	IncomingWorkerMessage,
 	ProxyContext,
 	WebSocketProxyData,
 } from "@agent-smith/proxy";
+import { createProviderSupplies } from "@agent-smith/proxy";
 import type { Account } from "@agent-smith/types";
 
 export type FakeUpstreamCapture = {
@@ -268,8 +270,8 @@ export function createCodexAccount(name = "codex-oauth"): Account {
 export function createInMemoryProxyContext(
 	accounts: Account[],
 	usageMessages: IncomingWorkerMessage[] = [],
-): ProxyContext {
-	return {
+): ProxyContext & { testPool: PoolContext } {
+	const fixture = {
 		providerRegistry: new ProviderRegistry([new CodexProvider()]),
 		strategy: {
 			select(selectedAccounts: Account[]) {
@@ -309,4 +311,11 @@ export function createInMemoryProxyContext(
 			},
 		} as unknown as Worker,
 	} as unknown as ProxyContext;
+	const context = {
+		...fixture,
+		testPool: fixture as unknown as PoolContext,
+		routedProviders: new Map<string, ProviderSupply>(),
+	};
+	context.routedProviders = createProviderSupplies(context.testPool, context);
+	return context;
 }

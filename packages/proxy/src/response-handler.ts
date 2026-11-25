@@ -3,8 +3,8 @@ import {
 	sanitizeRequestHeaders,
 	withSanitizedProxyHeaders,
 } from "@agent-smith/http";
+import { trackProxyBackgroundTask } from "@agent-smith/pool";
 import type { Account, HttpMethod } from "@agent-smith/types";
-import { trackProxyBackgroundTask } from "./background-tasks";
 import type { ResolvedProxyContext } from "./handlers";
 import type { ChunkMessage, EndMessage, StartMessage } from "./worker-messages";
 

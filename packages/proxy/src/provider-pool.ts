@@ -1,5 +1,9 @@
 import { ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import {
+	quotaExhaustionResponse,
+	type TeamRoutingRequest,
+} from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	ConversationProviderRouting,
@@ -16,7 +20,7 @@ import {
 	ERROR_MESSAGES,
 	type ProxyContext,
 } from "./handlers";
-import { quotaExhaustionResponse } from "./handlers/proxy-attempts";
+import { buildRouteRequest } from "./handlers/proxy-request";
 import { PoolConversationProviderRoutingStore } from "./pool/conversation-provider-routing-store";
 import {
 	configuredPoolChoices,
@@ -27,9 +31,10 @@ import {
 } from "./pool/interactive-provider-pool";
 import { proxyPoolCandidates } from "./pool/provider-pool-attempts";
 import {
+	getConversationProviderKey,
 	hasOrderedProviderFallback,
-	type TeamRoutingRequest,
-} from "./team-router";
+} from "./provider-routing";
+import { getProviderSupply } from "./supply-executor";
 
 const log = new Logger("Proxy");
 
@@ -39,7 +44,6 @@ type ProviderPoolSelection = {
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
 	kind: "selection";
-	pinnedId: string | undefined;
 	providerPreference: ReturnType<ConversationProviderRouting["getPreference"]>;
 	requestedChoice: string | null;
 	routing: ConversationProviderRouting;
@@ -53,7 +57,7 @@ function poolTeamRequest(
 	manualAccountName: string | undefined,
 	callerId: string | undefined,
 ): TeamRoutingRequest {
-	return {
+	const request: TeamRoutingRequest = {
 		body,
 		callerId,
 		contentType: req.headers.get("content-type"),
@@ -65,9 +69,10 @@ function poolTeamRequest(
 		sessionId:
 			pool.providers[0]?.provider.getClientSessionId?.(req.headers) ?? null,
 	};
+	return request;
 }
 
-function prepareProviderPoolSelection(
+async function prepareProviderPoolSelection(
 	req: Request,
 	url: URL,
 	ctx: ProxyContext,
@@ -76,7 +81,8 @@ function prepareProviderPoolSelection(
 	pool: ResolvedProviderPool,
 	manualAccountName: string | undefined,
 	callerId: string | undefined,
-): { kind: "response"; response: Response } | ProviderPoolSelection {
+	teamRequestOverride?: TeamRoutingRequest,
+): Promise<{ kind: "response"; response: Response } | ProviderPoolSelection> {
 	const firstCandidate = pool.providers[0];
 	if (!firstCandidate) {
 		return {
@@ -87,14 +93,9 @@ function prepareProviderPoolSelection(
 			),
 		};
 	}
-	const teamRequest = poolTeamRequest(
-		req,
-		body,
-		pool,
-		meta.model,
-		manualAccountName,
-		callerId,
-	);
+	const teamRequest =
+		teamRequestOverride ??
+		poolTeamRequest(req, body, pool, meta.model, manualAccountName, callerId);
 	const interactiveInput: InteractivePoolRequest = {
 		body,
 		ctx,
@@ -110,17 +111,26 @@ function prepareProviderPoolSelection(
 		firstCandidate.provider,
 		pool.upstreamPath,
 	);
-	const pinnedId = firstContext.teamRouter?.getPinnedAccountId(
+	const pinRoute = buildRouteRequest(
+		req,
+		url,
+		firstContext,
+		meta,
+		body,
 		teamRequest,
-		firstContext.runtime.teamRouting,
-		firstContext.provider,
-		firstContext.dbOps,
+		"pool-route",
 	);
-	const pinnedAccount = pinnedId ? ctx.dbOps.getAccount(pinnedId) : null;
-	const conversationKey = firstContext.teamRouter?.getConversationProviderKey(
-		teamRequest,
-		firstContext.runtime.teamRouting,
-	);
+	const pinnedProvider = getProviderSupply(
+		ctx,
+		firstCandidate.provider,
+	).holdingProvider(pinRoute);
+	const conversationKey = getProviderSupply(
+		ctx,
+		firstCandidate.provider,
+	).supportsConversationPins()
+		? getConversationProviderKey(teamRequest)
+		: undefined;
+
 	const routing = new ConversationProviderRouting(
 		new PoolConversationProviderRoutingStore(ctx.dbOps),
 	);
@@ -153,9 +163,9 @@ function prepareProviderPoolSelection(
 	if (interactive && manualProviderChoiceRequested(req.headers)) {
 		return {
 			kind: "response",
-			response: createManualProviderChoiceResponse(
+			response: await createManualProviderChoiceResponse(
 				interactiveInput,
-				pinnedAccount,
+				pinnedProvider,
 				providerPreference?.provider,
 			),
 		};
@@ -169,7 +179,7 @@ function prepareProviderPoolSelection(
 			(candidate) => candidate.provider.name,
 			{
 				orderedFallback,
-				pinnedProvider: pinnedAccount?.provider,
+				pinnedProvider,
 				preferredProvider: providerPreference?.provider,
 				requestedProvider: requestedChoice,
 			},
@@ -178,7 +188,6 @@ function prepareProviderPoolSelection(
 		interactive,
 		interactiveInput,
 		kind: "selection",
-		pinnedId,
 		providerPreference,
 		requestedChoice,
 		routing,
@@ -195,8 +204,9 @@ export async function proxyProviderPool(
 	manualAccountName?: string,
 	callerId?: string,
 	providerWaited = false,
+	teamRequestOverride?: TeamRoutingRequest,
 ): Promise<Response> {
-	const selection = prepareProviderPoolSelection(
+	const selection = await prepareProviderPoolSelection(
 		req,
 		url,
 		ctx,
@@ -205,6 +215,7 @@ export async function proxyProviderPool(
 		pool,
 		manualAccountName,
 		callerId,
+		teamRequestOverride,
 	);
 	if (selection.kind === "response") return selection.response;
 	const {
@@ -212,7 +223,6 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
-		pinnedId,
 		providerPreference,
 		requestedChoice,
 		routing,
@@ -234,6 +244,7 @@ export async function proxyProviderPool(
 					manualAccountName,
 					callerId,
 					true,
+					interactiveInput.teamRequest,
 				),
 			routing,
 		});
@@ -244,7 +255,6 @@ export async function proxyProviderPool(
 		conversationKey,
 		interactive,
 		interactiveInput,
-		pinnedId,
 		providerPreference,
 		requestedChoice,
 		routing,
@@ -255,11 +265,12 @@ export async function proxyProviderPool(
 		candidateAttempt.everyCandidateFull &&
 		candidateAttempt.soonestFleetReset !== null
 	) {
-		ctx.seatAlerts?.allAccountsFull(
-			`provider_pools.${pool.wire}`,
-			candidateAttempt.soonestFleetReset,
-			{ blocked: true, holdSeconds: 0 },
-		);
+		const firstProvider = pool.providers[0]?.provider;
+		if (firstProvider)
+			getProviderSupply(ctx, firstProvider).alertAllFull(
+				`provider_pools.${pool.wire}`,
+				candidateAttempt.soonestFleetReset,
+			);
 	}
 	if (interactive) {
 		const blockedProvider = candidates[0]?.provider.name;
@@ -269,7 +280,7 @@ export async function proxyProviderPool(
 			return createProviderCapacityProblem({
 				blockedProvider,
 				category: block?.category ?? "unknown",
-				choices: eligiblePoolChoices(interactiveInput, blockedProvider),
+				choices: await eligiblePoolChoices(interactiveInput, blockedProvider),
 				...(retryAt !== null &&
 					retryAt !== undefined && {
 						retryAt,

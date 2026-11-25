@@ -8,7 +8,7 @@ import {
 } from "bun:test";
 import { TokenRefreshError } from "@agent-smith/core";
 import type { Account } from "@agent-smith/types";
-import type { ResolvedProxyContext } from "./proxy-types";
+import type { ResolvedPoolContext } from "../pool-context";
 import { getValidAccessToken } from "./token-manager";
 
 function account(expiresAt: number): Account {
@@ -37,7 +37,7 @@ function account(expiresAt: number): Account {
 	};
 }
 
-function context(selected: Account): ResolvedProxyContext {
+function context(selected: Account): ResolvedPoolContext {
 	return {
 		provider: {
 			name: "claude-code",
@@ -66,12 +66,12 @@ function context(selected: Account): ResolvedProxyContext {
 		refreshInFlight: new Map(),
 		asyncWriter: {
 			enqueue: (task) => task(),
-		} as ResolvedProxyContext["asyncWriter"],
+		} as ResolvedPoolContext["asyncWriter"],
 		dbOps: {
 			getAccount: () => selected,
 			updateAccountTokens() {},
-		} as unknown as ResolvedProxyContext["dbOps"],
-	} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext["dbOps"],
+	} as unknown as ResolvedPoolContext;
 }
 
 describe("getValidAccessToken", () => {
@@ -112,4 +112,35 @@ describe("getValidAccessToken", () => {
 		);
 		expect(selected.refresh_token).toBe("refresh-new");
 	});
+});
+
+it("a settings reload keeps an in-flight token refresh deduplicated", async () => {
+	const selected = { ...account(0), id: "reload-refresh" };
+	const ctx = context(selected);
+	let calls = 0;
+	let finish:
+		| ((result: {
+				accessToken: string;
+				expiresAt: number;
+				refreshToken: string;
+		  }) => void)
+		| undefined;
+	ctx.provider.refreshToken = async () => {
+		calls += 1;
+		return await new Promise((resolve) => {
+			finish = resolve;
+		});
+	};
+	const first = getValidAccessToken(selected, ctx);
+	ctx.runtime.teamRouting = { ...ctx.runtime.teamRouting, enabled: true };
+	const second = getValidAccessToken(selected, ctx);
+	expect(calls).toBe(1);
+	if (!finish) throw new Error("refresh did not start");
+	finish({
+		accessToken: "new",
+		expiresAt: Date.now() + 3_600_000,
+		refreshToken: "new-refresh",
+	});
+	expect(await Promise.all([first, second])).toEqual(["new", "new"]);
+	expect(ctx.refreshInFlight.size).toBe(0);
 });

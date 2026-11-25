@@ -1,6 +1,9 @@
-import type { ProviderCapacityBlock } from "@agent-smith/capacity";
+import type {
+	ProviderCapacityBlock,
+	RouteRequest,
+} from "@agent-smith/capacity";
 import { requestEvents } from "@agent-smith/core";
-import { Logger } from "@agent-smith/logger";
+import type { ProviderSupply } from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	type ConversationProviderPreference,
@@ -10,48 +13,26 @@ import {
 	withProviderPromotionDetails,
 	withServedProviderHeaders,
 } from "@agent-smith/routing";
-import type { Account } from "@agent-smith/types";
+import { createResolvedProxyContext } from "../handlers";
+import { buildRouteRequest } from "../handlers/proxy-request";
+import { getProviderSupply } from "../supply-executor";
 import {
-	createResolvedProxyContext,
-	getSoonestQuotaReset,
-	isEveryAccountQuotaBlocked,
-} from "../handlers";
-import {
-	attemptAccount,
-	discardAttempt,
-	resolvePerMinuteRateLimit,
-	resolveQuotaRateLimit,
-	resolveRequestScopedRateLimit,
-	resolveTransportFailure,
-	resolveUpstreamFailure,
-} from "../handlers/proxy-attempts";
-import {
-	getRequestQuotaCapacityBlock,
-	getRequestRetryAt,
-	type ProxyRequest,
-	prepareProxyRequest,
-} from "../handlers/proxy-request";
-import {
-	admittedPoolAccounts,
 	configuredPoolChoices,
 	eligiblePoolChoices,
 	eligiblePoolProviders,
 	type InteractivePoolRequest,
 } from "./interactive-provider-pool";
 
-const log = new Logger("Proxy");
-
 type PoolCandidateResult =
 	| { block: ProviderCapacityBlock; kind: "capacity-block" }
 	| { block?: ProviderCapacityBlock; kind: "next-provider" }
-	| { account?: Account; kind: "response"; response: Response };
+	| { providerServed?: boolean; kind: "response"; response: Response };
 
 type ProviderPoolCandidateInput = {
 	candidates: ResolvedProviderPool["providers"];
 	conversationKey: string | undefined;
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
-	pinnedId: string | undefined;
 	providerPreference: ConversationProviderPreference | null;
 	requestedChoice: string | null;
 	routing: ConversationProviderRouting;
@@ -69,126 +50,38 @@ export type ProviderPoolCandidateAttempt =
 			soonestRetry: number | null;
 	  };
 
-function preferPinnedAccount(
-	accounts: Account[],
-	pinnedId: string | undefined,
-): Account[] {
-	if (!pinnedId) return accounts;
-	const pinned = accounts.find((account) => account.id === pinnedId);
-	return pinned
-		? [pinned, ...accounts.filter((account) => account.id !== pinned.id)]
-		: accounts;
-}
-
 async function proxyPoolCandidate(
-	request: ProxyRequest,
-	accounts: Account[],
+	supply: ProviderSupply,
+	route: RouteRequest,
 	allowNextProvider: boolean,
 ): Promise<PoolCandidateResult> {
-	for (let index = 0; index < accounts.length; index += 1) {
-		const account = accounts[index] as Account;
-		const attempt = await attemptAccount(request, account, index);
-		if (attempt.kind === "response") {
-			return { account, kind: "response", response: attempt.response };
-		}
-		if (attempt.kind === "authentication-failure") {
-			return {
-				kind: "response",
-				response: new Response("Bad Gateway", { status: 502 }),
-			};
-		}
-		if (attempt.kind === "provider-capacity-block") {
-			await attempt.discard?.();
-			if (accounts[index + 1]) continue;
-			if (allowNextProvider) {
-				return { block: attempt.block, kind: "next-provider" };
-			}
-			return { block: attempt.block, kind: "capacity-block" };
-		}
-		if (attempt.kind === "per-minute-rate-limit") {
-			return {
-				kind: "response",
-				response: await resolvePerMinuteRateLimit(
-					request,
-					account,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "request-scoped-rate-limit") {
-			return {
-				kind: "response",
-				response: await resolveRequestScopedRateLimit(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "quota-rate-limit") {
-			if (!accounts[index + 1]) {
-				if (!allowNextProvider) {
-					return { kind: "response", response: await attempt.forward() };
-				}
-				await attempt.discard?.();
-				return { kind: "next-provider" };
-			}
-			return {
-				kind: "response",
-				response: await resolveQuotaRateLimit(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "upstream-failure") {
-			if (!accounts[index + 1]) {
-				if (!allowNextProvider) {
-					return { kind: "response", response: await attempt.forward() };
-				}
-				await discardAttempt(attempt);
-				return { kind: "next-provider" };
-			}
-			return {
-				kind: "response",
-				response: await resolveUpstreamFailure(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "transport-failure") {
-			if (!accounts[index + 1]) {
-				return allowNextProvider
-					? { kind: "next-provider" }
-					: {
-							kind: "response",
-							response: new Response("Bad Gateway", { status: 502 }),
-						};
-			}
-			return {
-				kind: "response",
-				response: await resolveTransportFailure(request, accounts, index),
-			};
-		}
+	const result = await supply.serve(route);
+	if (result.kind === "final")
+		return {
+			kind: "response",
+			response: result.response,
+			providerServed: result.providerServed,
+		};
+	if (result.reason === "capacity-block" && result.block) {
+		await result.discard?.();
+		return allowNextProvider
+			? { kind: "next-provider", block: result.block }
+			: { kind: "capacity-block", block: result.block };
 	}
-	return allowNextProvider
-		? { kind: "next-provider" }
-		: {
-				kind: "response",
-				response: new Response("Bad Gateway", { status: 502 }),
-			};
+	if (allowNextProvider) {
+		await result.discard?.();
+		return { kind: "next-provider" };
+	}
+	return {
+		kind: "response",
+		response: result.forward
+			? await result.forward()
+			: new Response("Bad Gateway", { status: 502 }),
+	};
 }
 
-function resolvePoolCandidateResult({
+async function resolvePoolCandidateResult({
 	candidate,
-	candidateContext,
 	conversationKey,
 	interactive,
 	interactiveInput,
@@ -198,7 +91,6 @@ function resolvePoolCandidateResult({
 	routing,
 }: {
 	candidate: ResolvedPoolCandidate;
-	candidateContext: ReturnType<typeof createResolvedProxyContext>;
 	conversationKey: string | undefined;
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
@@ -206,7 +98,7 @@ function resolvePoolCandidateResult({
 	requestedChoice: string | null;
 	result: PoolCandidateResult;
 	routing: ConversationProviderRouting;
-}): Response | null {
+}): Promise<Response | null> {
 	if (result.kind === "capacity-block") {
 		if (conversationKey) {
 			routing.recordBlock(
@@ -219,14 +111,17 @@ function resolvePoolCandidateResult({
 		return createProviderCapacityProblem({
 			blockedProvider: candidate.provider.name,
 			category: result.block.category,
-			choices: eligiblePoolChoices(interactiveInput, candidate.provider.name),
+			choices: await eligiblePoolChoices(
+				interactiveInput,
+				candidate.provider.name,
+			),
 			...(result.block.retryAt !== undefined && {
 				retryAt: result.block.retryAt,
 			}),
 		});
 	}
 	if (result.kind !== "response") return null;
-	if (result.account) {
+	if (result.providerServed) {
 		if (conversationKey) {
 			routing.clearBlock(conversationKey, candidate.provider.name);
 		}
@@ -237,13 +132,6 @@ function resolvePoolCandidateResult({
 				Date.now(),
 			);
 		}
-		candidateContext.teamRouter?.rebind(
-			interactiveInput.teamRequest,
-			result.account.id,
-			candidateContext.runtime.teamRouting,
-			candidateContext.provider,
-			candidateContext.dbOps,
-		);
 	}
 	if (!interactive) return result.response;
 	const served = withServedProviderHeaders(result.response, {
@@ -264,7 +152,7 @@ function resolvePoolCandidateResult({
 		higherRankedProviderChoices(
 			configuredPoolChoices(interactiveInput.pool, interactiveInput.meta.model),
 			candidate.provider.name,
-			eligiblePoolProviders(interactiveInput),
+			await eligiblePoolProviders(interactiveInput),
 			(provider) =>
 				routing.canOfferProvider(conversationKey, provider, Date.now()),
 		),
@@ -274,38 +162,25 @@ function resolvePoolCandidateResult({
 function preparePoolCandidate(
 	input: InteractivePoolRequest,
 	candidate: ResolvedPoolCandidate,
-	pinnedId: string | undefined,
-): {
-	accounts: Account[];
-	context: ReturnType<typeof createResolvedProxyContext>;
-	request: ProxyRequest;
-} {
+	beforeAttempt: () => void,
+) {
 	const context = createResolvedProxyContext(
 		input.ctx,
 		candidate.provider,
 		input.pool.upstreamPath,
 	);
-	const prepared = prepareProxyRequest(
+	const supply = getProviderSupply(input.ctx, candidate.provider);
+	const route = buildRouteRequest(
 		input.req,
 		input.url,
 		context,
-		{ ...input.meta, model: candidate.model },
+		input.meta,
 		input.body,
-		input.manualAccountName,
 		input.teamRequest,
-		candidate.model,
-		{ allowRevalidationProbe: false, applyTeamRouting: false },
+		"pool-route",
+		beforeAttempt,
 	);
-	const eligibleAccounts = admittedPoolAccounts(
-		prepared.accounts,
-		context,
-		input,
-	);
-	return {
-		accounts: preferPinnedAccount(eligibleAccounts, pinnedId),
-		context,
-		request: prepared.request,
-	};
+	return { supply, route, prepared: supply.prepareRoute(route) };
 }
 
 export async function proxyPoolCandidates({
@@ -313,7 +188,6 @@ export async function proxyPoolCandidates({
 	conversationKey,
 	interactive,
 	interactiveInput,
-	pinnedId,
 	providerPreference,
 	requestedChoice,
 	routing,
@@ -325,62 +199,53 @@ export async function proxyPoolCandidates({
 	let emittedIngress = false;
 	const earliest = (current: number | null, next: number | null) =>
 		next !== null && (current === null || next < current) ? next : current;
-	const recordUnserved = (request: ProxyRequest) => {
-		firstCapacityBlock ??= getRequestQuotaCapacityBlock(request);
-		everyCandidateFull &&= isEveryAccountQuotaBlocked(
-			request.meta,
-			request.ctx,
-		);
-		soonestRetry = earliest(soonestRetry, getRequestRetryAt(request));
-		soonestFleetReset = earliest(
-			soonestFleetReset,
-			getSoonestQuotaReset(request.meta, request.ctx),
-		);
+	const recordUnserved = (
+		facts: ReturnType<ProviderSupply["unservedFacts"]>,
+	) => {
+		firstCapacityBlock ??= facts.block;
+		everyCandidateFull &&= facts.fleetFull;
+		soonestRetry = earliest(soonestRetry, facts.retryAt);
+		soonestFleetReset = earliest(soonestFleetReset, facts.fleetResetAt);
+	};
+	const beforeAttempt = () => {
+		if (emittedIngress) return;
+		requestEvents.emit("event", {
+			type: "ingress",
+			id: interactiveInput.meta.id,
+			timestamp: interactiveInput.meta.timestamp,
+			method: interactiveInput.meta.method,
+			path: interactiveInput.meta.path,
+		});
+		emittedIngress = true;
 	};
 
 	for (const [candidateIndex, candidate] of candidates.entries()) {
-		const { accounts, context, request } = preparePoolCandidate(
+		const { supply, route, prepared } = preparePoolCandidate(
 			interactiveInput,
 			candidate,
-			pinnedId,
+			beforeAttempt,
 		);
-		if (accounts.length === 0) {
-			recordUnserved(request);
+		if (!prepared.hasAccounts) {
+			recordUnserved(prepared);
 			continue;
 		}
-
-		if (!emittedIngress) {
-			requestEvents.emit("event", {
-				type: "ingress",
-				id: interactiveInput.meta.id,
-				timestamp: interactiveInput.meta.timestamp,
-				method: interactiveInput.meta.method,
-				path: interactiveInput.meta.path,
-			});
-			emittedIngress = true;
-		}
-		log.info(
-			`Selected ${accounts.length} accounts: ${accounts.map((account) => account.name).join(", ")}`,
-		);
 		const result = await proxyPoolCandidate(
-			request,
-			accounts,
+			supply,
+			route,
 			candidateIndex < candidates.length - 1,
 		);
 		if (result.kind === "next-provider" && result.block) {
 			firstCapacityBlock ??= result.block;
-			if (conversationKey) {
+			if (conversationKey)
 				routing.recordBlock(
 					conversationKey,
 					candidate.provider.name,
 					result.block,
 					Date.now(),
 				);
-			}
 		}
-		const response = resolvePoolCandidateResult({
+		const response = await resolvePoolCandidateResult({
 			candidate,
-			candidateContext: context,
 			conversationKey,
 			interactive,
 			interactiveInput,
@@ -390,7 +255,7 @@ export async function proxyPoolCandidates({
 			routing,
 		});
 		if (response) return { kind: "response", response };
-		recordUnserved(request);
+		recordUnserved(supply.unservedFacts(route));
 	}
 
 	return {

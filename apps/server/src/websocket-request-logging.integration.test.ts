@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { estimateCostUSD, requestEvents } from "@agent-smith/core";
 import { DatabaseFactory } from "@agent-smith/database";
+import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import {
+	createProviderSupplies,
 	getUsageWorker,
 	handleWebSocketUpgradeRequest,
 	type ProxyContext,
@@ -85,7 +87,7 @@ function insertCodexAccount(account: Account): void {
 }
 
 function createProxyContext(): ProxyContext {
-	return {
+	const fixture = {
 		providerRegistry: new ProviderRegistry([new CodexProvider()]),
 		strategy: {
 			select(selectedAccounts: Account[]) {
@@ -109,6 +111,13 @@ function createProxyContext(): ProxyContext {
 		},
 		usageWorker: getUsageWorker(),
 	} as unknown as ProxyContext;
+	const context = {
+		...fixture,
+		testPool: fixture as unknown as PoolContext,
+		routedProviders: new Map<string, ProviderSupply>(),
+	};
+	context.routedProviders = createProviderSupplies(context.testPool, context);
+	return context;
 }
 
 describe("WebSocket request logging integration", () => {
@@ -136,7 +145,7 @@ describe("WebSocket request logging integration", () => {
 						data: WebSocketProxyData;
 				  }
 				| undefined;
-			handleWebSocketUpgradeRequest(
+			await handleWebSocketUpgradeRequest(
 				new Request(url, {
 					method: "GET",
 					headers: {
@@ -299,7 +308,7 @@ describe("WebSocket request logging integration", () => {
 					data: WebSocketProxyData;
 			  }
 			| undefined;
-		handleWebSocketUpgradeRequest(
+		await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				method: "GET",
 				headers: {
@@ -387,7 +396,7 @@ describe("WebSocket request logging integration", () => {
 					data: WebSocketProxyData;
 			  }
 			| undefined;
-		handleWebSocketUpgradeRequest(
+		await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				method: "GET",
 				headers: {
@@ -483,7 +492,7 @@ describe("WebSocket request logging integration", () => {
 					data: WebSocketProxyData;
 			  }
 			| undefined;
-		handleWebSocketUpgradeRequest(
+		await handleWebSocketUpgradeRequest(
 			new Request(url, {
 				method: "GET",
 				headers: {

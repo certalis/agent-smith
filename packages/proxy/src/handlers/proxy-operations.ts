@@ -1,18 +1,18 @@
-import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import { ProviderRequestTransformError } from "@agent-smith/providers";
 import {
-	interactiveProviderChoiceRequested,
-	stripProviderChoiceHeaders,
-} from "@agent-smith/routing";
+	type AccountFact,
+	getValidAccessToken,
+	type MessageThreadRequest,
+	type ProxyAttempt,
+	type ResolvedPoolContext,
+	readMessageId,
+	refreshAccessTokenSafe,
+} from "@agent-smith/pool";
+import { ProviderRequestTransformError } from "@agent-smith/providers";
+import { stripProviderChoiceHeaders } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
 import { forwardToClient } from "../response-handler";
-import {
-	type MessageThreadRequest,
-	readMessageId,
-	rememberMessageThread,
-} from "./message-thread";
 import type { ResolvedProxyContext } from "./proxy-types";
 import { rewriteRequestBody } from "./request-body-rewriter";
 import { makeProxyRequest } from "./request-handler";
@@ -23,14 +23,8 @@ import {
 	isQuotaRejection,
 	isRequestScopedRateLimit,
 	isUpstreamFailureResponse,
-	processProxyResponse,
 } from "./response-processor";
 import { inspectStreamHead } from "./stream-failure";
-import {
-	getValidAccessToken,
-	quarantineAccount,
-	refreshAccessTokenSafe,
-} from "./token-manager";
 
 const API_KEY_AUTH_COOLDOWN_MS = 5 * 60_000;
 const ORGANIZATION_QUARANTINE_MS = 5 * 60_000;
@@ -52,6 +46,7 @@ type ProxyOperationInput = {
 	account: Account;
 	createBodyStream: BodyStreamFactory;
 	ctx: ResolvedProxyContext;
+	pool: ResolvedPoolContext;
 	failoverAttempts: number;
 	mappedModel: string | undefined;
 	requestBody: ArrayBuffer | null;
@@ -59,6 +54,8 @@ type ProxyOperationInput = {
 	req: Request;
 	thread: MessageThreadRequest | null;
 	url: URL;
+	inlineRateLimitRetry: boolean;
+	report: (fact: AccountFact) => void;
 };
 
 /**
@@ -73,34 +70,6 @@ type ProxyOperationInput = {
  * @param ctx - The proxy context
  * @returns A forwarded response, a retryable 429, or a failed attempt
  */
-export type ProxyAttempt =
-	| { kind: "authentication-failure" }
-	| { kind: "failed" }
-	| { kind: "transport-failure" }
-	| {
-			forward: () => Promise<Response>;
-			kind: "per-minute-rate-limit";
-			retryAfterMs: number;
-	  }
-	| { kind: "response"; response: Response }
-	| {
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "quota-rate-limit";
-	  }
-	| {
-			block: ProviderCapacityBlock;
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "provider-capacity-block";
-	  }
-	| { forward: () => Promise<Response>; kind: "request-scoped-rate-limit" }
-	| {
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "upstream-failure";
-	  };
-
 function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 	const transformed = input.ctx.provider.transformRequest?.({
 		body: input.requestBody,
@@ -144,25 +113,22 @@ async function sendAuthorizedRequest(
 	input: ProxyOperationInput,
 	send: SendUpstream,
 ): Promise<ProxyAttempt | UpstreamResponse> {
-	let accessToken = await getValidAccessToken(input.account, input.ctx);
+	let accessToken = await getValidAccessToken(input.account, input.pool);
 	let upstream = await send(accessToken);
 	if (upstream.response.status !== 401) return upstream;
 
 	if (input.account.auth_method === "api_key") {
 		const until = Date.now() + API_KEY_AUTH_COOLDOWN_MS;
-		input.account.rate_limited_until = until;
-		input.ctx.asyncWriter.enqueue(() =>
-			input.ctx.dbOps.markAccountRateLimited(input.account.id, until),
-		);
+		input.report({ kind: "cooldown", until });
 		return { kind: "failed" };
 	}
 	if (!input.account.refresh_token) {
-		quarantineAccount(input.account, input.ctx, "missing OAuth refresh token");
+		input.report({ kind: "quarantine", reason: "missing OAuth refresh token" });
 		return { kind: "failed" };
 	}
 
 	try {
-		accessToken = await refreshAccessTokenSafe(input.account, input.ctx);
+		accessToken = await refreshAccessTokenSafe(input.account, input.pool);
 		upstream = await send(accessToken);
 	} catch {
 		return { kind: "failed" };
@@ -213,6 +179,17 @@ function discardUpstreamResponse(state: {
 	};
 }
 
+function recordResponseFacts(
+	input: ProxyOperationInput,
+	response: Response,
+	quotaRejected: boolean,
+): boolean {
+	const streaming = input.ctx.provider.isStreamingResponse?.(response) ?? false;
+	const info = input.ctx.provider.parseRateLimit(response);
+	input.report({ kind: "rate-limit", info, streaming, quotaRejected });
+	return !streaming && info.isRateLimited;
+}
+
 async function classifyUpstreamResponse(
 	input: ProxyOperationInput,
 	upstream: UpstreamResponse,
@@ -220,20 +197,17 @@ async function classifyUpstreamResponse(
 	const state = { response: upstream.response };
 	if (await isOrganizationForbidden(state.response)) {
 		const until = Date.now() + ORGANIZATION_QUARANTINE_MS;
-		input.account.rate_limited_until = until;
-		input.ctx.asyncWriter.enqueue(() =>
-			input.ctx.dbOps.markAccountRateLimited(input.account.id, until),
-		);
+		input.report({ kind: "cooldown", until });
 		return { kind: "failed" };
 	}
 
 	let response = state.response;
 	const forward = createForwarder(input, upstream, state);
-	const interactive = interactiveProviderChoiceRequested(input.req.headers);
+	const interactive = input.inlineRateLimitRetry;
 	const capacityBlock = await input.ctx.provider.getCapacityBlock?.(response);
 	if (capacityBlock) {
 		const quotaRejected = await isQuotaRejection(response, input.ctx.provider);
-		processProxyResponse(response, input.account, input.ctx, quotaRejected);
+		recordResponseFacts(input, response, quotaRejected);
 		const perMinuteRetryAfterMs = getPerMinuteRetryAfterMs(
 			response,
 			quotaRejected,
@@ -280,12 +254,7 @@ async function classifyUpstreamResponse(
 	}
 
 	const quotaRejected = await isQuotaRejection(response, input.ctx.provider);
-	const isRateLimited = processProxyResponse(
-		response,
-		input.account,
-		input.ctx,
-		quotaRejected,
-	);
+	const isRateLimited = recordResponseFacts(input, response, quotaRejected);
 	const perMinuteRetryAfterMs = getPerMinuteRetryAfterMs(
 		response,
 		quotaRejected,
@@ -309,12 +278,7 @@ async function classifyUpstreamResponse(
 
 	if (response.ok && input.thread) {
 		const messageId = streamHead.messageId ?? (await readMessageId(response));
-		rememberMessageThread(
-			input.ctx.messageThreads,
-			input.thread,
-			messageId,
-			input.account,
-		);
+		input.report({ kind: "message-id", thread: input.thread, messageId });
 	}
 	return { kind: "response", response: await forward() };
 }
@@ -330,11 +294,15 @@ export async function proxyWithAccount(
 	failoverAttempts: number,
 	mappedModel: string | undefined,
 	ctx: ResolvedProxyContext,
+	pool: ResolvedPoolContext,
+	inlineRateLimitRetry: boolean,
+	report: (fact: AccountFact) => void,
 ): Promise<ProxyAttempt> {
 	const input: ProxyOperationInput = {
 		account,
 		createBodyStream,
 		ctx,
+		pool,
 		failoverAttempts,
 		mappedModel,
 		requestBody: requestBodyBuffer
@@ -350,6 +318,8 @@ export async function proxyWithAccount(
 		req,
 		thread,
 		url,
+		inlineRateLimitRetry,
+		report,
 	};
 	try {
 		log.info(`Attempting request with account: ${account.name}`);

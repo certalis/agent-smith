@@ -4,7 +4,7 @@ import type { ProxyContext } from "@agent-smith/proxy";
 import { createServerFetchHandler, createStartupBanner } from "./server";
 
 function createProxyContext(): ProxyContext {
-	return {
+	const fixture = {
 		providerRegistry: new ProviderRegistry(),
 		strategy: {
 			select() {
@@ -37,6 +37,7 @@ function createProxyContext(): ProxyContext {
 			postMessage() {},
 		} as unknown as Worker,
 	} as unknown as ProxyContext;
+	return { ...fixture, routedProviders: new Map() };
 }
 
 describe("createServerFetchHandler", () => {
@@ -186,7 +187,7 @@ describe("createServerFetchHandler", () => {
 				proxyCalls += 1;
 				return new Response("proxied");
 			},
-			handleWebSocketUpgrade: () => {
+			handleWebSocketUpgrade: async () => {
 				upgradeCalls += 1;
 				return undefined;
 			},

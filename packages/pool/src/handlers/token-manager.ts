@@ -3,7 +3,7 @@ import { Logger } from "@agent-smith/logger";
 import type { TokenRefreshResult } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import { TOKEN_REFRESH_BACKOFF_MS, TOKEN_SAFETY_WINDOW_MS } from "../constants";
-import { ERROR_MESSAGES, type ResolvedProxyContext } from "./proxy-types";
+import type { ResolvedPoolContext } from "../pool-context";
 
 const log = new Logger("TokenManager");
 
@@ -38,7 +38,7 @@ export function refreshBackoffUntil(
 
 export function quarantineAccount(
 	account: Account,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	reason: string,
 ): void {
 	const { access_token: accessToken, refresh_token: refreshToken } = account;
@@ -57,7 +57,7 @@ export function quarantineAccount(
 
 function recordRefreshFailure(
 	account: Account,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	error: unknown,
 ): TokenRefreshError {
 	const refreshError = new TokenRefreshError(account.id, error as Error);
@@ -94,7 +94,7 @@ function recordRefreshFailure(
  */
 export async function refreshAccessTokenSafe(
 	account: Account,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 ): Promise<string> {
 	// Check for recent refresh failures and implement backoff
 	const lastFailure = refreshFailures.get(account.id);
@@ -172,7 +172,7 @@ export async function refreshAccessTokenSafe(
 	if (!promise) {
 		throw new TokenRefreshError(
 			account.id,
-			new Error(ERROR_MESSAGES.REFRESH_NOT_FOUND),
+			new Error("Refresh promise not found for account"),
 		);
 	}
 	return promise;
@@ -186,7 +186,7 @@ export async function refreshAccessTokenSafe(
  */
 export async function getValidAccessToken(
 	account: Account,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 ): Promise<string> {
 	// API key accounts don't use access tokens
 	if (!account.refresh_token && account.api_key) {

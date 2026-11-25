@@ -6,7 +6,7 @@ import {
 	getSoonestQuotaReset,
 	isEveryAccountQuotaBlocked,
 } from "./handlers/account-selector";
-import type { ResolvedProxyContext } from "./handlers/proxy-types";
+import type { ResolvedPoolContext } from "./pool-context";
 
 const log = new Logger("SeatAlerts");
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
@@ -35,7 +35,7 @@ type SlackReply = { ok?: unknown; error?: unknown };
 /** The fleet-full trigger HTTP and WebSocket share; the pool route checks each of its providers itself. */
 export function alertWhenFleetFull(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	holdSeconds: number,
 ): void {
 	const resetAt = getSoonestQuotaReset(meta, ctx);

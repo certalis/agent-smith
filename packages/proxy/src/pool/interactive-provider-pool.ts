@@ -1,26 +1,19 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
+import type { TeamRoutingRequest } from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	type ConversationProviderRouting,
 	capacityChoices,
 	createProviderCapacityProblem,
 	createProviderChoiceProblem,
-	interactiveProviderChoiceRequested,
 	type ProviderChoice,
 	preferProviders,
 	providerWaitRequested,
 } from "@agent-smith/routing";
-import type { Account, RequestMeta } from "@agent-smith/types";
-import {
-	createResolvedProxyContext,
-	type ProxyContext,
-	type ResolvedProxyContext,
-} from "../handlers";
-import { prepareProxyRequest } from "../handlers/proxy-request";
-import {
-	hasOrderedProviderFallback,
-	type TeamRoutingRequest,
-} from "../team-router";
+import type { RequestMeta } from "@agent-smith/types";
+import { createResolvedProxyContext, type ProxyContext } from "../handlers";
+import { buildRouteRequest } from "../handlers/proxy-request";
+import { getProviderSupply } from "../supply-executor";
 
 export type InteractivePoolRequest = {
 	body: ArrayBuffer | null;
@@ -43,93 +36,72 @@ export function configuredPoolChoices(
 	}));
 }
 
-/**
- * Allowlisted seats, plus API-key accounts when a person picks the provider in
- * Claude Code's chooser or the device walks the pool under `caller_provider_fallback`.
- */
-export function admittedPoolAccounts(
-	accounts: Account[],
-	context: ResolvedProxyContext,
-	{ req, teamRequest }: Pick<InteractivePoolRequest, "req" | "teamRequest">,
-): Account[] {
-	const pooled = context.teamRouter
-		? context.teamRouter.eligibleAccounts(
-				accounts,
-				teamRequest,
-				context.runtime.teamRouting,
-			)
-		: accounts;
-	const reachesApiKeyAccounts =
-		interactiveProviderChoiceRequested(req.headers) ||
-		hasOrderedProviderFallback(
-			context.runtime.teamRouting,
-			teamRequest.callerId,
-		);
-	if (!reachesApiKeyAccounts) return pooled;
-	return accounts.filter(
-		(account) => account.auth_method === "api_key" || pooled.includes(account),
+export async function poolAvailability(
+	input: InteractivePoolRequest,
+	candidate: ResolvedProviderPool["providers"][number],
+) {
+	const context = createResolvedProxyContext(
+		input.ctx,
+		candidate.provider,
+		input.pool.upstreamPath,
+	);
+	const route = buildRouteRequest(
+		input.req,
+		input.url,
+		context,
+		input.meta,
+		input.body,
+		input.teamRequest,
+		"pool-route",
+	);
+	return await getProviderSupply(input.ctx, candidate.provider).availability(
+		route,
 	);
 }
 
-export function eligiblePoolProviders(
+export async function eligiblePoolProviders(
 	input: InteractivePoolRequest,
-): Set<string> {
-	const { body, ctx, manualAccountName, meta, pool, req, teamRequest, url } =
-		input;
-	const eligibleProviders = new Set<string>();
-	for (const candidate of pool.providers) {
-		const candidateContext = createResolvedProxyContext(
-			ctx,
-			candidate.provider,
-			pool.upstreamPath,
-		);
-		const prepared = prepareProxyRequest(
-			req,
-			url,
-			candidateContext,
-			{ ...meta, model: candidate.model },
-			body,
-			manualAccountName,
-			teamRequest,
-			candidate.model,
-			{ allowRevalidationProbe: false, applyTeamRouting: false },
-		);
-		if (prepared.request.thread || prepared.accounts.length === 0) continue;
-		const accounts = admittedPoolAccounts(
-			prepared.accounts,
-			candidateContext,
-			input,
-		);
-		if (accounts.length > 0) eligibleProviders.add(candidate.provider.name);
-	}
-	return eligibleProviders;
+): Promise<Set<string>> {
+	const availability = await Promise.all(
+		input.pool.providers.map((candidate) => poolAvailability(input, candidate)),
+	);
+	return new Set(
+		input.pool.providers.flatMap((candidate, index) => {
+			const state = availability[index];
+			return state &&
+				!state.threadRequest &&
+				state.capacity.state === "available"
+				? [candidate.provider.name]
+				: [];
+		}),
+	);
 }
 
-export function eligiblePoolChoices(
+export async function eligiblePoolChoices(
 	input: InteractivePoolRequest,
 	blockedProvider: string,
-): ProviderChoice[] {
+): Promise<ProviderChoice[]> {
 	return capacityChoices(
 		configuredPoolChoices(input.pool, input.meta.model),
 		blockedProvider,
-		eligiblePoolProviders(input),
+		await eligiblePoolProviders(input),
 	);
 }
 
-export function createManualProviderChoiceResponse(
+export async function createManualProviderChoiceResponse(
 	input: InteractivePoolRequest,
-	pinnedAccount: Account | null,
+	pinnedProvider: string | undefined,
 	preferredProvider: string | undefined,
-): Response {
+): Promise<Response> {
 	const ordered = preferProviders(
 		input.pool.providers,
 		(candidate) => candidate.provider.name,
-		pinnedAccount?.provider,
+		pinnedProvider,
 		preferredProvider,
 	);
 	const activeProvider =
 		ordered[0]?.provider.name ?? input.pool.providers[0]?.provider.name ?? "";
-	const eligible = eligiblePoolProviders(input);
+	const eligible = await eligiblePoolProviders(input);
 	return createProviderChoiceProblem({
 		activeProvider,
 		choices: configuredPoolChoices(input.pool, input.meta.model).filter(
@@ -181,7 +153,7 @@ export async function waitOrReturnProviderCapacity({
 			blockedProvider: provider,
 			category: (blocked?.category ??
 				"unknown") as ProviderCapacityBlock["category"],
-			choices: eligiblePoolChoices(input, provider),
+			choices: await eligiblePoolChoices(input, provider),
 			...(retryAt !== undefined && { retryAt }),
 		});
 	}

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
 import type { Account, AccountProvider, RequestMeta } from "@agent-smith/types";
+import type { PoolContext, ResolvedPoolContext } from "../pool-context";
 import {
 	getCallerPoolStatus,
 	getSoonestQuotaReset,
 	selectAccountsForRequest,
 } from "./account-selector";
-import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 
 afterEach(() => setSystemTime());
 
@@ -71,7 +71,7 @@ describe("selectAccountsForRequest", () => {
 					].filter((account) => account.provider === provider);
 				},
 			},
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		const selected = selectAccountsForRequest(meta, ctx);
 
@@ -103,7 +103,7 @@ describe("selectAccountsForRequest", () => {
 					];
 				},
 			},
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(meta, ctx).map((account) => account.name),
@@ -139,7 +139,7 @@ describe("selectAccountsForRequest", () => {
 			provider: quotaProvider,
 			runtime: { quotaThreshold: 0.98 },
 			dbOps: { getAccountsByProvider: () => [account] },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			getSoonestQuotaReset(
@@ -177,7 +177,7 @@ describe("selectAccountsForRequest", () => {
 			provider: quotaProvider,
 			runtime: { quotaThreshold: 0.98 },
 			dbOps: { getAccountsByProvider: () => [account] },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			getSoonestQuotaReset(
@@ -228,7 +228,7 @@ describe("selectAccountsForRequest", () => {
 				getEnrollmentContact: () => undefined,
 			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 		expect(
 			selectAccountsForRequest(
 				{
@@ -282,7 +282,7 @@ describe("selectAccountsForRequest", () => {
 			strategy: { select: (accounts: Account[]) => accounts },
 			dbOps: { getAvailableAccountsByProvider: () => [capped, available] },
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -333,7 +333,7 @@ describe("selectAccountsForRequest", () => {
 			strategy: { select: (accounts: Account[]) => accounts },
 			dbOps: { getAvailableAccountsByProvider: () => [staleUnknownReset] },
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -373,7 +373,7 @@ describe("selectAccountsForRequest", () => {
 				getAvailableAccountsByProvider: () => [account],
 				getEnrollmentContact: () => undefined,
 			},
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -428,7 +428,7 @@ describe("selectAccountsForRequest", () => {
 				getEnrollmentContact: () => undefined,
 			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -491,7 +491,7 @@ describe("selectAccountsForRequest", () => {
 				getEnrollmentContact: () => ({ email: "full@example.test" }),
 			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -565,7 +565,7 @@ describe("selectAccountsForRequest", () => {
 				getEnrollmentContact: () => undefined,
 			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -623,7 +623,7 @@ describe("selectAccountsForRequest", () => {
 				getEnrollmentContact: () => undefined,
 			},
 			teamRouter: { order: (accounts: Account[]) => accounts },
-		} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext;
 
 		expect(
 			selectAccountsForRequest(
@@ -707,11 +707,15 @@ describe("getCallerPoolStatus", () => {
 					accounts.filter((account) => account.provider === provider),
 				getEnrollmentContact: () => undefined,
 			},
-		} as unknown as Pick<
-			ProxyContext,
-			"runtime" | "dbOps" | "providerRegistry"
-		>;
-		return getCallerPoolStatus("anthropic-messages", undefined, callerId, ctx);
+		} as unknown as Pick<PoolContext, "runtime" | "dbOps" | "providerRegistry">;
+		return getCallerPoolStatus(
+			"anthropic-messages",
+			undefined,
+			callerId,
+			ctx,
+			ctx.runtime.teamRouting.enabled &&
+				ctx.runtime.teamRouting.callerProviderFallback[callerId] === "ordered",
+		);
 	}
 
 	const exhaustedSeatAndQwenKeys = () => [

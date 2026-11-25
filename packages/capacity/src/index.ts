@@ -29,3 +29,14 @@ export function isProviderBlockCategory(
 		(PROVIDER_BLOCK_CATEGORIES as readonly string[]).includes(value)
 	);
 }
+
+export type {
+	Availability,
+	EdgeRequest,
+	ProviderStatus,
+	RoutedProvider,
+	RouteRequest,
+	RouteScope,
+	ServeOutcome,
+	SessionOutcome,
+} from "./routed-provider";

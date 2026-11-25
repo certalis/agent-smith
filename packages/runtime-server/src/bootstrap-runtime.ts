@@ -11,25 +11,29 @@ import type { DatabaseOperations } from "@agent-smith/database";
 import { AsyncDbWriter, DatabaseFactory } from "@agent-smith/database";
 import { Logger } from "@agent-smith/logger";
 import {
+	getValidAccessToken,
+	OutsideSpendTracker,
+	type PoolContext,
+	type ProviderSupply,
+	QuotaProbe,
+	SeatAlerts,
+	type SeatTokenReader,
+	TeamAdmission,
+	TeamRouter,
+	WindowWarmup,
+} from "@agent-smith/pool";
+import {
 	createConfiguredProviderRegistry,
 	type ProviderRegistry,
 } from "@agent-smith/providers";
 import {
-	getCallerPoolStatus,
-	getPoolStatus,
+	createProviderSupplies,
 	getUsageWorker,
 	getUsageWorkerHealth,
-	getValidAccessToken,
-	OutsideSpendTracker,
+	hasOrderedProviderFallback,
 	type ProxyContext,
 	QuotaHold,
-	QuotaProbe,
-	SeatAlerts,
-	type SeatTokenReader,
 	SessionStrategy,
-	TeamAdmission,
-	TeamRouter,
-	WindowWarmup,
 } from "@agent-smith/proxy";
 import { deviceKeyName } from "./device-keys";
 import { createExposureConfig, type ExposureConfig } from "./exposure";
@@ -42,9 +46,43 @@ export type BootstrappedRuntime = {
 	apiRouter: APIRouter;
 	exposureConfig: ExposureConfig;
 	proxyContext: ProxyContext;
+	poolContext: PoolContext;
 	providerRegistry: ProviderRegistry;
 	runtimeConfig: RuntimeConfig;
 };
+
+type StatusRequest = Parameters<ProviderSupply["status"]>[0];
+
+function createStatusRequest(
+	scope: StatusRequest["scope"],
+	url: URL,
+	model: string | undefined,
+	callerId?: string,
+	apiKeyAccounts = false,
+): StatusRequest {
+	return {
+		scope,
+		edge: {
+			method: "GET",
+			url,
+			headers: new Headers(),
+			body: null,
+			meta: {
+				id: "pool-status",
+				method: "GET",
+				path: url.pathname,
+				timestamp: Date.now(),
+			},
+		},
+		model,
+		...(callerId !== undefined && { callerId }),
+		sessionId: null,
+		openingDigest: null,
+		apiKeyAccounts,
+		inlineRateLimitRetry: false,
+		signal: new AbortController().signal,
+	};
+}
 
 function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 	return {
@@ -82,6 +120,7 @@ function wireStrategyHotReload(
 	runtimeConfig: RuntimeConfig,
 	quotaProbe: QuotaProbe,
 	windowWarmup: WindowWarmup,
+	poolContext: PoolContext,
 ): void {
 	config.on("change", (change: { key?: string }) => {
 		if (change.key === "lb_strategy") {
@@ -91,6 +130,7 @@ function wireStrategyHotReload(
 				const strategy = new SessionStrategy();
 				strategy.initialize(dbOps);
 				proxyContext.strategy = strategy;
+				poolContext.strategy = strategy;
 			}
 		}
 		if (change.key === "data_retention_days") {
@@ -108,15 +148,15 @@ function wireStrategyHotReload(
 /** The seat jobs that read or start quota windows on no client's request. */
 function startSeatSchedulers(
 	config: Config,
-	proxyContext: ProxyContext,
+	poolContext: PoolContext,
 	outsideSpendTracker: OutsideSpendTracker,
 ): { quotaProbe: QuotaProbe; windowWarmup: WindowWarmup } {
-	const { dbOps, providerRegistry, runtime } = proxyContext;
+	const { dbOps, providerRegistry, runtime } = poolContext;
 	const readSeatToken: SeatTokenReader = async (account) => {
 		const provider = providerRegistry.getProvider(account.provider);
 		if (!provider) return null;
 		return await getValidAccessToken(account, {
-			...proxyContext,
+			...poolContext,
 			provider,
 			providerName: account.provider,
 			upstreamPath: "/",
@@ -186,24 +226,79 @@ export function bootstrapRuntime(
 			const provider = providerRegistry.getProvider(account.provider);
 			if (!provider) throw new Error("Provider unavailable");
 			return getValidAccessToken(account, {
-				...proxyContext,
+				...poolContext,
 				provider,
 				providerName: account.provider,
 				upstreamPath: "/",
 			});
 		},
-		getPoolStatus: (provider, model) =>
-			getPoolStatus(provider, model, {
-				dbOps,
-				runtime: runtimeConfig,
-				providerRegistry,
-			}),
-		getCallerPoolStatus: (pool, model, callerId) =>
-			getCallerPoolStatus(pool, model, callerId, {
-				dbOps,
-				runtime: runtimeConfig,
-				providerRegistry,
-			}),
+		getPoolStatus: async (provider, model) => {
+			const supply = proxyContext.routedProviders.get(provider);
+			if (!supply) throw new Error("Provider supply unavailable");
+			const url = new URL(`http://localhost/v1/${provider}/`);
+			const status = await supply.status(
+				createStatusRequest({ kind: "direct", provider }, url, model),
+			);
+			return {
+				version: 1,
+				provider,
+				routingEnabled: runtimeConfig.teamRouting.enabled,
+				eligibleAccounts: status.servableSeats,
+				retryAtMs: status.retryAt,
+				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				admissionWaitMs: status.admissionWaitMs,
+			};
+		},
+		getCallerPoolStatus: async (pool, model, callerId) => {
+			const members = providerRegistry.poolCapacityMembers(pool, model);
+			const first = members[0];
+			if (!first) return null;
+			const ordered = hasOrderedProviderFallback(
+				runtimeConfig.teamRouting,
+				callerId,
+			);
+			const reachable = !runtimeConfig.teamRouting.enabled
+				? []
+				: ordered
+					? members
+					: [first];
+			const url = new URL(`http://localhost/v1/pool/${pool}/`);
+			const statuses = await Promise.all(
+				reachable.map(({ provider }) => {
+					const supply = proxyContext.routedProviders.get(provider.name);
+					if (!supply) throw new Error("Provider supply unavailable");
+					return supply.status(
+						createStatusRequest(
+							{ kind: "pool-route", wire: pool },
+							url,
+							model,
+							callerId,
+							ordered,
+						),
+					);
+				}),
+			);
+			const eligibleAccounts = statuses.reduce(
+				(sum, status) => sum + status.servableSeats,
+				0,
+			);
+			const retryTimes = statuses.flatMap((status) =>
+				status.retryAt === null ? [] : [status.retryAt],
+			);
+			return {
+				version: 1,
+				pool,
+				provider: first.provider.name,
+				routingEnabled: runtimeConfig.teamRouting.enabled,
+				eligibleAccounts,
+				retryAtMs:
+					eligibleAccounts === 0 && retryTimes.length
+						? Math.min(...retryTimes)
+						: null,
+				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				admissionWaitMs: runtimeConfig.teamRouting.admissionWaitMs,
+			};
+		},
 		callerForDeviceKey: (key) =>
 			deviceKeyName(key, exposureConfig.clientKeysFile),
 		getRuntimeHealth: () => ({
@@ -224,7 +319,7 @@ export function bootstrapRuntime(
 	const quotaHold = new QuotaHold();
 	const outsideSpendTracker = new OutsideSpendTracker();
 	registerDisposable(quotaHold);
-	const proxyContext: ProxyContext = {
+	const poolContext: PoolContext = {
 		strategy,
 		dbOps,
 		runtime: runtimeConfig,
@@ -234,15 +329,27 @@ export function bootstrapRuntime(
 		quotaProbeAt: new Map(),
 		teamRouter,
 		teamAdmission,
-		quotaHold,
 		outsideSpendTracker,
 		seatAlerts: new SeatAlerts(config.getAlerts()),
 		asyncWriter,
+	};
+	const proxyContext: ProxyContext = {
+		strategy,
+		dbOps,
+		runtime: runtimeConfig,
+		providerRegistry,
+		asyncWriter,
+		routedProviders: new Map(),
+		quotaHold,
 		usageWorker: getUsageWorker(),
 	};
+	proxyContext.routedProviders = createProviderSupplies(
+		poolContext,
+		proxyContext,
+	);
 	const { quotaProbe, windowWarmup } = startSeatSchedulers(
 		config,
-		proxyContext,
+		poolContext,
 		outsideSpendTracker,
 	);
 
@@ -254,6 +361,7 @@ export function bootstrapRuntime(
 		runtimeConfig,
 		quotaProbe,
 		windowWarmup,
+		poolContext,
 	);
 
 	return {
@@ -264,6 +372,7 @@ export function bootstrapRuntime(
 		apiRouter,
 		exposureConfig,
 		proxyContext,
+		poolContext,
 		providerRegistry,
 		runtimeConfig,
 	};

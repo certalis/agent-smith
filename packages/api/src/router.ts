@@ -196,7 +196,7 @@ export class APIRouter {
 		this.staticHandlers.set("GET:/health", () => healthHandler());
 		this.staticHandlers.set("GET:/api/stats", () => statsHandler());
 		this.staticHandlers.set("GET:/api/status", () => fleetStatusHandler());
-		this.staticHandlers.set("GET:/api/pool-status", (req, url) => {
+		this.staticHandlers.set("GET:/api/pool-status", async (req, url) => {
 			if (this.context.deploymentDrain?.("status").draining) {
 				return errorResponse(
 					new ServiceUnavailableError(
@@ -226,7 +226,7 @@ export class APIRouter {
 					{ status: 503 },
 				);
 			}
-			return Response.json(this.context.getPoolStatus(provider, model), {
+			return Response.json(await this.context.getPoolStatus(provider, model), {
 				headers: { "cache-control": "no-store" },
 			});
 		});
@@ -358,7 +358,11 @@ export class APIRouter {
 		);
 	}
 
-	private callerPoolStatus(req: Request, url: URL, pool: string): Response {
+	private async callerPoolStatus(
+		req: Request,
+		url: URL,
+		pool: string,
+	): Promise<Response> {
 		const model = url.searchParams.get("model") ?? undefined;
 		if (
 			!isProviderWire(pool) ||
@@ -383,7 +387,7 @@ export class APIRouter {
 				{ status: 401 },
 			);
 		}
-		const status = getCallerPoolStatus(pool, model, callerId);
+		const status = await getCallerPoolStatus(pool, model, callerId);
 		if (!status) {
 			return Response.json(
 				{ error: "No provider in this pool serves the model" },

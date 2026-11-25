@@ -11,22 +11,18 @@ import {
 	quotaThresholdFor,
 	type RequestMeta,
 } from "@agent-smith/types";
+import type { PoolContext, ResolvedPoolContext } from "../pool-context";
+import { isAllowlisted, type TeamRoutingRequest } from "../seat-router";
 import { soonestWeeklyReset } from "../seat-usage";
-import {
-	hasOrderedProviderFallback,
-	isAllowlisted,
-	type TeamRoutingRequest,
-} from "../team-router";
-import type { ProxyContext, ResolvedProxyContext } from "./proxy-types";
 import { refreshBackoffUntil } from "./token-manager";
 
-type EligibilityContext = Pick<ProxyContext, "runtime" | "dbOps">;
+type EligibilityContext = Pick<PoolContext, "runtime" | "dbOps">;
 type SeatPolicyContext = {
-	runtime: Pick<ProxyContext["runtime"], "quotaThreshold" | "teamRouting">;
-	dbOps: Pick<ProxyContext["dbOps"], "getEnrollmentContact">;
+	runtime: Pick<PoolContext["runtime"], "quotaThreshold" | "teamRouting">;
+	dbOps: Pick<PoolContext["dbOps"], "getEnrollmentContact">;
 };
 type PoolStatusContext = Pick<
-	ProxyContext,
+	PoolContext,
 	"runtime" | "dbOps" | "providerRegistry"
 >;
 
@@ -188,7 +184,7 @@ export function isServableSeat(
 	);
 }
 
-function isServableNow(
+export function isServableNow(
 	provider: Provider,
 	account: Account,
 	model: string | undefined,
@@ -300,7 +296,7 @@ function quotaBlockForAccount(
  */
 export function getQuotaCapacityBlock(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	seatsFor: (fleet: Account[]) => Account[] = (fleet) => fleet,
 	callerId?: string,
 ): ProviderCapacityBlock | null {
@@ -415,6 +411,42 @@ export function getPoolStatus(
 	};
 }
 
+/** Factual capacity for one caller on one provider, without routing policy. */
+export function getProviderCallerStatus(
+	provider: AccountProvider,
+	model: string | undefined,
+	callerId: string,
+	ctx: PoolStatusContext,
+	apiKeyAccounts: boolean,
+): import("@agent-smith/capacity").ProviderStatus {
+	const strategy = ctx.providerRegistry.getProvider(provider);
+	if (!strategy) throw new Error(`Unknown provider '${provider}'`);
+	const config = ctx.runtime.teamRouting;
+	const now = Date.now();
+	const accounts = config.enabled
+		? callerPoolAccounts(provider, ctx, apiKeyAccounts)
+		: [];
+	const servableSeats = accounts.filter((account) =>
+		isServableNow(strategy, account, model, ctx, now, callerId),
+	).length;
+	return {
+		servableSeats,
+		retryAt:
+			servableSeats === 0
+				? soonestServableAt(
+						strategy,
+						accounts,
+						accounts,
+						model,
+						ctx,
+						now,
+						callerId,
+					)
+				: null,
+		admissionWaitMs: config.admissionWaitMs,
+	};
+}
+
 /**
  * getPoolStatus for one registered caller on a provider pool: the first
  * provider under the caller's weekly ceiling, later providers only under its
@@ -425,12 +457,12 @@ export function getCallerPoolStatus(
 	model: string | undefined,
 	callerId: string,
 	ctx: PoolStatusContext,
+	orderedFallback: boolean,
 ): CallerPoolStatus | null {
 	const members = ctx.providerRegistry.poolCapacityMembers(wire, model);
 	const [first] = members;
 	if (!first) return null;
 	const config = ctx.runtime.teamRouting;
-	const orderedFallback = hasOrderedProviderFallback(config, callerId);
 	const now = Date.now();
 	const reachable = !config.enabled ? [] : orderedFallback ? members : [first];
 	const fleets = reachable.map((member) => ({
@@ -478,7 +510,7 @@ export function getCallerPoolStatus(
  */
 export function getSoonestQuotaReset(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	seatsFor: (fleet: Account[]) => Account[] = (fleet) => fleet,
 	callerId?: string,
 ): number | null {
@@ -501,7 +533,7 @@ export function getSoonestQuotaReset(
  */
 export function isEveryAccountQuotaBlocked(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	now: number = Date.now(),
 	callerId?: string,
 ): boolean {
@@ -520,7 +552,7 @@ export function isEveryAccountQuotaBlocked(
 
 function selectRevalidationProbe(
 	accounts: Account[],
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	now: number,
 	model: string | undefined,
 	callerId?: string,
@@ -572,7 +604,7 @@ function selectRevalidationProbe(
  */
 export function getOrderedAccounts(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	teamRequest?: TeamRoutingRequest,
 	options: AccountSelectionOptions = {},
 ): Account[] {
@@ -633,7 +665,7 @@ export function getOrderedAccounts(
  */
 export function selectAccountsForRequest(
 	meta: RequestMeta,
-	ctx: ResolvedProxyContext,
+	ctx: ResolvedPoolContext,
 	teamRequest?: TeamRoutingRequest,
 	options?: AccountSelectionOptions,
 ): Account[] {

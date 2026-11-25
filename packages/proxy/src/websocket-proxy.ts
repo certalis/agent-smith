@@ -1,18 +1,19 @@
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { errorResponse, sanitizeRequestHeaders } from "@agent-smith/http";
 import { Logger } from "@agent-smith/logger";
+import {
+	getValidAccessToken,
+	type TeamRoutingRequest,
+} from "@agent-smith/pool";
 import type { Account, AccountProvider } from "@agent-smith/types";
-import { selectAccountsForRequest } from "./handlers/account-selector";
 import type {
 	ProxyContext,
 	ResolvedProxyContext,
 } from "./handlers/proxy-types";
 import { ERROR_MESSAGES, resolveProxyContext } from "./handlers/proxy-types";
 import { createRequestMetadata } from "./handlers/request-handler";
-import { getValidAccessToken } from "./handlers/token-manager";
 import { normalizeOpenAIUsage, type OpenAIUsagePayload } from "./openai-usage";
-import { alertWhenFleetFull } from "./seat-alerts";
-import type { TeamRoutingRequest } from "./team-router";
+import { getProviderSupply } from "./supply-executor";
 import type {
 	ChunkMessage,
 	EndMessage,
@@ -49,7 +50,10 @@ export interface WebSocketProxySession {
 	query: string;
 	requestHeaders: Record<string, string>;
 	requestContext: ResolvedProxyContext;
-	candidateAccounts: Account[];
+	poolSession: Extract<
+		import("@agent-smith/capacity").SessionOutcome,
+		{ kind: "prepared" }
+	>["session"];
 	nextAccountIndex: number;
 	pendingMessages: WebSocketMessageData[];
 	upstream: WebSocket | null;
@@ -68,6 +72,7 @@ export interface WebSocketProxyData {
 }
 
 const websocketSessions = new Map<string, WebSocketProxySession>();
+const websocketAttempts = new WeakMap<object, WebSocketProxyPlan>();
 const textEncoder = new TextEncoder();
 
 function sanitizeWebSocketRequestHeaders(original: Headers): Headers {
@@ -468,9 +473,10 @@ async function buildWebSocketPlan(
 	query: string,
 	ctx: ResolvedProxyContext,
 	account: Account,
+	pool: import("@agent-smith/pool").ResolvedPoolContext,
 ): Promise<WebSocketProxyPlan> {
 	const sanitizedHeaders = sanitizeWebSocketRequestHeaders(requestHeaders);
-	const accessToken = await getValidAccessToken(account, ctx);
+	const accessToken = await getValidAccessToken(account, pool);
 	const requestAccount =
 		accessToken === account.access_token
 			? account
@@ -493,6 +499,31 @@ async function buildWebSocketPlan(
 	};
 }
 
+/** The pool chooses a seat; this executor prepares its upstream websocket. */
+export function createWebSocketSupplyAttempt(proxy: ProxyContext) {
+	return async (
+		route: import("@agent-smith/capacity").RouteRequest,
+		request: import("@agent-smith/pool").PoolAttemptRequest,
+		account: Account,
+	): Promise<object> => {
+		const plan = await buildWebSocketPlan(
+			route.edge.headers,
+			route.edge.url.search,
+			{
+				...proxy,
+				provider: request.ctx.provider,
+				providerName: request.ctx.providerName,
+				upstreamPath: request.ctx.upstreamPath,
+			},
+			account,
+			request.ctx,
+		);
+		const handle = Object.freeze({});
+		websocketAttempts.set(handle, plan);
+		return handle;
+	};
+}
+
 async function connectToNextUpstream(
 	ws: Bun.ServerWebSocket<WebSocketProxyData>,
 ): Promise<void> {
@@ -504,9 +535,13 @@ async function connectToNextUpstream(
 		return;
 	}
 
-	const account = session.candidateAccounts[session.nextAccountIndex];
-	if (account === undefined) {
+	session.connecting = true;
+	const next = await session.poolSession.next();
+	if (!next) {
+		session.connecting = false;
+		if (session.closed || session.downstreamClosed) return;
 		session.closed = true;
+		session.poolSession.close();
 		closeDownstream(
 			ws,
 			CLOSE_CODE_TRY_AGAIN_LATER,
@@ -514,25 +549,17 @@ async function connectToNextUpstream(
 		);
 		return;
 	}
-
-	session.nextAccountIndex += 1;
-	session.connecting = true;
-
-	let plan: WebSocketProxyPlan;
-	try {
-		plan = await buildWebSocketPlan(
-			new Headers(session.requestHeaders),
-			session.query,
-			session.requestContext,
-			account,
-		);
-	} catch (error) {
+	session.nextAccountIndex = next.attemptNumber;
+	const plan = websocketAttempts.get(next.handle);
+	websocketAttempts.delete(next.handle);
+	if (!plan) {
 		session.connecting = false;
-		log.warn("Skipping websocket account during upstream connection", {
-			account: account.name,
-			error: error instanceof Error ? error.message : String(error),
-		});
-		await connectToNextUpstream(ws);
+		session.closed = true;
+		closeDownstream(
+			ws,
+			CLOSE_CODE_INTERNAL_ERROR,
+			"Upstream websocket plan unavailable",
+		);
 		return;
 	}
 
@@ -651,13 +678,13 @@ export function isWebSocketUpgradeRequest(req: Request): boolean {
 		.some((value) => value.trim() === "upgrade");
 }
 
-export function handleWebSocketUpgradeRequest(
+export async function handleWebSocketUpgradeRequest(
 	req: Request,
 	url: URL,
 	ctx: ProxyContext,
 	server: Bun.Server<WebSocketProxyData>,
 	callerId?: string,
-): Response | undefined {
+): Promise<Response | undefined> {
 	if (!isWebSocketUpgradeRequest(req)) {
 		return undefined;
 	}
@@ -685,13 +712,32 @@ export function handleWebSocketUpgradeRequest(
 		sessionId:
 			requestContext.provider.getClientSessionId?.(req.headers) ?? null,
 	};
-	const accounts = selectAccountsForRequest(
-		requestMeta,
-		requestContext,
-		teamRequest,
+	const supply = getProviderSupply(
+		ctx,
+		requestContext.provider,
+		createWebSocketSupplyAttempt(ctx),
 	);
-	if (accounts.length === 0) {
-		alertWhenFleetFull(requestMeta, requestContext, 0);
+	const route: import("@agent-smith/capacity").RouteRequest = {
+		scope: { kind: "direct", provider: requestContext.providerName },
+		edge: {
+			method: req.method,
+			url,
+			headers: sanitizeRequestHeaders(req.headers),
+			body: null,
+			meta: requestMeta,
+		},
+		model: requestMeta.model,
+		callerId,
+		sessionId: teamRequest.sessionId,
+		openingDigest: null,
+		seatPinLookup: {},
+		apiKeyAccounts: false,
+		inlineRateLimitRetry: false,
+		signal: req.signal,
+	};
+	const outcome = await supply.openSession(route);
+	if (outcome.kind !== "prepared") {
+		supply.alertFleetFull(route, 0);
 		log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);
 		return errorResponse(
 			new ServiceUnavailableError(
@@ -700,6 +746,8 @@ export function handleWebSocketUpgradeRequest(
 			),
 		);
 	}
+	const poolSession = outcome.session;
+
 	const protocols = getProtocols(req.headers);
 	const sessionId = crypto.randomUUID();
 	const session: WebSocketProxySession = {
@@ -711,7 +759,7 @@ export function handleWebSocketUpgradeRequest(
 			sanitizeRequestHeaders(req.headers).entries(),
 		),
 		requestContext,
-		candidateAccounts: accounts,
+		poolSession,
 		nextAccountIndex: 0,
 		pendingMessages: [],
 		upstream: null,
@@ -736,6 +784,7 @@ export function handleWebSocketUpgradeRequest(
 	});
 
 	if (!upgraded) {
+		poolSession.close();
 		websocketSessions.delete(sessionId);
 		return new Response("WebSocket upgrade failed", { status: 400 });
 	}
@@ -765,6 +814,7 @@ export const websocketProxyHandler: Bun.WebSocketHandler<WebSocketProxyData> = {
 
 		if (session.pendingMessages.length >= PENDING_MESSAGE_LIMIT) {
 			session.closed = true;
+			session.poolSession.close();
 			closeUpstream(
 				session,
 				CLOSE_CODE_TRY_AGAIN_LATER,
@@ -787,6 +837,7 @@ export const websocketProxyHandler: Bun.WebSocketHandler<WebSocketProxyData> = {
 		}
 		session.downstreamClosed = true;
 		session.closed = true;
+		session.poolSession.close();
 		session.pendingMessages.length = 0;
 		clearConnectTimeout(session);
 		session.connectedAccount = null;

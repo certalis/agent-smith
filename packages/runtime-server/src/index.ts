@@ -3,9 +3,9 @@ import { stopAllOAuthCallbackForwarders } from "@agent-smith/api";
 import { NETWORK, shutdown } from "@agent-smith/core";
 import { DatabaseFactory } from "@agent-smith/database";
 import { Logger, LogLevel } from "@agent-smith/logger";
+import { waitForProxyBackgroundTasks } from "@agent-smith/pool";
 import {
 	terminateUsageWorker,
-	waitForProxyBackgroundTasks,
 	websocketProxyHandler,
 } from "@agent-smith/proxy";
 import { serve } from "bun";
@@ -215,6 +215,7 @@ export default function startServer(
 		apiRouter,
 		exposureConfig,
 		proxyContext,
+		poolContext,
 		providerRegistry,
 		runtimeConfig,
 	} = bootstrapRuntime(port, serverLog, drain.control);
@@ -268,7 +269,7 @@ export default function startServer(
 		port: activePort,
 		stop: () => stopServerRuntime(),
 		advanceRoutingClock: () => {
-			proxyContext.teamAdmission?.advance();
+			poolContext.teamAdmission?.advance();
 			proxyContext.quotaHold?.advance();
 			checkShutdownDrain?.();
 		},

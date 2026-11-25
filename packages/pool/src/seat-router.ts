@@ -15,6 +15,8 @@ export type TeamRoutingRequest = {
 	model: string | undefined;
 	pinBucket?: string;
 	pinScope?: string;
+	lookupOpeningDigest?: string | null;
+	seatPinLookup?: object;
 	provider: AccountProvider;
 	sessionId: string | null;
 };
@@ -39,7 +41,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function openingDigest(
+export function getOpeningDigest(
 	request: TeamRoutingRequest,
 	provider: Provider,
 ): string | null {
@@ -69,7 +71,10 @@ function pinKey(
 	provider: Provider,
 ): string | null {
 	if (!request.sessionId) return null;
-	const digest = openingDigest(request, provider) ?? "no-opening";
+	const digest =
+		(request.lookupOpeningDigest !== undefined
+			? request.lookupOpeningDigest
+			: getOpeningDigest(request, provider)) ?? "no-opening";
 	return createHash("sha256")
 		.update(
 			[
@@ -78,15 +83,6 @@ function pinKey(
 				request.sessionId,
 				digest,
 			].join("\u0000"),
-		)
-		.digest("hex");
-}
-
-function providerConversationKey(request: TeamRoutingRequest): string | null {
-	if (!request.sessionId) return null;
-	return createHash("sha256")
-		.update(
-			[request.pinScope ?? request.provider, request.sessionId].join("\u0000"),
 		)
 		.digest("hex");
 }
@@ -103,26 +99,18 @@ export function isAllowlisted(
 	);
 }
 
-/** Only a registered device the private policy names may move on to later pool providers. */
-export function hasOrderedProviderFallback(
-	config: TeamRoutingConfig,
-	callerId: string | undefined,
-): boolean {
-	return (
-		config.enabled &&
-		callerId !== undefined &&
-		Object.hasOwn(config.callerProviderFallback, callerId) &&
-		config.callerProviderFallback[callerId] === "ordered"
-	);
-}
-
 /**
- * Small, proxy-owned state for W3 team routing. It intentionally knows nothing
+ * Seat ordering and conversation pins for team routing. It intentionally knows nothing
  * about provider HTTP details or database SQL.
  */
 export class TeamRouter {
 	private readonly inFlight = new Map<string, number>();
 	private readonly pins = new Map<string, ConversationPin>();
+	private readonly pinLookups = new WeakMap<
+		object,
+		{ accountId: string | undefined }
+	>();
+	private readonly cleanedLookups = new WeakSet<object>();
 
 	order(
 		accounts: Account[],
@@ -133,7 +121,7 @@ export class TeamRouter {
 		now: number = Date.now(),
 	): Account[] {
 		if (!config.enabled || !request) return accounts;
-		this.removeExpiredPins(now, store);
+		this.removeExpiredPinsOnce(request, now, store);
 
 		const eligible = this.eligibleAccounts(accounts, request, config);
 		if (eligible.length === 0) return [];
@@ -203,11 +191,16 @@ export class TeamRouter {
 		if (!config.enabled || !request?.sessionId || request.manualAccountName) {
 			return undefined;
 		}
-		this.removeExpiredPins(now, store);
+		const lookup = request.seatPinLookup;
+		const cached = lookup ? this.pinLookups.get(lookup) : undefined;
+		if (cached) return cached.accountId;
+		this.removeExpiredPinsOnce(request, now, store);
 		const key = this.getConversationPinKey(request, config, provider);
-		return key
+		const accountId = key
 			? (this.pins.get(key) ?? store?.getConversationPin(key))?.accountId
 			: undefined;
+		if (lookup) this.pinLookups.set(lookup, { accountId });
+		return accountId;
 	}
 
 	/** Returns the durable, opaque conversation key for account-seat pins. */
@@ -220,15 +213,6 @@ export class TeamRouter {
 			return undefined;
 		}
 		return pinKey(request, provider) ?? undefined;
-	}
-
-	/** Returns the session-wide key for an interactive provider selection. */
-	getConversationProviderKey(
-		request: TeamRoutingRequest | undefined,
-		_config: TeamRoutingConfig,
-	): string | undefined {
-		if (!request?.sessionId || request.manualAccountName) return undefined;
-		return providerConversationKey(request) ?? undefined;
 	}
 
 	begin(accountId: string): void {
@@ -254,7 +238,9 @@ export class TeamRouter {
 		now: number = Date.now(),
 	): void {
 		if (!config.enabled || request?.manualAccountName) return;
-		const key = request ? pinKey(request, provider) : null;
+		const key = request
+			? pinKey({ ...request, lookupOpeningDigest: undefined }, provider)
+			: null;
 		if (key) this.touchPin(key, accountId, now, store);
 	}
 
@@ -289,11 +275,18 @@ export class TeamRouter {
 		)[0] as Account;
 	}
 
-	private removeExpiredPins(now: number, store?: ConversationPinStore): void {
+	private removeExpiredPinsOnce(
+		request: TeamRoutingRequest,
+		now: number,
+		store?: ConversationPinStore,
+	): void {
+		const lookup = request.seatPinLookup;
+		if (lookup && this.cleanedLookups.has(lookup)) return;
 		for (const [key, pin] of this.pins) {
 			if (now - pin.lastSeenAt > PIN_TTL_MS) this.pins.delete(key);
 		}
 		store?.deleteExpiredConversationPins(now - PIN_TTL_MS);
+		if (lookup) this.cleanedLookups.add(lookup);
 	}
 
 	private touchPin(
