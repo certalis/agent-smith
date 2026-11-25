@@ -4,7 +4,11 @@ import {
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
-import { TeamRouter, type TeamRoutingRequest } from "./team-router";
+import {
+	getConversationProviderKey,
+	TeamRouter,
+	type TeamRoutingRequest,
+} from "./team-router";
 
 const config: TeamRoutingConfig = {
 	admissionCap: 5,
@@ -64,10 +68,10 @@ test("direct and pooled conversation keys remain byte-identical", () => {
 	expect(router.getConversationPinKey(pooled, config, first)).toBe(
 		"cdd09933e1e8dd79417c5f52f8cf61e5b3c2d122854fdc2c24a60abad3d2516a",
 	);
-	expect(router.getConversationProviderKey(request, config)).toBe(
+	expect(getConversationProviderKey(request)).toBe(
 		"cabc45a4cd63272f28ec56efd4edf37ac9974ff4ae4f94df4bd6e10e3625fa0f",
 	);
-	expect(router.getConversationProviderKey(pooled, config)).toBe(
+	expect(getConversationProviderKey(pooled)).toBe(
 		"83401ab8220e1e68c34afc4a89748064c34cd31cca3f6496795d1e4c2ea9e58b",
 	);
 });

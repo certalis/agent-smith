@@ -6,7 +6,7 @@ import type { ResolvedProxyContext } from "./proxy-types";
 
 const log = new Logger("ResponseProcessor");
 
-export const MAX_INLINE_RATE_LIMIT_RETRY_MS = 60_000;
+export { MAX_INLINE_RATE_LIMIT_RETRY_MS } from "@agent-smith/pool";
 
 function retryAfterMs(response: Response): number | undefined {
 	const value = response.headers.get("retry-after");

@@ -1,4 +1,3 @@
-import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import { ProviderRequestTransformError } from "@agent-smith/providers";
@@ -7,6 +6,7 @@ import {
 	stripProviderChoiceHeaders,
 } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
+import type { ProxyAttempt } from "../attempt-executor";
 import { forwardToClient } from "../response-handler";
 import {
 	type MessageThreadRequest,
@@ -73,33 +73,7 @@ type ProxyOperationInput = {
  * @param ctx - The proxy context
  * @returns A forwarded response, a retryable 429, or a failed attempt
  */
-export type ProxyAttempt =
-	| { kind: "authentication-failure" }
-	| { kind: "failed" }
-	| { kind: "transport-failure" }
-	| {
-			forward: () => Promise<Response>;
-			kind: "per-minute-rate-limit";
-			retryAfterMs: number;
-	  }
-	| { kind: "response"; response: Response }
-	| {
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "quota-rate-limit";
-	  }
-	| {
-			block: ProviderCapacityBlock;
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "provider-capacity-block";
-	  }
-	| { forward: () => Promise<Response>; kind: "request-scoped-rate-limit" }
-	| {
-			discard?: () => Promise<void>;
-			forward: () => Promise<Response>;
-			kind: "upstream-failure";
-	  };
+export type { ProxyAttempt } from "../attempt-executor";
 
 function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 	const transformed = input.ctx.provider.transformRequest?.({

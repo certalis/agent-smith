@@ -8,7 +8,7 @@ import {
 } from "bun:test";
 import { TokenRefreshError } from "@agent-smith/core";
 import type { Account } from "@agent-smith/types";
-import type { ResolvedProxyContext } from "./proxy-types";
+import type { ResolvedPoolContext } from "../pool-context";
 import { getValidAccessToken } from "./token-manager";
 
 function account(expiresAt: number): Account {
@@ -37,7 +37,7 @@ function account(expiresAt: number): Account {
 	};
 }
 
-function context(selected: Account): ResolvedProxyContext {
+function context(selected: Account): ResolvedPoolContext {
 	return {
 		provider: {
 			name: "claude-code",
@@ -66,12 +66,12 @@ function context(selected: Account): ResolvedProxyContext {
 		refreshInFlight: new Map(),
 		asyncWriter: {
 			enqueue: (task) => task(),
-		} as ResolvedProxyContext["asyncWriter"],
+		} as ResolvedPoolContext["asyncWriter"],
 		dbOps: {
 			getAccount: () => selected,
 			updateAccountTokens() {},
-		} as unknown as ResolvedProxyContext["dbOps"],
-	} as unknown as ResolvedProxyContext;
+		} as unknown as ResolvedPoolContext["dbOps"],
+	} as unknown as ResolvedPoolContext;
 }
 
 describe("getValidAccessToken", () => {

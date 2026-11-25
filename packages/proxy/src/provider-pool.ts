@@ -27,6 +27,7 @@ import {
 } from "./pool/interactive-provider-pool";
 import { proxyPoolCandidates } from "./pool/provider-pool-attempts";
 import {
+	getConversationProviderKey,
 	hasOrderedProviderFallback,
 	type TeamRoutingRequest,
 } from "./team-router";
@@ -117,10 +118,9 @@ function prepareProviderPoolSelection(
 		firstContext.dbOps,
 	);
 	const pinnedAccount = pinnedId ? ctx.dbOps.getAccount(pinnedId) : null;
-	const conversationKey = firstContext.teamRouter?.getConversationProviderKey(
-		teamRequest,
-		firstContext.runtime.teamRouting,
-	);
+	const conversationKey = firstContext.teamRouter
+		? getConversationProviderKey(teamRequest)
+		: undefined;
 	const routing = new ConversationProviderRouting(
 		new PoolConversationProviderRoutingStore(ctx.dbOps),
 	);

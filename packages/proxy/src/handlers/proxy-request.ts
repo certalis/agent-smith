@@ -1,3 +1,4 @@
+import type { PoolAttemptRequest } from "@agent-smith/pool";
 import type { Account, RequestMeta } from "@agent-smith/types";
 import type { TeamRoutingRequest } from "../team-router";
 import {
@@ -8,20 +9,13 @@ import {
 } from "./account-selector";
 import {
 	getThreadBoundAccountId,
-	type MessageThreadRequest,
 	parseMessageThreadRequest,
 } from "./message-thread";
+import { proxyWithAccount } from "./proxy-operations";
 import type { ResolvedProxyContext } from "./proxy-types";
 
-export type ProxyRequest = {
-	body: ArrayBuffer | null;
+export type ProxyRequest = PoolAttemptRequest & {
 	ctx: ResolvedProxyContext;
-	mappedModel: string | undefined;
-	meta: RequestMeta;
-	req: Request;
-	teamRequest: TeamRoutingRequest;
-	thread: MessageThreadRequest | null;
-	url: URL;
 };
 
 export function prepareProxyRequest(
@@ -52,7 +46,7 @@ export function prepareProxyRequest(
 		sessionId,
 		callerId,
 	};
-	const request = {
+	const request: ProxyRequest = {
 		body,
 		ctx,
 		mappedModel,
@@ -61,6 +55,20 @@ export function prepareProxyRequest(
 		teamRequest,
 		thread,
 		url,
+		execute: (account, failoverAttempts) =>
+			proxyWithAccount(
+				req,
+				url,
+				account,
+				meta,
+				body,
+				(payload) =>
+					payload ? (new Response(payload).body ?? undefined) : undefined,
+				thread,
+				failoverAttempts,
+				mappedModel,
+				ctx,
+			),
 	};
 	return {
 		accounts: selectRequestAccounts(request, selectionOptions),

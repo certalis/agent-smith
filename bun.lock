@@ -175,6 +175,19 @@
         "@agent-smith/types": "workspace:*",
       },
     },
+    "packages/pool": {
+      "name": "@agent-smith/pool",
+      "version": "0.1.0",
+      "dependencies": {
+        "@agent-smith/capacity": "workspace:*",
+        "@agent-smith/config": "workspace:*",
+        "@agent-smith/core": "workspace:*",
+        "@agent-smith/database": "workspace:*",
+        "@agent-smith/logger": "workspace:*",
+        "@agent-smith/providers": "workspace:*",
+        "@agent-smith/types": "workspace:*",
+      },
+    },
     "packages/providers": {
       "name": "@agent-smith/providers",
       "version": "0.1.0",
@@ -197,6 +210,7 @@
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
+        "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/routing": "workspace:*",
         "@agent-smith/types": "workspace:*",
@@ -264,6 +278,8 @@
     "@agent-smith/logger": ["@agent-smith/logger@workspace:packages/logger"],
 
     "@agent-smith/oauth-flow": ["@agent-smith/oauth-flow@workspace:packages/oauth-flow"],
+
+    "@agent-smith/pool": ["@agent-smith/pool@workspace:packages/pool"],
 
     "@agent-smith/providers": ["@agent-smith/providers@workspace:packages/providers"],
 
