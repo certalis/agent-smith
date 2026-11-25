@@ -30,6 +30,7 @@ import {
 } from "@agent-smith/types";
 import { BUILTIN_PROVIDER_CONFIGS } from "./builtin-providers";
 import { resolveConfigPath } from "./paths";
+import { hasLegacyConfig, rewriteConfigFile } from "./rewrite-file";
 import {
 	sanitizeWindowWarmup,
 	WINDOW_WARMUP_DEFAULTS,
@@ -763,15 +764,53 @@ function sanitizeRouting(value: unknown): RoutingFileConfig | undefined {
 	return routing;
 }
 
+function migrateLegacyConfig(path: string, parsed: unknown): unknown {
+	let current = parsed;
+	for (let attempt = 0; attempt < 3 && hasLegacyConfig(current); attempt++) {
+		try {
+			const result = rewriteConfigFile(path, undefined, {
+				allowConcurrent: true,
+			});
+			if (result.changed)
+				log.info(`Rewrote config ${path}; backup: ${result.backup}`);
+			current = JSON.parse(readFileSync(path, "utf8")) as unknown;
+		} catch (error) {
+			const reason =
+				error instanceof SyntaxError
+					? "invalid JSON"
+					: error instanceof Error
+						? error.message
+						: String(error);
+			throw new Error(
+				`Could not rewrite legacy config ${path}: ${reason}. Run: agent-smith config rewrite`,
+			);
+		}
+	}
+	if (hasLegacyConfig(current))
+		throw new Error(
+			`Config ${path} kept changing while rewriting. Run: agent-smith config rewrite`,
+		);
+	return current;
+}
+
 export function readClientRouting(
 	configPath = resolveConfigPath(),
 ): ClientRoutingConfig {
 	let data: unknown;
 	try {
 		data = JSON.parse(readFileSync(configPath, "utf8"));
-	} catch {
-		throw new Error("Agent Smith client config could not be read");
+	} catch (error) {
+		const reason =
+			error instanceof SyntaxError
+				? "invalid JSON"
+				: error instanceof Error
+					? error.message
+					: String(error);
+		throw new Error(
+			`Could not read config ${configPath}: ${reason}. Run: agent-smith config rewrite`,
+		);
 	}
+	data = migrateLegacyConfig(configPath, data);
 	if (
 		!isRecord(data) ||
 		(data.client !== undefined && !isRecord(data.client)) ||
@@ -813,20 +852,17 @@ export class Config extends EventEmitter {
 				const content = readFileSync(this.configPath, "utf8");
 				parsed = JSON.parse(content);
 			} catch (error) {
-				log.error(`Failed to parse config file: ${error}`);
-				this.data = {};
-				return;
-			}
-			if (
-				isRecord(parsed) &&
-				["team_routing", "provider_pools", "block_when_all_full"].some((key) =>
-					Object.hasOwn(parsed, key),
-				)
-			) {
+				const reason =
+					error instanceof SyntaxError
+						? "invalid JSON"
+						: error instanceof Error
+							? error.message
+							: String(error);
 				throw new Error(
-					"Legacy configuration keys are not supported. Use routing and providers.<name>.pool; run: agent-smith config rewrite",
+					`Could not read config ${this.configPath}: ${reason}. Run: agent-smith config rewrite`,
 				);
 			}
+			parsed = migrateLegacyConfig(this.configPath, parsed);
 			this.data = sanitizeConfigData(parsed);
 
 			try {

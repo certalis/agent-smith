@@ -155,3 +155,29 @@ test("leaves invalid input untouched and does not create a backup", () => {
 	expect(readFileSync(f.path, "utf8")).toBe("{invalid json");
 	expect(existsSync(`${f.path}.backup`)).toBe(false);
 });
+
+test("client status starts on a legacy config and keeps its JSON output usable", () => {
+	const f = fixture({
+		client: { enabled: false },
+		provider_pools: { "anthropic-messages": ["anthropic"] },
+	});
+	const result = f.run("client", "status", "--raw");
+	expect(result.exitCode).toBe(0);
+	expect(JSON.parse(result.stdout.toString())).toMatchObject({
+		enabled: false,
+	});
+	expect(readFileSync(`${f.path}.backup`, "utf8")).toBe(f.original);
+	expect(JSON.parse(readFileSync(f.path, "utf8"))).toHaveProperty("routing");
+});
+
+test("install-client migrates a legacy config before reading client settings", () => {
+	const f = fixture({
+		client: { enabled: false },
+		provider_pools: { "anthropic-messages": ["anthropic"] },
+	});
+	const result = f.run("install-client");
+	expect(result.exitCode).toBe(0);
+	expect(result.stdout.toString()).toContain("client.enabled=false");
+	expect(readFileSync(`${f.path}.backup`, "utf8")).toBe(f.original);
+	expect(JSON.parse(readFileSync(f.path, "utf8"))).toHaveProperty("routing");
+});

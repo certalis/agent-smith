@@ -68,31 +68,6 @@ test("disabled legacy team routing never enables its dormant fallback rules", ()
 	});
 });
 
-test("startup rejects legacy routing keys and points to the rewrite command", async () => {
-	const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
-	const { tmpdir } = await import("node:os");
-	const { join } = await import("node:path");
-	const directory = mkdtempSync(join(tmpdir(), "agent-smith-legacy-config-"));
-	try {
-		const path = join(directory, "config.json");
-		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
-		expect(() => new config.Config(path)).toThrow(
-			/routing.*providers.*agent-smith config rewrite/i,
-		);
-		writeFileSync(
-			path,
-			JSON.stringify({
-				provider_pools: { "anthropic-messages": ["claude-code"] },
-			}),
-		);
-		expect(() => new config.Config(path)).toThrow(
-			/routing.*providers.*agent-smith config rewrite/i,
-		);
-	} finally {
-		rmSync(directory, { recursive: true, force: true });
-	}
-});
-
 test("rewrites every example config without mutating its input", async () => {
 	const { readdirSync, readFileSync } = await import("node:fs");
 	const { join } = await import("node:path");
