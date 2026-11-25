@@ -401,7 +401,7 @@ describe("WebSocket failover characterization", () => {
 			access_token: "second-access-token",
 		};
 		const ctx = createInMemoryProxyContext([first, second]);
-		ctx.runtime.teamRouting = {
+		ctx.runtime.providerPools.codex = {
 			enabled: true,
 			distributionEnabled: true,
 			preferExpiringQuota: false,
@@ -410,13 +410,12 @@ describe("WebSocket failover characterization", () => {
 			weeklyMaxUsage: 0.9,
 			weeklyMaxUsageByEmail: {},
 			callerWeeklyMaxUsage: {},
-			callerProviderFallback: {},
 			admissionCap: 1,
 			admissionQueueLimit: 0,
 			admissionWaitMs: 0,
-			holdSeconds: 0,
 			quotaProbeSeconds: 0,
 			windowWarmup: WINDOW_WARMUP_DEFAULTS,
+			blockWhenAllFull: true,
 		};
 		let admissionCalls = 0;
 		let inFlightCalls = 0;

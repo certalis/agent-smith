@@ -1,4 +1,8 @@
-import { nextWindowWarmupAt, type RuntimeConfig } from "@agent-smith/config";
+import {
+	nextWindowWarmupAt,
+	type ProviderPoolSettings,
+	type RuntimeConfig,
+} from "@agent-smith/config";
 import type { DatabaseOperations } from "@agent-smith/database";
 import { Logger } from "@agent-smith/logger";
 import type { Provider, ProviderRegistry } from "@agent-smith/providers";
@@ -17,7 +21,9 @@ import {
 
 const log = new Logger("WindowWarmup");
 
-type WarmupRuntime = Pick<RuntimeConfig, "quotaThreshold" | "teamRouting">;
+type WarmupRuntime = Pick<RuntimeConfig, "quotaThreshold"> & {
+	pool: ProviderPoolSettings;
+};
 type WarmupStore = QuotaStore &
 	Pick<DatabaseOperations, "getEnrollmentContact">;
 
@@ -64,7 +70,7 @@ export class WindowWarmup {
 	/** Sends one request per seat that needs it; a failure is logged, never retried. */
 	async run(): Promise<void> {
 		const runtime = this.runtime();
-		const routing = runtime.teamRouting;
+		const routing = runtime.pool;
 		if (this.running || !routing.enabled || !routing.windowWarmup.enabled) {
 			return;
 		}
@@ -91,7 +97,7 @@ export class WindowWarmup {
 
 	private scheduleAfter(after: number): void {
 		this.dispose();
-		const dueAt = nextWindowWarmupAt(this.runtime().teamRouting, after);
+		const dueAt = nextWindowWarmupAt(this.runtime().pool, after);
 		if (dueAt === null) return;
 		this.timer = setTimeout(
 			() => void this.fire(dueAt),
@@ -118,7 +124,7 @@ export class WindowWarmup {
 			isServableSeat(
 				provider,
 				account,
-				runtime.teamRouting.windowWarmup.model ?? undefined,
+				runtime.pool.windowWarmup.model ?? undefined,
 				{ runtime, dbOps: this.store },
 				now,
 			)

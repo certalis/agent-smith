@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
 import type { RoutedProvider, RouteRequest } from "@agent-smith/capacity";
+import { POOL_DEFAULTS, runtimeForProvider } from "@agent-smith/config";
 import { getProviderCallerStatus, type PoolContext } from "@agent-smith/pool";
 import { getCallerPoolStatus } from "@agent-smith/routing";
 import type { Account, AccountProvider } from "@agent-smith/types";
@@ -71,17 +72,27 @@ describe("getCallerPoolStatus", () => {
 		const ctx = {
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
-					enabled: true,
-					allowlistedAccountUuids: ["seat-a"],
-					maxUsage: 0.9,
-					weeklyMaxUsage: 0.95,
-					weeklyMaxUsageByEmail: {},
-					callerWeeklyMaxUsage: { box: 0.7 },
-					callerProviderFallback: { box: "ordered" },
+				routing: {
+					routes: {},
+					apiKeyAccounts: "chooser_or_fallback",
+					callers: { box: { allowFallbacks: true } },
 					holdSeconds: 0,
-					admissionWaitMs: 1000,
 				},
+				providerPools: Object.fromEntries(
+					["claude-code", "qwen-claude"].map((name) => [
+						name,
+						{
+							...POOL_DEFAULTS,
+							enabled: true,
+							allowlistedAccountUuids: ["seat-a"],
+							maxUsage: 0.9,
+							weeklyMaxUsage: 0.95,
+							weeklyMaxUsageByEmail: {},
+							callerWeeklyMaxUsage: { box: 0.7 },
+							admissionWaitMs: 1000,
+						},
+					]),
+				),
 			},
 			providerRegistry: {
 				getProvider: (name: string) => (name === "claude-code" ? claude : qwen),
@@ -107,7 +118,7 @@ describe("getCallerPoolStatus", () => {
 					provider.name,
 					undefined,
 					callerId,
-					ctx,
+					{ ...ctx, runtime: runtimeForProvider(ctx.runtime, provider.name) },
 					request.apiKeyAccounts,
 				),
 		})) as unknown as RoutedProvider[];
@@ -115,10 +126,10 @@ describe("getCallerPoolStatus", () => {
 			route,
 			providers,
 			orderedFallback:
-				ctx.runtime.teamRouting.callerProviderFallback[callerId] === "ordered",
-			teamRoutingEnabled: true,
+				ctx.runtime.routing.callers[callerId]?.allowFallbacks === true,
+			apiKeyAccounts:
+				ctx.runtime.routing.callers[callerId]?.allowFallbacks === true,
 			holdSeconds: 0,
-			admissionWaitMs: 1000,
 		});
 	}
 

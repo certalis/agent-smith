@@ -511,6 +511,7 @@ export function createWebSocketSupplyAttempt(proxy: ProxyContext) {
 			route.edge.url.search,
 			{
 				...proxy,
+				runtime: request.ctx.runtime,
 				provider: request.ctx.provider,
 				providerName: request.ctx.providerName,
 				upstreamPath: request.ctx.upstreamPath,
@@ -726,9 +727,8 @@ export async function handleWebSocketUpgradeRequest(
 		callerId,
 		sessionId: teamRequest.sessionId,
 		openingDigest: null,
-		apiKeyAccounts: requestContext.runtime.routing
-			? requestContext.runtime.routing.apiKeyAccounts === "everyone"
-			: !requestContext.runtime.teamRouting?.enabled,
+		apiKeyAccounts:
+			requestContext.runtime.routing.apiKeyAccounts === "everyone",
 		inlineRateLimitRetry: false,
 		signal: req.signal,
 	};

@@ -1,10 +1,6 @@
 import { type APIContext, APIRouter } from "@agent-smith/api";
 import type { RouteRequest } from "@agent-smith/capacity";
-import {
-	Config,
-	type RuntimeConfig,
-	runtimeForProvider,
-} from "@agent-smith/config";
+import { Config, type RuntimeConfig } from "@agent-smith/config";
 import {
 	container,
 	registerDisposable,
@@ -92,7 +88,6 @@ function createStatusRequest(
 
 function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 	return {
-		blockWhenAllFull: config.getBlockWhenAllFull(),
 		clientId: config.get(
 			"client_id",
 			"9d1c250a-e61b-44d9-88ed-5944d1962f5e",
@@ -114,7 +109,6 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 		) as number,
 		port,
 		storeRequestPayloads: config.storesRequestPayloads(),
-		teamRouting: config.getTeamRouting(),
 		routing: config.getRouting(),
 		providerPools: config.getProviderPoolSettings(),
 	};
@@ -145,7 +139,6 @@ function wireStrategyHotReload(
 			runtimeConfig.storeRequestPayloads = config.storesRequestPayloads();
 		}
 		if (change.key === "providers" || change.key === "routing") {
-			runtimeConfig.teamRouting = config.getTeamRouting();
 			runtimeConfig.providerPools = config.getProviderPoolSettings();
 			runtimeConfig.routing = config.getRouting();
 			proxyContext.providerRegistry.setProviderPools(config.getProviderPools());
@@ -171,6 +164,10 @@ function startSeatSchedulers(
 		if (!provider) return null;
 		return await getValidAccessToken(account, {
 			...poolContext,
+			runtime: {
+				...poolContext.runtime,
+				pool: config.getTeamRouting(account.provider),
+			},
 			provider,
 			providerName: account.provider,
 			upstreamPath: "/",
@@ -193,7 +190,10 @@ function startSeatSchedulers(
 			readSeatToken,
 		);
 		const warmup = new WindowWarmup(
-			() => runtimeForProvider(runtime, name),
+			() => ({
+				quotaThreshold: runtime.quotaThreshold,
+				pool: config.getTeamRouting(name),
+			}),
 			store,
 			outsideSpendTracker,
 			providerRegistry,
@@ -266,6 +266,10 @@ export function bootstrapRuntime(
 			if (!provider) throw new Error("Provider unavailable");
 			return getValidAccessToken(account, {
 				...poolContext,
+				runtime: {
+					...poolContext.runtime,
+					pool: config.getTeamRouting(account.provider),
+				},
 				provider,
 				providerName: account.provider,
 				upstreamPath: "/",
@@ -281,10 +285,10 @@ export function bootstrapRuntime(
 			return {
 				version: 1,
 				provider,
-				routingEnabled: config.getTeamRouting(provider).enabled,
+				routingEnabled: status.poolEnabled,
 				eligibleAccounts: status.servableSeats,
 				retryAtMs: status.retryAt,
-				holdSeconds: runtimeConfig.routing?.holdSeconds ?? 0,
+				holdSeconds: runtimeConfig.routing.holdSeconds,
 				admissionWaitMs: status.admissionWaitMs,
 			};
 		},
@@ -305,25 +309,14 @@ export function bootstrapRuntime(
 				),
 				providers,
 				orderedFallback: hasOrderedProviderFallback(
-					runtimeConfig.routing ?? runtimeConfig.teamRouting,
+					runtimeConfig.routing,
 					callerId,
 				),
 				apiKeyAccounts:
-					runtimeConfig.routing?.apiKeyAccounts === "everyone" ||
-					hasOrderedProviderFallback(
-						runtimeConfig.routing ?? runtimeConfig.teamRouting,
-						callerId,
-					),
-				teamRoutingEnabled:
-					Object.values(runtimeConfig.providerPools ?? {}).some(
-						(pool) => pool.teamRouting.enabled,
-					) ||
-					hasOrderedProviderFallback(
-						runtimeConfig.routing ?? runtimeConfig.teamRouting,
-						callerId,
-					),
-				holdSeconds: runtimeConfig.routing?.holdSeconds ?? 0,
-				admissionWaitMs: runtimeConfig.teamRouting.admissionWaitMs,
+					runtimeConfig.routing.apiKeyAccounts === "everyone" ||
+					hasOrderedProviderFallback(runtimeConfig.routing, callerId),
+
+				holdSeconds: runtimeConfig.routing.holdSeconds,
 			});
 		},
 		callerForDeviceKey: (key) =>

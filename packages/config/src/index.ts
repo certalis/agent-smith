@@ -28,6 +28,7 @@ import {
 	type ProviderWire,
 	type StrategyName,
 } from "@agent-smith/types";
+import { BUILTIN_PROVIDER_CONFIGS } from "./builtin-providers";
 import { resolveConfigPath } from "./paths";
 import {
 	sanitizeWindowWarmup,
@@ -40,7 +41,6 @@ import {
 const log = new Logger("Config");
 
 export interface RuntimeConfig {
-	blockWhenAllFull: boolean;
 	clientId: string;
 	maxBodyBytes: number;
 	quotaThreshold: number;
@@ -49,15 +49,11 @@ export interface RuntimeConfig {
 	sessionDurationMs: number;
 	port: number;
 	storeRequestPayloads: boolean;
-	teamRouting: TeamRoutingConfig;
-	routing?: RoutingConfig;
-	providerPools?: Record<
-		string,
-		{ teamRouting: TeamRoutingConfig; blockWhenAllFull: boolean }
-	>;
+	routing: RoutingConfig;
+	providerPools: Record<string, ProviderPoolSettings>;
 }
 
-export interface TeamRoutingConfig {
+export interface ProviderPoolSettings {
 	enabled: boolean;
 	distributionEnabled: boolean;
 	preferExpiringQuota: boolean;
@@ -66,13 +62,12 @@ export interface TeamRoutingConfig {
 	weeklyMaxUsage: number;
 	weeklyMaxUsageByEmail: Record<string, number>;
 	callerWeeklyMaxUsage: Record<string, number>;
-	callerProviderFallback: Record<string, "ordered">;
 	admissionCap: number;
 	admissionQueueLimit: number;
 	admissionWaitMs: number;
-	holdSeconds: number;
 	quotaProbeSeconds: number;
 	windowWarmup: WindowWarmupConfig;
+	blockWhenAllFull: boolean;
 }
 
 export type TeamRoutingFileConfig = {
@@ -189,14 +184,7 @@ export type ClientRoutingConfig = {
 	poolSshHost?: string;
 };
 
-const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
-	{ name: "anthropic", enabled: true, strategy: "anthropic-api" },
-	{ name: "openai", enabled: true, strategy: "openai-api" },
-	{ name: "claude-code", enabled: false, strategy: "claude-code" },
-	{ name: "codex", enabled: false, strategy: "codex" },
-] as const;
-
-const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map(
+const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map<string, ProviderConfig>(
 	BUILTIN_PROVIDER_CONFIGS.map((provider) => [provider.name, provider]),
 );
 const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -204,7 +192,7 @@ const POOL_SSH_HOST_PATTERN = /^\w[\w.-]{0,127}(@\w[\w.-]{0,127})?$/;
 const CALLER_ID_PATTERN = /^[-a-zA-Z0-9_]{1,64}$/;
 const MAX_CALLERS = 128;
 
-const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
+export const POOL_DEFAULTS: ProviderPoolSettings = {
 	enabled: false,
 	distributionEnabled: true,
 	preferExpiringQuota: false,
@@ -213,26 +201,26 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.95,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
-	holdSeconds: 0,
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
 
-/** Resolve one provider's policy while retaining the shared runtime settings. */
+/** Provider-specific view for Pool execution; routing policy stays global. */
+export type ResolvedRuntimeConfig = RuntimeConfig & {
+	pool: ProviderPoolSettings;
+};
+
 export function runtimeForProvider(
 	runtime: RuntimeConfig,
 	provider: string,
-): RuntimeConfig {
-	if (!runtime.providerPools) return runtime;
-	const pool = runtime.providerPools[provider];
+): ResolvedRuntimeConfig {
 	return {
 		...runtime,
-		teamRouting: pool?.teamRouting ?? { ...TEAM_ROUTING_DEFAULTS },
-		blockWhenAllFull: pool?.blockWhenAllFull ?? true,
+		pool: runtime.providerPools[provider] ?? { ...POOL_DEFAULTS },
 	};
 }
 
@@ -1022,37 +1010,28 @@ export class Config extends EventEmitter {
 		};
 	}
 
-	getTeamRouting(providerName = "claude-code"): TeamRoutingConfig {
+	getTeamRouting(providerName: string): ProviderPoolSettings {
 		const pool = this.data.providers?.[providerName]?.pool;
-		const routing = this.getRouting();
 		return {
 			enabled: pool !== undefined && pool.enabled !== false,
 			distributionEnabled:
-				pool?.distribution_enabled ?? TEAM_ROUTING_DEFAULTS.distributionEnabled,
+				pool?.distribution_enabled ?? POOL_DEFAULTS.distributionEnabled,
 			preferExpiringQuota:
-				pool?.prefer_expiring_quota ??
-				TEAM_ROUTING_DEFAULTS.preferExpiringQuota,
+				pool?.prefer_expiring_quota ?? POOL_DEFAULTS.preferExpiringQuota,
 			allowlistedAccountUuids: [...(pool?.members ?? [])],
-			maxUsage: pool?.max_usage ?? TEAM_ROUTING_DEFAULTS.maxUsage,
-			weeklyMaxUsage:
-				pool?.weekly_max_usage ?? TEAM_ROUTING_DEFAULTS.weeklyMaxUsage,
+			maxUsage: pool?.max_usage ?? POOL_DEFAULTS.maxUsage,
+			weeklyMaxUsage: pool?.weekly_max_usage ?? POOL_DEFAULTS.weeklyMaxUsage,
 			weeklyMaxUsageByEmail: { ...pool?.weekly_max_usage_by_email },
 			callerWeeklyMaxUsage: { ...pool?.caller_weekly_max_usage },
-			callerProviderFallback: Object.fromEntries(
-				Object.entries(routing.callers)
-					.filter(([, policy]) => policy.allowFallbacks)
-					.map(([caller]) => [caller, "ordered" as const]),
-			),
-			admissionCap: pool?.admission?.cap ?? TEAM_ROUTING_DEFAULTS.admissionCap,
+			admissionCap: pool?.admission?.cap ?? POOL_DEFAULTS.admissionCap,
 			admissionQueueLimit:
-				pool?.admission?.queue_limit ??
-				TEAM_ROUTING_DEFAULTS.admissionQueueLimit,
+				pool?.admission?.queue_limit ?? POOL_DEFAULTS.admissionQueueLimit,
 			admissionWaitMs:
-				pool?.admission?.wait_ms ?? TEAM_ROUTING_DEFAULTS.admissionWaitMs,
-			holdSeconds: routing.holdSeconds,
+				pool?.admission?.wait_ms ?? POOL_DEFAULTS.admissionWaitMs,
 			quotaProbeSeconds:
-				pool?.quota_probe_seconds ?? TEAM_ROUTING_DEFAULTS.quotaProbeSeconds,
+				pool?.quota_probe_seconds ?? POOL_DEFAULTS.quotaProbeSeconds,
 			windowWarmup: windowWarmupConfig(pool?.window_warmup),
+			blockWhenAllFull: pool?.block_when_all_full !== false,
 		};
 	}
 
@@ -1074,13 +1053,6 @@ export class Config extends EventEmitter {
 
 	setClientRoutingEnabled(enabled: boolean): void {
 		this.persistStrictly("client", { ...this.data.client, enabled });
-	}
-
-	/** On unless the file says `false`: a full fleet refuses requests rather than spend extra usage. */
-	getBlockWhenAllFull(providerName = "claude-code"): boolean {
-		return (
-			this.data.providers?.[providerName]?.pool?.block_when_all_full !== false
-		);
 	}
 
 	getProviderConfig(name: string): ProviderConfig | undefined {
@@ -1117,7 +1089,9 @@ export class Config extends EventEmitter {
 	}
 
 	getProviderConfigs(): ProviderConfig[] {
-		const names = new Set(BUILTIN_PROVIDER_CONFIGS.map(({ name }) => name));
+		const names = new Set<string>(
+			BUILTIN_PROVIDER_CONFIGS.map(({ name }) => name),
+		);
 		for (const name of Object.keys(this.data.providers ?? {})) {
 			names.add(name);
 		}
@@ -1126,17 +1100,11 @@ export class Config extends EventEmitter {
 			.filter((provider): provider is ProviderConfig => provider !== undefined);
 	}
 
-	getProviderPoolSettings(): Record<
-		string,
-		{ teamRouting: TeamRoutingConfig; blockWhenAllFull: boolean }
-	> {
+	getProviderPoolSettings(): Record<string, ProviderPoolSettings> {
 		return Object.fromEntries(
 			this.getProviderConfigs().map((provider) => [
 				provider.name,
-				{
-					teamRouting: this.getTeamRouting(provider.name),
-					blockWhenAllFull: this.getBlockWhenAllFull(provider.name),
-				},
+				this.getTeamRouting(provider.name),
 			]),
 		);
 	}
@@ -1231,26 +1199,30 @@ export class Config extends EventEmitter {
 	}
 
 	/** Persist a consented seat without changing routing enablement or limits. */
-	allowAccountUuid(accountUuid: string): void {
-		const current = this.getTeamRouting().allowlistedAccountUuids;
+	allowAccountUuid(provider: string, accountUuid: string): void {
+		const current = this.getTeamRouting(provider).allowlistedAccountUuids;
 		if (current.includes(accountUuid)) return;
-		this.persistAccountAllowlist([...current, accountUuid]);
+		this.persistAccountAllowlist(provider, [...current, accountUuid]);
 	}
 
 	/** Remove only this membership, with the same strict persistence as enrollment. */
-	removeAccountUuid(accountUuid: string): void {
-		const current = this.getTeamRouting().allowlistedAccountUuids;
+	removeAccountUuid(provider: string, accountUuid: string): void {
+		const current = this.getTeamRouting(provider).allowlistedAccountUuids;
 		if (!current.includes(accountUuid)) return;
 		this.persistAccountAllowlist(
+			provider,
 			current.filter((uuid) => uuid !== accountUuid),
 		);
 	}
 
-	private persistAccountAllowlist(accountUuids: string[]): void {
-		const pool = this.getProviderPoolConfig("claude-code") ?? {
+	private persistAccountAllowlist(
+		provider: string,
+		accountUuids: string[],
+	): void {
+		const pool = this.getProviderPoolConfig(provider) ?? {
 			enabled: false,
 		};
-		this.setProviderPool("claude-code", { ...pool, members: accountUuids });
+		this.setProviderPool(provider, { ...pool, members: accountUuids });
 	}
 
 	getEnrollmentEmails(): string[] {
@@ -1300,7 +1272,6 @@ export class Config extends EventEmitter {
 	getRuntime(): RuntimeConfig {
 		// Default values
 		const defaults: RuntimeConfig = {
-			blockWhenAllFull: this.getBlockWhenAllFull(),
 			clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
 			maxBodyBytes: 64 * 1024 * 1024,
 			quotaThreshold: 0.98,
@@ -1313,7 +1284,6 @@ export class Config extends EventEmitter {
 			sessionDurationMs: TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 			port: NETWORK.DEFAULT_PORT,
 			storeRequestPayloads: this.storesRequestPayloads(),
-			teamRouting: this.getTeamRouting(),
 			routing: this.getRouting(),
 			providerPools: this.getProviderPoolSettings(),
 		};

@@ -82,10 +82,10 @@ export async function attemptAccount(
 	const admission = request.ctx.teamAdmission;
 	let permit: AdmissionPermit | undefined;
 	try {
-		permit = request.ctx.runtime.teamRouting.enabled
+		permit = request.ctx.runtime.pool.enabled
 			? await admission?.acquire(
 					account.id,
-					request.ctx.runtime.teamRouting,
+					request.ctx.runtime.pool,
 					request.req.signal,
 				)
 			: undefined;
@@ -222,7 +222,7 @@ export async function resolveQuotaRateLimit(
 		request.ctx.teamRouter?.rebind(
 			request.teamRequest,
 			sibling.id,
-			request.ctx.runtime.teamRouting,
+			request.ctx.runtime.pool,
 			request.ctx.provider,
 			request.ctx.dbOps,
 		);

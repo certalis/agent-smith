@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { ProviderPoolSettings } from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
 import type { Account, AccountProvider } from "@agent-smith/types";
 import { compareSeatUsage } from "./seat-usage";
@@ -90,7 +90,7 @@ function pinKey(
 
 export function isAllowlisted(
 	account: Account,
-	config: TeamRoutingConfig,
+	config: ProviderPoolSettings,
 ): boolean {
 	return (
 		account.auth_method === "oauth" &&
@@ -116,7 +116,7 @@ export class TeamRouter {
 	order(
 		accounts: Account[],
 		request: TeamRoutingRequest | undefined,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 		provider: Provider,
 		store?: ConversationPinStore,
 		now: number = Date.now(),
@@ -169,7 +169,7 @@ export class TeamRouter {
 	eligibleAccounts(
 		accounts: Account[],
 		request: TeamRoutingRequest | undefined,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 	): Account[] {
 		if (!config.enabled) return accounts;
 		const eligible = accounts.filter(
@@ -186,7 +186,7 @@ export class TeamRouter {
 	/** Returns a still-valid pin without selecting or rebinding an account. */
 	getPinnedAccountId(
 		request: TeamRoutingRequest | undefined,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 		provider: Provider,
 		store?: ConversationPinStore,
 		now: number = Date.now(),
@@ -209,7 +209,7 @@ export class TeamRouter {
 	/** Returns the durable, opaque conversation key for account-seat pins. */
 	getConversationPinKey(
 		request: TeamRoutingRequest | undefined,
-		_config: TeamRoutingConfig,
+		_config: ProviderPoolSettings,
 		provider: Provider,
 	): string | undefined {
 		if (!request?.sessionId || request.manualAccountName) {
@@ -235,7 +235,7 @@ export class TeamRouter {
 	rebind(
 		request: TeamRoutingRequest | undefined,
 		accountId: string,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 		provider: Provider,
 		store?: ConversationPinStore,
 		now: number = Date.now(),

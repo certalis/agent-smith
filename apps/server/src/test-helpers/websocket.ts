@@ -292,6 +292,13 @@ export function createInMemoryProxyContext(
 			},
 		},
 		runtime: {
+			providerPools: {},
+			routing: {
+				routes: {},
+				apiKeyAccounts: "everyone",
+				callers: {},
+				holdSeconds: 0,
+			},
 			clientId: "test-client",
 			retry: {
 				attempts: 1,

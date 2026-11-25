@@ -15,8 +15,8 @@ import {
 	formatPoolLimits,
 	type LocalPoolState,
 	localPoolState,
-	nextTeamRoutingConfig,
-	teamRoutingFileConfig,
+	nextProviderPoolSettings,
+	providerPoolFileConfig,
 } from "./local-pool";
 
 export interface AddAccountProviderOption {
@@ -200,32 +200,12 @@ export function setAccountPoolMembership(
 		throw new Error("Account not found");
 	}
 
-	const nextRouting = nextTeamRoutingConfig(
+	const nextRouting = nextProviderPoolSettings(
 		config.getTeamRouting(account.provider),
 		account,
 		pooled,
 	);
-	const old = teamRoutingFileConfig(nextRouting);
-	const {
-		enabled,
-		allowlisted_account_uuids,
-		caller_provider_fallback: _fallback,
-		hold_seconds: _hold,
-		admission_cap,
-		admission_queue_limit,
-		admission_wait_ms,
-		...pool
-	} = old;
-	config.setProviderPool(account.provider, {
-		...pool,
-		enabled,
-		members: allowlisted_account_uuids,
-		admission: {
-			cap: admission_cap,
-			queue_limit: admission_queue_limit,
-			wait_ms: admission_wait_ms,
-		},
-	});
+	config.setProviderPool(account.provider, providerPoolFileConfig(nextRouting));
 }
 
 export async function removeAccount(name: string): Promise<void> {

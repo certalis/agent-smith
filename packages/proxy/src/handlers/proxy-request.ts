@@ -27,16 +27,14 @@ export function buildRouteRequest(
 ): RouteRequest {
 	const routeHasPool =
 		scope === "pool-route" &&
-		ctx.runtime.providerPools &&
 		ctx.providerRegistry
 			.resolvePool(url.pathname, teamRequest.model)
 			?.providers.some(
 				(candidate) =>
-					ctx.runtime.providerPools?.[candidate.provider.name]?.teamRouting
-						.enabled,
+					ctx.runtime.providerPools[candidate.provider.name]?.enabled,
 			);
 	const shouldParseOpening =
-		(ctx.runtime.teamRouting.enabled || routeHasPool === true) &&
+		(ctx.runtime.pool.enabled || routeHasPool === true) &&
 		!!teamRequest.sessionId &&
 		(scope === "direct" || !teamRequest.manualAccountName);
 	if (shouldParseOpening && teamRequest.lookupOpeningDigest === undefined) {

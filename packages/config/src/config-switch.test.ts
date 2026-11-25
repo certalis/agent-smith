@@ -66,7 +66,7 @@ test("reads independent provider pools and router settings", () => {
 			maxUsage: 0.7,
 		});
 		expect(reader.getTeamRouting("key")).toMatchObject({ enabled: false });
-		expect(reader.getBlockWhenAllFull("alpha")).toBe(false);
+		expect(settings.getTeamRouting("alpha").blockWhenAllFull).toBe(false);
 		expect(settings.getProviderPool("anthropic-messages")).toEqual([
 			"alpha",
 			"beta",
@@ -98,15 +98,15 @@ test("enrollment preserves disabled sharing and saved members", () => {
 			}),
 		);
 		const settings = new Config(path);
-		settings.allowAccountUuid("new");
+		settings.allowAccountUuid("claude-code", "new");
 		const reopened = new Config(path);
 		expect(reopened.getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			allowlistedAccountUuids: ["old", "new"],
 			maxUsage: 0.8,
 		});
-		expect(reopened.getBlockWhenAllFull("claude-code")).toBe(false);
-		reopened.removeAccountUuid("new");
+		expect(reopened.getTeamRouting("claude-code").blockWhenAllFull).toBe(false);
+		reopened.removeAccountUuid("claude-code", "new");
 		expect(new Config(path).getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			allowlistedAccountUuids: ["old"],
@@ -139,13 +139,13 @@ test("partial updates preserve pool and routing settings and reject invalid rout
 		);
 		const config = new Config(path);
 		config.setProviderPool("claude-code", { enabled: false });
-		expect(config.getTeamRouting()).toMatchObject({
+		expect(config.getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			allowlistedAccountUuids: ["seat"],
 			maxUsage: 0.8,
 		});
 		config.setProviderPool("claude-code", { enabled: true });
-		expect(config.getTeamRouting()).toMatchObject({
+		expect(config.getTeamRouting("claude-code")).toMatchObject({
 			enabled: true,
 			allowlistedAccountUuids: ["seat"],
 			maxUsage: 0.8,

@@ -1,3 +1,5 @@
+import { BUILTIN_PROVIDER_CONFIGS } from "./builtin-providers";
+
 /** Rewrite a legacy JSON config without reading credentials, the database or the network. */
 export function rewriteLegacyConfig(value: unknown): Record<string, unknown> {
 	if (!isRecord(value)) throw new Error("Configuration must be a JSON object");
@@ -117,7 +119,7 @@ export function rewriteLegacyConfig(value: unknown): Record<string, unknown> {
 		if (Object.keys(admission).length) pool.admission = admission;
 		if (hasBlockPolicy) pool.block_when_all_full = output.block_when_all_full;
 		// Old sharing covered every provider, including ones enabled later; do not guess account types from names.
-		for (const name of ["anthropic", "openai", "claude-code", "codex"])
+		for (const { name } of BUILTIN_PROVIDER_CONFIGS)
 			if (!Object.hasOwn(providers, name)) providers[name] = {};
 		for (const [name, entry] of Object.entries(providers)) {
 			if (!isRecord(entry)) throw new Error(`Invalid provider: ${name}`);

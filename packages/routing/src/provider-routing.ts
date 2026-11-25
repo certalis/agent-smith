@@ -6,10 +6,6 @@ type TeamRoutingRequest = {
 	pinScope?: string;
 	provider: string;
 };
-type TeamRoutingConfig = {
-	enabled: boolean;
-	callerProviderFallback: Record<string, string>;
-};
 type RouterFallbackConfig = {
 	callers: Record<string, { allowFallbacks: boolean }>;
 };
@@ -27,20 +23,13 @@ export function providerConversationKey(
 
 /** Only a registered device the private policy names may move on to later pool providers. */
 export function hasOrderedProviderFallback(
-	config: TeamRoutingConfig | RouterFallbackConfig,
+	config: RouterFallbackConfig,
 	callerId: string | undefined,
 ): boolean {
-	if ("callers" in config)
-		return (
-			callerId !== undefined &&
-			Object.hasOwn(config.callers, callerId) &&
-			config.callers[callerId]?.allowFallbacks === true
-		);
 	return (
-		config.enabled &&
 		callerId !== undefined &&
-		Object.hasOwn(config.callerProviderFallback, callerId) &&
-		config.callerProviderFallback[callerId] === "ordered"
+		Object.hasOwn(config.callers, callerId) &&
+		config.callers[callerId]?.allowFallbacks === true
 	);
 }
 

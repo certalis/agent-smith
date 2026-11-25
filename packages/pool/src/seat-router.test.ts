@@ -1,13 +1,13 @@
 import { expect, test } from "bun:test";
 import {
-	type TeamRoutingConfig,
+	type ProviderPoolSettings,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import { TeamRouter, type TeamRoutingRequest } from "./seat-router";
 
-const config: TeamRoutingConfig = {
+const config: ProviderPoolSettings = {
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -15,14 +15,13 @@ const config: TeamRoutingConfig = {
 	distributionEnabled: true,
 	preferExpiringQuota: false,
 	enabled: true,
-	holdSeconds: 0,
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
 
 const provider = {

@@ -36,14 +36,16 @@ describe("window warm-up configuration", () => {
 	it("is off until an operator turns it on, even with team routing on", () => {
 		const config = configFrom({ providers: { "claude-code": { pool: {} } } });
 
-		expect(config.getTeamRouting().windowWarmup).toEqual({
+		expect(config.getTeamRouting("claude-code").windowWarmup).toEqual({
 			enabled: false,
 			times: ["06:00"],
 			timeZone: "Europe/Paris",
 			weekdaysOnly: true,
 			model: null,
 		});
-		expect(nextWindowWarmupAt(config.getTeamRouting(), Date.now())).toBeNull();
+		expect(
+			nextWindowWarmupAt(config.getTeamRouting("claude-code"), Date.now()),
+		).toBeNull();
 	});
 
 	it("refuses a schedule with an unknown time zone or field instead of half-applying it", () => {
@@ -61,7 +63,9 @@ describe("window warm-up configuration", () => {
 				}),
 			).toThrow("Invalid provider pool field: window_warmup");
 		}
-		expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+		expect(config.getTeamRouting("claude-code").windowWarmup.enabled).toBe(
+			false,
+		);
 	});
 
 	it("survives a restart once switched on", () => {
@@ -78,7 +82,9 @@ describe("window warm-up configuration", () => {
 			window_warmup: { enabled: true },
 		});
 
-		expect(new Config(path).getTeamRouting().windowWarmup.enabled).toBe(true);
+		expect(
+			new Config(path).getTeamRouting("claude-code").windowWarmup.enabled,
+		).toBe(true);
 	});
 
 	it("refuses the change and keeps the running policy when the file cannot be written", () => {
@@ -99,7 +105,9 @@ describe("window warm-up configuration", () => {
 					window_warmup: { enabled: true },
 				}),
 			).toThrow();
-			expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+			expect(config.getTeamRouting("claude-code").windowWarmup.enabled).toBe(
+				false,
+			);
 		} finally {
 			chmodSync(directory, 0o700);
 		}

@@ -22,6 +22,7 @@ test("ordered routing tries the next provider only after discarding the first fa
 			threadRequest: false,
 		}),
 		status: async () => ({
+			poolEnabled: true,
 			servableSeats: 1,
 			retryAt: null,
 			admissionWaitMs: 0,
@@ -59,7 +60,7 @@ test("ordered routing tries the next provider only after discarding the first fa
 		providers: [first, second] as unknown as RoutedProvider[],
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("unavailable", { status: 503 }),
 	});
 	expect(await response.text()).toBe("second");
@@ -72,7 +73,12 @@ test("caller status counts only the first provider unless fallback is allowed", 
 		name,
 		status: async () => {
 			seen.push(name);
-			return { servableSeats: index + 1, retryAt: null, admissionWaitMs: 0 };
+			return {
+				poolEnabled: true,
+				servableSeats: index + 1,
+				retryAt: null,
+				admissionWaitMs: 0,
+			};
 		},
 	})) as unknown as RoutedProvider[];
 	const route = {
@@ -81,9 +87,8 @@ test("caller status counts only the first provider unless fallback is allowed", 
 	const base = {
 		route,
 		providers,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: true,
 		holdSeconds: 0,
-		admissionWaitMs: 0,
 	};
 	expect(
 		(await getCallerPoolStatus({ ...base, orderedFallback: false }))
@@ -142,6 +147,7 @@ function fakeProvider(
 			};
 		},
 		status: async () => ({
+			poolEnabled: true,
 			servableSeats: 1,
 			retryAt: null,
 			admissionWaitMs: 0,
@@ -237,7 +243,7 @@ test("a normal caller forwards the first failure without reaching another provid
 		providers: [first.provider, second.provider],
 		headers: new Headers(),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(response.status).toBe(429);
@@ -255,7 +261,7 @@ test("a pinned conversation chooses its provider and uses one route object", asy
 		providers: [first.provider, pinned.provider],
 		headers: new Headers(),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(await result.text()).toBe("served");
@@ -286,7 +292,7 @@ test("chooser records a pick only after that provider actually serves", async ()
 		providers: [first.provider],
 		headers,
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		conversationKey: "conversation",
 		noEligible: () => new Response("empty", { status: 503 }),
 	};
@@ -313,7 +319,7 @@ test("a thread-bound provider is excluded from the chooser", async () => {
 		providers: [first.provider, thread.provider, available.provider],
 		headers: new Headers({ "x-agent-smith-interactive-provider-choice": "v1" }),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	const problem = (await response.json()) as {
@@ -346,7 +352,7 @@ test("a provider with unknown capacity is offered as a choice", async () => {
 		providers: [first.provider, unknown.provider],
 		headers: new Headers({ "x-agent-smith-interactive-provider-choice": "v1" }),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	const problem = (await response.json()) as {
@@ -375,7 +381,7 @@ test("an interactive wait retries once with the same request", async () => {
 			"x-agent-smith-provider-wait": "v1",
 		}),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		conversationKey: "conversation",
 		holdSeconds: 10,
 		waitUntil: async (_, signal) => {
@@ -407,7 +413,7 @@ test("a capacity block is stored and cleared after a successful retry", async ()
 		providers: [first.provider],
 		headers: new Headers({ "x-agent-smith-interactive-provider-choice": "v1" }),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		conversationKey: "conversation",
 		noEligible: () => new Response("empty", { status: 503 }),
 	};
@@ -438,7 +444,7 @@ test("reports a full route and returns the soonest reset", async () => {
 		providers: [first.provider, second.provider],
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		onRouteFull: (at) => {
 			reported = at;
 		},
@@ -467,7 +473,7 @@ test("an aborted wait does not call a provider", async () => {
 				"x-agent-smith-provider-wait": "v1",
 			}),
 			orderedFallback: false,
-			teamRoutingEnabled: true,
+			apiKeyAccounts: "chooser_or_fallback" as const,
 			conversationKey: "conversation",
 			holdSeconds: 10,
 			waitUntil: async () => {
@@ -491,7 +497,7 @@ test("a manual menu lists available providers without serving", async () => {
 			"x-agent-smith-provider-menu": "v1",
 		}),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	const menu = (await response.json()) as { choices: { provider: string }[] };
@@ -525,7 +531,7 @@ test("a provider with no known recovery time does not invent one from a quota bl
 		providers: [first.provider],
 		headers: new Headers(),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(response.status).toBe(503);
@@ -548,7 +554,7 @@ test("an upstream failure does not persist a quota observation as a conversation
 		providers: [first.provider, second.provider],
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		conversationKey: "conversation",
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
@@ -576,11 +582,144 @@ test("ordered fallback starts from the first provider when an old pin is outside
 		providers: [first.provider, second.provider],
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		conversationKey: "conversation",
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(response.status).toBe(200);
 	expect(first.served).toBe(1);
 	expect(second.served).toBe(0);
+});
+
+test("caller status uses only reachable provider pool facts and the first provider's wait", async () => {
+	const route = {
+		scope: { kind: "pool-route", wire: "openai-responses" },
+	} as RouteRequest;
+	const reached: string[] = [];
+	const providers = [
+		{
+			name: "codex",
+			status: async (request: RouteRequest) => {
+				reached.push(`codex:${request.apiKeyAccounts}`);
+				return {
+					poolEnabled: true,
+					servableSeats: 1,
+					retryAt: null,
+					admissionWaitMs: 1700,
+				};
+			},
+		},
+		{
+			name: "next",
+			status: async (request: RouteRequest) => {
+				reached.push(`next:${request.apiKeyAccounts}`);
+				return {
+					poolEnabled: false,
+					servableSeats: 2,
+					retryAt: null,
+					admissionWaitMs: 30000,
+				};
+			},
+		},
+	] as unknown as RoutedProvider[];
+	const input = { route, providers, apiKeyAccounts: true, holdSeconds: 20 };
+	expect(
+		await getCallerPoolStatus({ ...input, orderedFallback: false }),
+	).toEqual({
+		version: 1,
+		pool: "openai-responses",
+		provider: "codex",
+		routingEnabled: true,
+		eligibleAccounts: 1,
+		retryAtMs: null,
+		holdSeconds: 20,
+		admissionWaitMs: 1700,
+	});
+	expect(reached).toEqual(["codex:true"]);
+	reached.length = 0;
+	expect(
+		await getCallerPoolStatus({ ...input, orderedFallback: true }),
+	).toMatchObject({
+		routingEnabled: true,
+		eligibleAccounts: 3,
+		admissionWaitMs: 1700,
+	});
+	expect(reached).toEqual(["codex:true", "next:true"]);
+});
+
+test("unpooled status remains reachable and does not borrow an unreachable pool", async () => {
+	const route = {
+		scope: { kind: "pool-route", wire: "openai-responses" },
+	} as RouteRequest;
+	const calls: string[] = [];
+	const providers = [
+		{
+			name: "personal",
+			status: async () => {
+				calls.push("personal");
+				return {
+					poolEnabled: false,
+					servableSeats: 1,
+					retryAt: null,
+					admissionWaitMs: 200,
+				};
+			},
+		},
+		{
+			name: "team",
+			status: async () => {
+				calls.push("team");
+				return {
+					poolEnabled: true,
+					servableSeats: 3,
+					retryAt: null,
+					admissionWaitMs: 900,
+				};
+			},
+		},
+	] as unknown as RoutedProvider[];
+	const input = { route, providers, apiKeyAccounts: true, holdSeconds: 0 };
+	expect(
+		await getCallerPoolStatus({ ...input, orderedFallback: false }),
+	).toMatchObject({
+		routingEnabled: false,
+		eligibleAccounts: 1,
+		admissionWaitMs: 200,
+	});
+	expect(calls).toEqual(["personal"]);
+	calls.length = 0;
+	expect(
+		await getCallerPoolStatus({ ...input, orderedFallback: true }),
+	).toMatchObject({
+		routingEnabled: true,
+		eligibleAccounts: 4,
+		admissionWaitMs: 200,
+	});
+	expect(calls).toEqual(["personal", "team"]);
+});
+
+test.each([
+	["direct", "everyone", false, false, true],
+	["direct", "chooser_or_fallback", true, true, false],
+	["pool-route", "everyone", false, false, true],
+	["pool-route", "chooser_or_fallback", false, false, false],
+	["pool-route", "chooser_or_fallback", true, false, true],
+	["pool-route", "chooser_or_fallback", false, true, true],
+] as const)("key reach derives from Router policy: %s %s interactive=%s fallback=%s", async (scope, apiKeyAccounts, interactive, orderedFallback, expected) => {
+	const fixture = fakeProvider("first", [ok()]);
+	const route = routeFixture();
+	if (scope === "direct") route.scope = { kind: "direct", provider: "first" };
+	await new Router(memoryStore().store).route({
+		route,
+		providers: [fixture.provider],
+		headers: new Headers(
+			interactive ? { "x-agent-smith-interactive-provider-choice": "v1" } : {},
+		),
+		orderedFallback,
+		apiKeyAccounts,
+		noEligible: () => new Response("empty", { status: 503 }),
+	});
+	expect(
+		fixture.seen.some((request) => request.apiKeyAccounts === expected),
+	).toBe(true);
 });

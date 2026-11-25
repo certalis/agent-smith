@@ -33,8 +33,7 @@ type Input = {
 	providers: readonly RoutedProvider[];
 	headers: Headers;
 	orderedFallback: boolean;
-	teamRoutingEnabled: boolean;
-	apiKeyAccounts?: "everyone" | "chooser_or_fallback";
+	apiKeyAccounts: "everyone" | "chooser_or_fallback";
 	conversationKey?: string;
 	holdSeconds?: number;
 	waitUntil?: (time: number, signal: AbortSignal) => Promise<void>;
@@ -77,11 +76,10 @@ export class Router {
 	private async preparePoolRoute(input: Input): Promise<PoolRoute | Response> {
 		const { route, providers, headers, conversationKey } = input;
 		const interactive = interactiveProviderChoiceRequested(headers);
-		route.apiKeyAccounts = input.apiKeyAccounts
-			? input.apiKeyAccounts === "everyone" ||
-				interactive ||
-				input.orderedFallback
-			: !input.teamRoutingEnabled || interactive || input.orderedFallback;
+		route.apiKeyAccounts =
+			input.apiKeyAccounts === "everyone" ||
+			interactive ||
+			input.orderedFallback;
 		const choices = providers.map((provider) => ({
 			provider: provider.name,
 			model: provider.mapModel(route.model) ?? route.model ?? "",
@@ -351,9 +349,7 @@ export class Router {
 	private async direct(input: Input): Promise<Response> {
 		const provider = input.providers[0];
 		if (!provider) return input.noEligible();
-		input.route.apiKeyAccounts = input.apiKeyAccounts
-			? input.apiKeyAccounts === "everyone"
-			: !input.teamRoutingEnabled;
+		input.route.apiKeyAccounts = input.apiKeyAccounts === "everyone";
 		let result = await provider.serve(input.route);
 		if (
 			result.kind === "exhausted" &&
@@ -416,19 +412,13 @@ export async function getCallerPoolStatus(input: {
 	route: RouteRequest;
 	providers: readonly RoutedProvider[];
 	orderedFallback: boolean;
-	apiKeyAccounts?: boolean;
-	teamRoutingEnabled: boolean;
+	apiKeyAccounts: boolean;
 	holdSeconds: number;
-	admissionWaitMs: number;
 }) {
 	const first = input.providers[0];
 	if (!first || input.route.scope.kind !== "pool-route") return null;
-	const reachable = !input.teamRoutingEnabled
-		? []
-		: input.orderedFallback
-			? input.providers
-			: [first];
-	input.route.apiKeyAccounts = input.apiKeyAccounts ?? input.orderedFallback;
+	const reachable = input.orderedFallback ? input.providers : [first];
+	input.route.apiKeyAccounts = input.apiKeyAccounts;
 	const statuses = await Promise.all(
 		reachable.map((provider) => provider.status(input.route)),
 	);
@@ -443,13 +433,13 @@ export async function getCallerPoolStatus(input: {
 		version: 1 as const,
 		pool: input.route.scope.wire,
 		provider: first.name,
-		routingEnabled: input.teamRoutingEnabled,
+		routingEnabled: statuses.some((status) => status.poolEnabled),
 		eligibleAccounts,
 		retryAtMs:
 			eligibleAccounts === 0 && retryTimes.length
 				? Math.min(...retryTimes)
 				: null,
 		holdSeconds: input.holdSeconds,
-		admissionWaitMs: input.admissionWaitMs,
+		admissionWaitMs: statuses[0]?.admissionWaitMs ?? 0,
 	};
 }

@@ -20,11 +20,9 @@ function publicProviderPool(config: Config, name: string) {
 	const {
 		weeklyMaxUsageByEmail: _weekly,
 		callerWeeklyMaxUsage: _caller,
-		callerProviderFallback: _fallback,
-		holdSeconds: _hold,
 		...pool
 	} = config.getTeamRouting(name);
-	return { ...pool, blockWhenAllFull: config.getBlockWhenAllFull(name) };
+	return pool;
 }
 
 function publicRouting(config: Config) {

@@ -22,6 +22,7 @@ export function createSupplyExecutorFactory(
 			request.mappedModel,
 			{
 				...proxy,
+				runtime: request.ctx.runtime,
 				provider: request.ctx.provider,
 				providerName: request.ctx.providerName,
 				upstreamPath: request.ctx.upstreamPath,

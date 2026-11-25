@@ -42,7 +42,13 @@ export function createFleetStatusHandler(
 ) {
 	return (): Response => {
 		const now = Date.now();
-		const { quotaThreshold, teamRouting } = config.getRuntime();
+		const { quotaThreshold } = config.getRuntime();
+		const warmupTimes = providerRegistry
+			.listProviders()
+			.map((provider) =>
+				nextWindowWarmupAt(config.getTeamRouting(provider), now),
+			)
+			.filter((at): at is number => at !== null);
 		const accounts = dbOps.getAllAccounts().map((account) => ({
 			...serializeAccount(account, providerRegistry, now),
 			blockedReason: blockedReason(account, quotaThreshold, now),
@@ -53,7 +59,7 @@ export function createFleetStatusHandler(
 		return jsonResponse({
 			accounts,
 			quotaThreshold,
-			nextWindowWarmupAt: nextWindowWarmupAt(teamRouting, now),
+			nextWindowWarmupAt: warmupTimes.length ? Math.min(...warmupTimes) : null,
 		});
 	};
 }

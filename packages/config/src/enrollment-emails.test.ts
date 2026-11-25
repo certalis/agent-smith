@@ -60,7 +60,7 @@ describe("enrollment email and exact-domain rules", () => {
 		]);
 		config.setEnrollmentEmails(["invited@outside.test"]);
 		expect(config.isEnrollmentEmailAllowed("new@example.test")).toBe(false);
-		expect(new Config(path).getTeamRouting()).toMatchObject({
+		expect(new Config(path).getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			maxUsage: 0.8,
 		});

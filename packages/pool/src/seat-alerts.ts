@@ -41,7 +41,7 @@ export function alertWhenFleetFull(
 	const resetAt = getSoonestQuotaReset(meta, ctx);
 	if (resetAt === null || !isEveryAccountQuotaBlocked(meta, ctx)) return;
 	ctx.seatAlerts?.allAccountsFull(ctx.providerName, resetAt, {
-		blocked: ctx.runtime.blockWhenAllFull,
+		blocked: ctx.runtime.pool.blockWhenAllFull,
 		holdSeconds,
 	});
 }

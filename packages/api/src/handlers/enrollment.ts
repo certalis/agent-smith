@@ -206,7 +206,7 @@ export class EnrollmentHandlers {
 			...(state.kind === "connected"
 				? {
 						reconnected: !!details.reconnect,
-						...this.connectionStatus(state.accountId),
+						...this.connectionStatus("claude-code", state.accountId),
 					}
 				: {}),
 		});
@@ -520,7 +520,7 @@ export class EnrollmentHandlers {
 							connected: true,
 							email: state.seat.identity.email,
 							reconnected: !!entry.details.reconnect,
-							...this.connectionStatus(accountId),
+							...this.connectionStatus("claude-code", accountId),
 						},
 					);
 				}
@@ -591,7 +591,10 @@ export class EnrollmentHandlers {
 			);
 		return null;
 	}
-	private connectionStatus(accountId: string): {
+	private connectionStatus(
+		provider: "claude-code",
+		accountId: string,
+	): {
 		paused: boolean;
 		inPool: boolean;
 	} {
@@ -601,7 +604,7 @@ export class EnrollmentHandlers {
 			inPool:
 				!!account?.account_uuid &&
 				this.context.config
-					.getTeamRouting()
+					.getTeamRouting(provider)
 					.allowlistedAccountUuids.includes(account.account_uuid),
 		};
 	}
@@ -644,7 +647,7 @@ export class EnrollmentHandlers {
 				email: details.contactEmail,
 				slackUserId: details.slackUserId,
 			});
-			config.allowAccountUuid(seat.identity.accountUuid);
+			config.allowAccountUuid("claude-code", seat.identity.accountUuid);
 			return account.id;
 		})();
 	}
@@ -664,7 +667,7 @@ export class EnrollmentHandlers {
 				);
 			if (!dbOps.deleteAccount(accountId))
 				throw new Error("Seat removal failed");
-			config.removeAccountUuid(accountUuid);
+			config.removeAccountUuid("claude-code", accountUuid);
 		})();
 	}
 }
