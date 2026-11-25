@@ -1,6 +1,15 @@
-import type { RoutedProvider, ServeOutcome } from "@agent-smith/capacity";
+import type {
+	Availability,
+	ProviderCapacityBlock,
+	ProviderStatus,
+	RoutedProvider,
+	RouteRequest,
+	ServeOutcome,
+	SessionOutcome,
+} from "@agent-smith/capacity";
 import { Logger } from "@agent-smith/logger";
-import type { Account } from "@agent-smith/types";
+import type { Provider } from "@agent-smith/providers";
+import type { Account, ProviderWire } from "@agent-smith/types";
 import {
 	attemptAccount,
 	discardAttempt,
@@ -10,7 +19,7 @@ import {
 	resolveTransportFailure,
 	resolveUpstreamFailure,
 } from "./account-attempts";
-import type { PoolAttemptRequest } from "./attempt-executor";
+import type { AttemptExecutor, PoolAttemptRequest } from "./attempt-executor";
 import {
 	getOrderedAccounts,
 	getPoolStatus,
@@ -22,10 +31,12 @@ import {
 } from "./handlers/account-selector";
 import {
 	getThreadBoundAccountId,
+	type MessageThreadRequest,
 	parseMessageThreadRequest,
 } from "./handlers/message-thread";
+import type { PoolContext, ResolvedPoolContext } from "./pool-context";
 import { alertWhenFleetFull } from "./seat-alerts";
-import { isAllowlisted } from "./seat-router";
+import { isAllowlisted, type TeamRoutingRequest } from "./seat-router";
 
 /** Serve one provider without deciding whether the router should try another. */
 export async function serveSelectedAccounts(
@@ -149,12 +160,12 @@ export async function serveSelectedAccounts(
 }
 
 export type SupplyExecutorFactory = (
-	route: import("@agent-smith/capacity").RouteRequest,
+	route: RouteRequest,
 	request: Omit<PoolAttemptRequest, "execute">,
-) => import("./attempt-executor").AttemptExecutor;
+) => AttemptExecutor;
 
 export type SupplySessionExecutor = (
-	route: import("@agent-smith/capacity").RouteRequest,
+	route: RouteRequest,
 	request: PoolAttemptRequest,
 	account: Account,
 ) => Promise<object>;
@@ -162,15 +173,15 @@ export type SupplySessionExecutor = (
 /** Per-provider seat state and upstream executor, shared across requests. */
 export class ProviderSupply implements RoutedProvider {
 	private readonly preparedRoutes = new WeakMap<
-		import("@agent-smith/capacity").RouteRequest,
+		RouteRequest,
 		{ request: PoolAttemptRequest; accounts: Account[] }
 	>();
 	readonly name: string;
-	readonly wire: import("@agent-smith/types").ProviderWire;
+	readonly wire: ProviderWire;
 
 	constructor(
-		private readonly provider: import("@agent-smith/providers").Provider,
-		private readonly context: import("./pool-context").PoolContext,
+		private readonly provider: Provider,
+		private readonly context: PoolContext,
 		private readonly options: {
 			mapModel: (model: string | undefined) => string | undefined | null;
 			createExecutor: SupplyExecutorFactory;
@@ -193,7 +204,7 @@ export class ProviderSupply implements RoutedProvider {
 		return this.options.mapModel(model);
 	}
 
-	private contextFor(route: import("@agent-smith/capacity").RouteRequest) {
+	private contextFor(route: RouteRequest) {
 		const resolved =
 			route.scope.kind === "direct"
 				? this.context.providerRegistry.resolveProvider(route.edge.url.pathname)
@@ -209,10 +220,14 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	private teamRequestFor(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): import("./seat-router").TeamRoutingRequest {
-		return {
+	/** A request's thread and eligible seats, evaluated only when needed. */
+	private requestView(
+		route: RouteRequest,
+		prepared?: PoolAttemptRequest,
+		context?: ResolvedPoolContext,
+	) {
+		const ctx = prepared?.ctx ?? context ?? this.contextFor(route);
+		const teamRequest: TeamRoutingRequest = prepared?.teamRequest ?? {
 			body: route.edge.body,
 			callerId: route.callerId,
 			contentType: route.edge.headers.get("content-type"),
@@ -227,9 +242,46 @@ export class ProviderSupply implements RoutedProvider {
 				pinBucket: route.model,
 			}),
 		};
+		let thread: MessageThreadRequest | null | undefined = prepared
+			? prepared.thread
+			: undefined;
+		let bound = false;
+		let threadAccount: string | null = null;
+		const getThread = () => {
+			if (thread === undefined) {
+				thread = parseMessageThreadRequest(
+					route.edge.body,
+					ctx.upstreamPath,
+					route.edge.headers.get("content-type"),
+					this.provider.getClientSessionId?.(route.edge.headers) ?? null,
+				);
+			}
+			return thread;
+		};
+		const getThreadAccount = () => {
+			if (!bound) {
+				threadAccount = getThreadBoundAccountId(
+					ctx.messageThreads,
+					getThread(),
+				);
+				bound = true;
+			}
+			return threadAccount;
+		};
+		const seatsFor = (fleet: Account[]) => {
+			const eligible =
+				ctx.teamRouter?.eligibleAccounts(
+					fleet,
+					teamRequest,
+					ctx.runtime.teamRouting,
+				) ?? fleet;
+			const id = getThreadAccount();
+			return id ? eligible.filter((account) => account.id === id) : eligible;
+		};
+		return { ctx, teamRequest, getThread, getThreadAccount, seatsFor };
 	}
 
-	private prepare(route: import("@agent-smith/capacity").RouteRequest): {
+	private prepare(route: RouteRequest): {
 		request: PoolAttemptRequest;
 		accounts: Account[];
 	} {
@@ -242,13 +294,9 @@ export class ProviderSupply implements RoutedProvider {
 			route.scope.kind === "pool-route"
 				? { ...route.edge.meta, model: mappedModel }
 				: route.edge.meta;
-		const teamRequest = this.teamRequestFor(route);
-		const thread = parseMessageThreadRequest(
-			route.edge.body,
-			ctx.upstreamPath,
-			route.edge.headers.get("content-type"),
-			this.provider.getClientSessionId?.(route.edge.headers) ?? null,
-		);
+		const view = this.requestView(route, undefined, ctx);
+		const teamRequest = view.teamRequest;
+		const thread = view.getThread();
 		const req = new Request(route.edge.url, {
 			method: route.edge.method,
 			headers: route.edge.headers,
@@ -303,17 +351,17 @@ export class ProviderSupply implements RoutedProvider {
 					...accounts.filter((candidate) => candidate.id !== pinned.id),
 				];
 		}
-		const threadAccount = getThreadBoundAccountId(ctx.messageThreads, thread);
+		const threadAccount = view.getThreadAccount();
 		if (threadAccount)
 			accounts = accounts.filter((candidate) => candidate.id === threadAccount);
 		return { request, accounts };
 	}
 
 	/** Temporary adapter for the existing proxy's hold and provider-selection flow. */
-	prepareRoute(route: import("@agent-smith/capacity").RouteRequest): {
+	prepareRoute(route: RouteRequest): {
 		hasAccounts: boolean;
 		attemptedAccounts: number;
-		block: import("@agent-smith/capacity").ProviderCapacityBlock | null;
+		block: ProviderCapacityBlock | null;
 		retryAt: number | null;
 		fleetFull: boolean;
 		fleetResetAt: number | null;
@@ -350,37 +398,20 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	unservedFacts(route: import("@agent-smith/capacity").RouteRequest): {
-		block: import("@agent-smith/capacity").ProviderCapacityBlock | null;
+	unservedFacts(route: RouteRequest): {
+		block: ProviderCapacityBlock | null;
 		retryAt: number | null;
 		fleetFull: boolean;
 		fleetResetAt: number | null;
 	} {
-		const ctx = this.contextFor(route);
-		const teamRequest = this.teamRequestFor(route);
+		const view = this.requestView(route);
+		const { ctx, seatsFor } = view;
 		const model =
 			route.scope.kind === "pool-route"
 				? (this.mapModel(route.model) ?? undefined)
 				: route.model;
 		const meta = { ...route.edge.meta, model };
-		const thread = parseMessageThreadRequest(
-			route.edge.body,
-			ctx.upstreamPath,
-			route.edge.headers.get("content-type"),
-			this.provider.getClientSessionId?.(route.edge.headers) ?? null,
-		);
-		const threadAccount = getThreadBoundAccountId(ctx.messageThreads, thread);
-		const seatsFor = (fleet: Account[]) => {
-			const eligible =
-				ctx.teamRouter?.eligibleAccounts(
-					fleet,
-					teamRequest,
-					ctx.runtime.teamRouting,
-				) ?? fleet;
-			return threadAccount
-				? eligible.filter((account) => account.id === threadAccount)
-				: eligible;
-		};
+		view.getThreadAccount();
 		return {
 			block: getQuotaCapacityBlock(meta, ctx, seatsFor, route.callerId),
 			retryAt: getSoonestQuotaReset(meta, ctx, seatsFor, route.callerId),
@@ -389,10 +420,7 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	alertFleetFull(
-		route: import("@agent-smith/capacity").RouteRequest,
-		holdSeconds: number,
-	): void {
+	alertFleetFull(route: RouteRequest, holdSeconds: number): void {
 		alertWhenFleetFull(route.edge.meta, this.contextFor(route), holdSeconds);
 	}
 
@@ -404,12 +432,10 @@ export class ProviderSupply implements RoutedProvider {
 	}
 
 	/** Provider holding the existing seat pin, without exposing the seat. */
-	holdingProvider(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): string | undefined {
-		const ctx = this.contextFor(route);
+	holdingProvider(route: RouteRequest): string | undefined {
+		const { ctx, teamRequest } = this.requestView(route);
 		const pinnedId = ctx.teamRouter?.getPinnedAccountId(
-			this.teamRequestFor(route),
+			teamRequest,
 			ctx.runtime.teamRouting,
 			ctx.provider,
 			ctx.dbOps,
@@ -417,11 +443,9 @@ export class ProviderSupply implements RoutedProvider {
 		return pinnedId ? ctx.dbOps.getAccount(pinnedId)?.provider : undefined;
 	}
 
-	async availability(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): Promise<import("@agent-smith/capacity").Availability> {
-		const ctx = this.contextFor(route);
-		const teamRequest = this.teamRequestFor(route);
+	async availability(route: RouteRequest): Promise<Availability> {
+		const view = this.requestView(route);
+		const { ctx, teamRequest, seatsFor } = view;
 		const mappedModel =
 			route.scope.kind === "pool-route"
 				? this.mapModel(route.model)
@@ -439,25 +463,8 @@ export class ProviderSupply implements RoutedProvider {
 			ctx.dbOps
 				.getAccountsByProvider(this.name)
 				.some((account) => account.id === pinnedId);
-		const thread = parseMessageThreadRequest(
-			route.edge.body,
-			ctx.upstreamPath,
-			route.edge.headers.get("content-type"),
-			this.provider.getClientSessionId?.(route.edge.headers) ?? null,
-		);
-		const threadRequest = thread !== null;
-		const threadAccount = getThreadBoundAccountId(ctx.messageThreads, thread);
-		const seatsFor = (fleet: Account[]) => {
-			const eligible =
-				ctx.teamRouter?.eligibleAccounts(
-					fleet,
-					teamRequest,
-					ctx.runtime.teamRouting,
-				) ?? fleet;
-			return threadAccount
-				? eligible.filter((account) => account.id === threadAccount)
-				: eligible;
-		};
+		const threadRequest = view.getThread() !== null;
+		const threadAccount = view.getThreadAccount();
 		const hasAvailableAccount = ctx.dbOps
 			.getAvailableAccountsByProvider(this.name)
 			.some((account) => {
@@ -504,9 +511,7 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	async status(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): Promise<import("@agent-smith/capacity").ProviderStatus> {
+	async status(route: RouteRequest): Promise<ProviderStatus> {
 		const mapped =
 			route.scope.kind === "pool-route"
 				? this.mapModel(route.model)
@@ -534,9 +539,7 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	async openSession(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): Promise<import("@agent-smith/capacity").SessionOutcome> {
+	async openSession(route: RouteRequest): Promise<SessionOutcome> {
 		const createAttempt = this.options.createSessionAttempt;
 		if (!createAttempt) return { kind: "unavailable", reason: "not-supported" };
 		const { request, accounts } = this.prepare(route);
@@ -579,9 +582,7 @@ export class ProviderSupply implements RoutedProvider {
 		};
 	}
 
-	async serve(
-		route: import("@agent-smith/capacity").RouteRequest,
-	): Promise<ServeOutcome> {
+	async serve(route: RouteRequest): Promise<ServeOutcome> {
 		if (
 			route.scope.kind === "pool-route" &&
 			this.mapModel(route.model) === null
@@ -607,25 +608,12 @@ export class ProviderSupply implements RoutedProvider {
 			outcome.reason !== "no-eligible-account"
 		)
 			return outcome;
-		const threadAccount = getThreadBoundAccountId(
-			request.ctx.messageThreads,
-			request.thread,
-		);
-		const seatsFor = (fleet: Account[]) => {
-			const eligible =
-				request.ctx.teamRouter?.eligibleAccounts(
-					fleet,
-					request.teamRequest,
-					request.ctx.runtime.teamRouting,
-				) ?? fleet;
-			return threadAccount
-				? eligible.filter((account) => account.id === threadAccount)
-				: eligible;
-		};
+		const view = this.requestView(route, request);
+		view.getThreadAccount();
 		const block = getQuotaCapacityBlock(
 			request.meta,
 			request.ctx,
-			seatsFor,
+			view.seatsFor,
 			route.callerId,
 		);
 		return block ? { ...outcome, block } : outcome;

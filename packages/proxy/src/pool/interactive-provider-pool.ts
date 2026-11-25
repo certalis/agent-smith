@@ -1,4 +1,5 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
+import type { TeamRoutingRequest } from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	type ConversationProviderRouting,
@@ -13,7 +14,6 @@ import type { RequestMeta } from "@agent-smith/types";
 import { createResolvedProxyContext, type ProxyContext } from "../handlers";
 import { buildRouteRequest } from "../handlers/proxy-request";
 import { getProviderSupply } from "../supply-executor";
-import type { TeamRoutingRequest } from "../team-router";
 
 export type InteractivePoolRequest = {
 	body: ArrayBuffer | null;

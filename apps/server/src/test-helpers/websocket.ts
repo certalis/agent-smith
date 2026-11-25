@@ -1,14 +1,11 @@
-import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
+import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import type {
 	IncomingWorkerMessage,
 	ProxyContext,
 	WebSocketProxyData,
 } from "@agent-smith/proxy";
-import {
-	createSupplyExecutorFactory,
-	createWebSocketSupplyAttempt,
-} from "@agent-smith/proxy";
+import { createProviderSupplies } from "@agent-smith/proxy";
 import type { Account } from "@agent-smith/types";
 
 export type FakeUpstreamCapture = {
@@ -319,17 +316,6 @@ export function createInMemoryProxyContext(
 		testPool: fixture as unknown as PoolContext,
 		routedProviders: new Map<string, ProviderSupply>(),
 	};
-	const provider = context.providerRegistry.getProvider("codex");
-	if (!provider) throw new Error("Codex provider missing from fixture");
-	context.routedProviders = new Map([
-		[
-			provider.name,
-			new ProviderSupply(provider, context.testPool, {
-				mapModel: (model) => model,
-				createExecutor: createSupplyExecutorFactory(context),
-				createSessionAttempt: createWebSocketSupplyAttempt(context),
-			}),
-		],
-	]);
+	context.routedProviders = createProviderSupplies(context.testPool, context);
 	return context;
 }

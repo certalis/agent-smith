@@ -3,8 +3,6 @@ import type { Logger } from "@agent-smith/logger";
 import type { Provider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 
-export { MAX_INLINE_RATE_LIMIT_RETRY_MS } from "@agent-smith/pool";
-
 function retryAfterMs(response: Response): number | undefined {
 	const value = response.headers.get("retry-after");
 	if (!value) return undefined;
@@ -92,8 +90,6 @@ export function getPerMinuteRetryAfterMs(
 export function isUpstreamFailureResponse(response: Response): boolean {
 	return response.status === 529 || response.status >= 500;
 }
-
-export { processProxyResponse } from "@agent-smith/pool";
 
 /**
  * Handles errors that occur during proxy operations

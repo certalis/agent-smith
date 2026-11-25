@@ -4,11 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { estimateCostUSD, requestEvents } from "@agent-smith/core";
 import { DatabaseFactory } from "@agent-smith/database";
-import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
+import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { CodexProvider, ProviderRegistry } from "@agent-smith/providers";
 import {
-	createSupplyExecutorFactory,
-	createWebSocketSupplyAttempt,
+	createProviderSupplies,
 	getUsageWorker,
 	handleWebSocketUpgradeRequest,
 	type ProxyContext,
@@ -117,18 +116,7 @@ function createProxyContext(): ProxyContext {
 		testPool: fixture as unknown as PoolContext,
 		routedProviders: new Map<string, ProviderSupply>(),
 	};
-	const provider = context.providerRegistry.getProvider("codex");
-	if (!provider) throw new Error("Codex provider missing from fixture");
-	context.routedProviders = new Map([
-		[
-			provider.name,
-			new ProviderSupply(provider, context.testPool, {
-				mapModel: (model) => model,
-				createExecutor: createSupplyExecutorFactory(context),
-				createSessionAttempt: createWebSocketSupplyAttempt(context),
-			}),
-		],
-	]);
+	context.routedProviders = createProviderSupplies(context.testPool, context);
 	return context;
 }
 

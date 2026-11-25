@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { waitForProxyBackgroundTasks } from "@agent-smith/pool";
 import type { Account } from "@agent-smith/types";
-import { waitForProxyBackgroundTasks } from "./background-tasks";
 import type { ResolvedProxyContext } from "./handlers";
 import { forwardToClient } from "./response-handler";
 

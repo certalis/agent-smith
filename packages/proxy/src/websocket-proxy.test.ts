@@ -3,7 +3,7 @@ import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { type Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import type { ProxyContext } from "./handlers/proxy-types";
-import { createSupplyExecutorFactory } from "./supply-executor";
+import { createProviderSupplies } from "./provider-supply-factory";
 import {
 	handleWebSocketUpgradeRequest,
 	type WebSocketProxyData,
@@ -105,15 +105,7 @@ function createProxyContext(accounts: Account[]): ProxyContext {
 		...fixture,
 		routedProviders: new Map<string, ProviderSupply>(),
 	};
-	const provider = context.providerRegistry.getProvider("codex");
-	if (!provider) throw new Error("provider missing");
-	context.routedProviders.set(
-		provider.name,
-		new ProviderSupply(provider, pool, {
-			mapModel: (model) => model,
-			createExecutor: createSupplyExecutorFactory(context),
-		}),
-	);
+	context.routedProviders = createProviderSupplies(pool, context);
 	return context;
 }
 

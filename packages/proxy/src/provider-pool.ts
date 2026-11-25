@@ -1,6 +1,10 @@
 import { ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import { getOpeningDigest } from "@agent-smith/pool";
+import {
+	getOpeningDigest,
+	quotaExhaustionResponse,
+	type TeamRoutingRequest,
+} from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	ConversationProviderRouting,
@@ -17,7 +21,6 @@ import {
 	ERROR_MESSAGES,
 	type ProxyContext,
 } from "./handlers";
-import { quotaExhaustionResponse } from "./handlers/proxy-attempts";
 import { buildRouteRequest } from "./handlers/proxy-request";
 import { PoolConversationProviderRoutingStore } from "./pool/conversation-provider-routing-store";
 import {
@@ -28,12 +31,11 @@ import {
 	waitOrReturnProviderCapacity,
 } from "./pool/interactive-provider-pool";
 import { proxyPoolCandidates } from "./pool/provider-pool-attempts";
-import { getProviderSupply } from "./supply-executor";
 import {
 	getConversationProviderKey,
 	hasOrderedProviderFallback,
-	type TeamRoutingRequest,
-} from "./team-router";
+} from "./provider-routing";
+import { getProviderSupply } from "./supply-executor";
 
 const log = new Logger("Proxy");
 

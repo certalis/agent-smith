@@ -1,8 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import {
+	processProxyResponse,
+	type ResolvedPoolContext,
+} from "@agent-smith/pool";
 import { CodexProvider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
-import type { ResolvedPoolContext } from "../pool-context";
-import { isQuotaRejection, processProxyResponse } from "./response-processor";
+import { isQuotaRejection } from "./response-processor";
 
 function createAccount(): Account {
 	return {

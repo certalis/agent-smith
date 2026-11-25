@@ -1,13 +1,11 @@
-import { getOpeningDigest } from "@agent-smith/pool";
+import type { RouteRequest } from "@agent-smith/capacity";
+import { getOpeningDigest, type TeamRoutingRequest } from "@agent-smith/pool";
 import {
 	interactiveProviderChoiceRequested,
 	stripProviderChoiceHeaders,
 } from "@agent-smith/routing";
 import type { RequestMeta } from "@agent-smith/types";
-import {
-	hasOrderedProviderFallback,
-	type TeamRoutingRequest,
-} from "../team-router";
+import { hasOrderedProviderFallback } from "../provider-routing";
 import type { ResolvedProxyContext } from "./proxy-types";
 
 /** Transitional route builder until Router owns request creation in the next PR. */
@@ -20,7 +18,7 @@ export function buildRouteRequest(
 	teamRequest: TeamRoutingRequest,
 	scope: "direct" | "pool-route",
 	beforeAttempt?: () => void,
-): import("@agent-smith/capacity").RouteRequest {
+): RouteRequest {
 	const openingDigest =
 		teamRequest.lookupOpeningDigest !== undefined
 			? teamRequest.lookupOpeningDigest

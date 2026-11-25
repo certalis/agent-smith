@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
-import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
+import {
+	type PoolContext,
+	type ProviderSupply,
+	TeamRouter,
+} from "@agent-smith/pool";
 import {
 	ClaudeCodeProvider,
 	GoogleGeminiProvider,
@@ -10,9 +14,8 @@ import {
 	ProviderRegistry,
 } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
+import { createProviderSupplies } from "./provider-supply-factory";
 import { handleProxy, type ProxyContext } from "./proxy";
-import { createSupplyExecutorFactory } from "./supply-executor";
-import { TeamRouter } from "./team-router";
 
 const originalFetch = globalThis.fetch;
 
@@ -197,19 +200,7 @@ function createProxyContext(
 		testPool,
 		routedProviders: new Map<string, ProviderSupply>(),
 	};
-	for (const name of context.providerRegistry.listProviders()) {
-		const provider = context.providerRegistry.getProvider(name);
-		if (!provider) continue;
-		context.routedProviders.set(
-			name,
-			new ProviderSupply(provider, testPool, {
-				mapModel: (model) =>
-					context.providerRegistry.mapModel(name, model) ??
-					(model === undefined ? undefined : null),
-				createExecutor: createSupplyExecutorFactory(context),
-			}),
-		);
-	}
+	context.routedProviders = createProviderSupplies(testPool, context);
 	return context;
 }
 

@@ -1,6 +1,10 @@
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { errorResponse, sanitizeRequestHeaders } from "@agent-smith/http";
 import { Logger } from "@agent-smith/logger";
+import {
+	getValidAccessToken,
+	type TeamRoutingRequest,
+} from "@agent-smith/pool";
 import type { Account, AccountProvider } from "@agent-smith/types";
 import type {
 	ProxyContext,
@@ -8,10 +12,8 @@ import type {
 } from "./handlers/proxy-types";
 import { ERROR_MESSAGES, resolveProxyContext } from "./handlers/proxy-types";
 import { createRequestMetadata } from "./handlers/request-handler";
-import { getValidAccessToken } from "./handlers/token-manager";
 import { normalizeOpenAIUsage, type OpenAIUsagePayload } from "./openai-usage";
 import { getProviderSupply } from "./supply-executor";
-import type { TeamRoutingRequest } from "./team-router";
 import type {
 	ChunkMessage,
 	EndMessage,

@@ -2,12 +2,6 @@ import { createHash } from "node:crypto";
 import type { TeamRoutingConfig } from "@agent-smith/config";
 import type { TeamRoutingRequest } from "@agent-smith/pool";
 
-export {
-	isAllowlisted,
-	TeamRouter,
-	type TeamRoutingRequest,
-} from "@agent-smith/pool";
-
 export function providerConversationKey(
 	request: TeamRoutingRequest,
 ): string | null {

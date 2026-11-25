@@ -1,5 +1,6 @@
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import { quotaExhaustionResponse } from "@agent-smith/pool";
 import { isRequestPayload, isRequestSummary } from "@agent-smith/types";
 import {
 	buildRouteRequest,
@@ -7,7 +8,6 @@ import {
 	ERROR_MESSAGES,
 	type ProxyContext,
 	prepareRequestBody,
-	quotaExhaustionResponse,
 	readRequestModel,
 	resolveProxyContext,
 	TIMING,

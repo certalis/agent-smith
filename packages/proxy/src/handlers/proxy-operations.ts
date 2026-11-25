@@ -1,12 +1,18 @@
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import type { AccountFact, ResolvedPoolContext } from "@agent-smith/pool";
+import {
+	type AccountFact,
+	getValidAccessToken,
+	type MessageThreadRequest,
+	type ProxyAttempt,
+	type ResolvedPoolContext,
+	readMessageId,
+	refreshAccessTokenSafe,
+} from "@agent-smith/pool";
 import { ProviderRequestTransformError } from "@agent-smith/providers";
 import { stripProviderChoiceHeaders } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
-import type { ProxyAttempt } from "../attempt-executor";
 import { forwardToClient } from "../response-handler";
-import { type MessageThreadRequest, readMessageId } from "./message-thread";
 import type { ResolvedProxyContext } from "./proxy-types";
 import { rewriteRequestBody } from "./request-body-rewriter";
 import { makeProxyRequest } from "./request-handler";
@@ -19,7 +25,6 @@ import {
 	isUpstreamFailureResponse,
 } from "./response-processor";
 import { inspectStreamHead } from "./stream-failure";
-import { getValidAccessToken, refreshAccessTokenSafe } from "./token-manager";
 
 const API_KEY_AUTH_COOLDOWN_MS = 5 * 60_000;
 const ORGANIZATION_QUARANTINE_MS = 5 * 60_000;
@@ -65,8 +70,6 @@ type ProxyOperationInput = {
  * @param ctx - The proxy context
  * @returns A forwarded response, a retryable 429, or a failed attempt
  */
-export type { ProxyAttempt } from "../attempt-executor";
-
 function createUpstreamSender(input: ProxyOperationInput): SendUpstream {
 	const transformed = input.ctx.provider.transformRequest?.({
 		body: input.requestBody,

@@ -1,6 +1,6 @@
+import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
 import type { AccountProvider } from "@agent-smith/types";
-import type { PoolContext } from "../pool-context";
 import type { QuotaHold } from "../quota-hold";
 import type { UsageWorkerTransport } from "../usage-worker";
 
@@ -9,7 +9,7 @@ export interface ProxyContext
 		PoolContext,
 		"strategy" | "dbOps" | "runtime" | "providerRegistry" | "asyncWriter"
 	> {
-	routedProviders: Map<string, import("@agent-smith/pool").ProviderSupply>;
+	routedProviders: Map<string, ProviderSupply>;
 	quotaHold?: QuotaHold;
 	usageWorker: UsageWorkerTransport;
 }

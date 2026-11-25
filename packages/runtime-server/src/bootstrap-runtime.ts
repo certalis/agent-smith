@@ -14,7 +14,7 @@ import {
 	getValidAccessToken,
 	OutsideSpendTracker,
 	type PoolContext,
-	ProviderSupply,
+	type ProviderSupply,
 	QuotaProbe,
 	SeatAlerts,
 	type SeatTokenReader,
@@ -27,8 +27,7 @@ import {
 	type ProviderRegistry,
 } from "@agent-smith/providers";
 import {
-	createSupplyExecutorFactory,
-	createWebSocketSupplyAttempt,
+	createProviderSupplies,
 	getUsageWorker,
 	getUsageWorkerHealth,
 	hasOrderedProviderFallback,
@@ -51,6 +50,39 @@ export type BootstrappedRuntime = {
 	providerRegistry: ProviderRegistry;
 	runtimeConfig: RuntimeConfig;
 };
+
+type StatusRequest = Parameters<ProviderSupply["status"]>[0];
+
+function createStatusRequest(
+	scope: StatusRequest["scope"],
+	url: URL,
+	model: string | undefined,
+	callerId?: string,
+	apiKeyAccounts = false,
+): StatusRequest {
+	return {
+		scope,
+		edge: {
+			method: "GET",
+			url,
+			headers: new Headers(),
+			body: null,
+			meta: {
+				id: "pool-status",
+				method: "GET",
+				path: url.pathname,
+				timestamp: Date.now(),
+			},
+		},
+		model,
+		...(callerId !== undefined && { callerId }),
+		sessionId: null,
+		openingDigest: null,
+		apiKeyAccounts,
+		inlineRateLimitRetry: false,
+		signal: new AbortController().signal,
+	};
+}
 
 function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 	return {
@@ -204,27 +236,9 @@ export function bootstrapRuntime(
 			const supply = proxyContext.routedProviders.get(provider);
 			if (!supply) throw new Error("Provider supply unavailable");
 			const url = new URL(`http://localhost/v1/${provider}/`);
-			const status = await supply.status({
-				scope: { kind: "direct", provider },
-				edge: {
-					method: "GET",
-					url,
-					headers: new Headers(),
-					body: null,
-					meta: {
-						id: "pool-status",
-						method: "GET",
-						path: url.pathname,
-						timestamp: Date.now(),
-					},
-				},
-				model,
-				sessionId: null,
-				openingDigest: null,
-				apiKeyAccounts: false,
-				inlineRateLimitRetry: false,
-				signal: new AbortController().signal,
-			});
+			const status = await supply.status(
+				createStatusRequest({ kind: "direct", provider }, url, model),
+			);
 			return {
 				version: 1,
 				provider,
@@ -253,28 +267,15 @@ export function bootstrapRuntime(
 				reachable.map(({ provider }) => {
 					const supply = proxyContext.routedProviders.get(provider.name);
 					if (!supply) throw new Error("Provider supply unavailable");
-					return supply.status({
-						scope: { kind: "pool-route", wire: pool },
-						edge: {
-							method: "GET",
+					return supply.status(
+						createStatusRequest(
+							{ kind: "pool-route", wire: pool },
 							url,
-							headers: new Headers(),
-							body: null,
-							meta: {
-								id: "pool-status",
-								method: "GET",
-								path: url.pathname,
-								timestamp: Date.now(),
-							},
-						},
-						model,
-						callerId,
-						sessionId: null,
-						openingDigest: null,
-						apiKeyAccounts: ordered,
-						inlineRateLimitRetry: false,
-						signal: new AbortController().signal,
-					});
+							model,
+							callerId,
+							ordered,
+						),
+					);
 				}),
 			);
 			const eligibleAccounts = statuses.reduce(
@@ -342,24 +343,9 @@ export function bootstrapRuntime(
 		quotaHold,
 		usageWorker: getUsageWorker(),
 	};
-	const createExecutor = createSupplyExecutorFactory(proxyContext);
-	proxyContext.routedProviders = new Map(
-		providerRegistry.listProviders().flatMap((name) => {
-			const provider = providerRegistry.getProvider(name);
-			if (!provider) return [];
-			return [
-				[
-					name,
-					new ProviderSupply(provider, poolContext, {
-						mapModel: (model) =>
-							providerRegistry.mapModel(name, model) ??
-							(model === undefined ? undefined : null),
-						createExecutor,
-						createSessionAttempt: createWebSocketSupplyAttempt(proxyContext),
-					}),
-				] as const,
-			];
-		}),
+	proxyContext.routedProviders = createProviderSupplies(
+		poolContext,
+		proxyContext,
 	);
 	const { quotaProbe, windowWarmup } = startSeatSchedulers(
 		config,

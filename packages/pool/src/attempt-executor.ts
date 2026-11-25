@@ -1,5 +1,9 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
-import type { Account } from "@agent-smith/types";
+import type { Account, RequestMeta } from "@agent-smith/types";
+import type { AccountFact } from "./account-facts";
+import type { MessageThreadRequest } from "./handlers/message-thread";
+import type { ResolvedPoolContext } from "./pool-context";
+import type { TeamRoutingRequest } from "./seat-router";
 
 export type ProxyAttempt =
 	| { kind: "authentication-failure" }
@@ -33,7 +37,7 @@ export type ProxyAttempt =
 export type AttemptExecutor = (
 	account: Account,
 	failoverAttempts: number,
-	report: (fact: import("./account-facts").AccountFact) => void,
+	report: (fact: AccountFact) => void,
 ) => Promise<ProxyAttempt>;
 
 export const MAX_INLINE_RATE_LIMIT_RETRY_MS = 60_000;
@@ -41,12 +45,12 @@ export const MAX_INLINE_RATE_LIMIT_RETRY_MS = 60_000;
 /** A pool request and the proxy-owned sender bound to this request. */
 export type PoolAttemptRequest = {
 	body: ArrayBuffer | null;
-	ctx: import("./pool-context").ResolvedPoolContext;
+	ctx: ResolvedPoolContext;
 	mappedModel: string | undefined;
-	meta: import("@agent-smith/types").RequestMeta;
+	meta: RequestMeta;
 	req: Request;
-	teamRequest: import("./seat-router").TeamRoutingRequest;
-	thread: import("./handlers/message-thread").MessageThreadRequest | null;
+	teamRequest: TeamRoutingRequest;
+	thread: MessageThreadRequest | null;
 	url: URL;
 	execute: AttemptExecutor;
 };

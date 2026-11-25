@@ -3,12 +3,9 @@ import {
 	type TeamRoutingConfig,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
+import { TeamRouter, type TeamRoutingRequest } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
-import {
-	getConversationProviderKey,
-	TeamRouter,
-	type TeamRoutingRequest,
-} from "./team-router";
+import { getConversationProviderKey } from "./provider-routing";
 
 const config: TeamRoutingConfig = {
 	admissionCap: 5,
