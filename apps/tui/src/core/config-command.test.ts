@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	statSync,
@@ -106,14 +107,32 @@ test("rewrites a pooled config into a new file without overwriting either file",
 	expect(f.run("config", "rewrite", f.path, output).exitCode).not.toBe(0);
 });
 
-test("does not overwrite a previous backup when a legacy file needs rewriting", () => {
+test("the command saves another backup after rollback and legacy changes", () => {
 	const f = fixture({
 		provider_pools: { "anthropic-messages": ["anthropic"] },
 	});
-	writeFileSync(`${f.path}.backup`, "older backup");
-	expect(f.run("config", "rewrite").exitCode).not.toBe(0);
-	expect(readFileSync(f.path, "utf8")).toBe(f.original);
-	expect(readFileSync(`${f.path}.backup`, "utf8")).toBe("older backup");
+	expect(f.run("config", "rewrite").exitCode).toBe(0);
+	const first = `${f.path}.backup`;
+	writeFileSync(f.path, readFileSync(first, "utf8"));
+	const changed = JSON.stringify({
+		provider_pools: { "anthropic-messages": ["anthropic"] },
+		retry_attempts: 7,
+	});
+	writeFileSync(f.path, changed);
+	const result = f.run("config", "rewrite");
+	expect({ exit: result.exitCode, error: result.stderr.toString() }).toEqual({
+		exit: 0,
+		error: "",
+	});
+	const backups = readdirSync(f.root).filter((name) =>
+		name.startsWith("config.json.backup-"),
+	);
+	expect(backups).toHaveLength(1);
+	const second = join(f.root, backups[0] as string);
+	expect(readFileSync(first, "utf8")).toBe(f.original);
+	expect(readFileSync(second, "utf8")).toBe(changed);
+	expect(statSync(second).mode & 0o777).toBe(0o600);
+	expect(result.stdout.toString()).toContain(second);
 });
 
 test("uses the default config path when no override is set", () => {

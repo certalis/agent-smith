@@ -768,9 +768,7 @@ function migrateLegacyConfig(path: string, parsed: unknown): unknown {
 	let current = parsed;
 	for (let attempt = 0; attempt < 3 && hasLegacyConfig(current); attempt++) {
 		try {
-			const result = rewriteConfigFile(path, undefined, {
-				allowConcurrent: true,
-			});
+			const result = rewriteConfigFile(path);
 			if (result.changed)
 				log.info(`Rewrote config ${path}; backup: ${result.backup}`);
 			current = JSON.parse(readFileSync(path, "utf8")) as unknown;
@@ -799,16 +797,8 @@ export function readClientRouting(
 	let data: unknown;
 	try {
 		data = JSON.parse(readFileSync(configPath, "utf8"));
-	} catch (error) {
-		const reason =
-			error instanceof SyntaxError
-				? "invalid JSON"
-				: error instanceof Error
-					? error.message
-					: String(error);
-		throw new Error(
-			`Could not read config ${configPath}: ${reason}. Run: agent-smith config rewrite`,
-		);
+	} catch {
+		throw new Error("Agent Smith client config could not be read");
 	}
 	data = migrateLegacyConfig(configPath, data);
 	if (
@@ -852,15 +842,9 @@ export class Config extends EventEmitter {
 				const content = readFileSync(this.configPath, "utf8");
 				parsed = JSON.parse(content);
 			} catch (error) {
-				const reason =
-					error instanceof SyntaxError
-						? "invalid JSON"
-						: error instanceof Error
-							? error.message
-							: String(error);
-				throw new Error(
-					`Could not read config ${this.configPath}: ${reason}. Run: agent-smith config rewrite`,
-				);
+				log.error(`Failed to parse config file: ${error}`);
+				this.data = {};
+				return;
 			}
 			parsed = migrateLegacyConfig(this.configPath, parsed);
 			this.data = sanitizeConfigData(parsed);

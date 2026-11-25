@@ -9,7 +9,6 @@ import {
 	rmSync,
 	statSync,
 	symlinkSync,
-	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -148,7 +147,14 @@ test("simultaneous config loads leave one intact backup and all succeed", async 
 			{ code: 0, error: "" },
 			{ code: 0, error: "" },
 		]);
-		expect(outcomes.reduce((sum, outcome) => sum + outcome.logs, 0)).toBe(1);
+		expect(
+			outcomes.reduce((sum, outcome) => sum + outcome.logs, 0),
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			readdirSync(f.root).filter((name) =>
+				name.startsWith("config.json.backup"),
+			),
+		).toEqual(["config.json.backup"]);
 		expect(readFileSync(f.backup, "utf8")).toBe(f.source);
 		expect(statSync(f.backup).mode & 0o777).toBe(0o600);
 		expect(lstatSync(alias).isSymbolicLink()).toBe(true);
@@ -161,12 +167,30 @@ test("simultaneous config loads leave one intact backup and all succeed", async 
 	}
 }, 15_000);
 
-test("an older backup is never replaced by an automatic migration", () => {
+test("upgrade after rollback saves the changed legacy config in another private backup", () => {
 	const f = fixture(laptop);
-	writeFileSync(f.backup, "previous backup", { mode: 0o600 });
-	expect(() => new Config(f.path)).toThrow(/agent-smith config rewrite/);
-	expect(readFileSync(f.path, "utf8")).toBe(f.source);
-	expect(readFileSync(f.backup, "utf8")).toBe("previous backup");
+	new Config(f.path);
+	writeFileSync(f.path, readFileSync(f.backup, "utf8"));
+	const changed = JSON.stringify({ ...laptop, retry_attempts: 7 });
+	writeFileSync(f.path, changed);
+	const messages: string[] = [];
+	const capture = (event: { msg: string }) => messages.push(event.msg);
+	logBus.on("log", capture);
+	try {
+		const config = new Config(f.path);
+		expect(config.getProviderPool("anthropic-messages")).toEqual(["anthropic"]);
+		const backups = readdirSync(f.root).filter((name) =>
+			name.startsWith("config.json.backup-"),
+		);
+		expect(backups).toHaveLength(1);
+		const second = join(f.root, backups[0] as string);
+		expect(readFileSync(f.backup, "utf8")).toBe(f.source);
+		expect(readFileSync(second, "utf8")).toBe(changed);
+		expect(statSync(second).mode & 0o777).toBe(0o600);
+		expect(messages.some((line) => line.includes(second))).toBe(true);
+	} finally {
+		logBus.off("log", capture);
+	}
 });
 
 test("refuses a config the current user cannot write even when another class has a write bit", () => {
@@ -200,174 +224,21 @@ test("can finish an interrupted or slow rewrite from the intact identical backup
 	expect(readFileSync(f.backup, "utf8")).toBe(f.source);
 });
 
-test("refuses an unreadable existing config instead of starting with defaults", () => {
-	const f = fixture(laptop);
-	chmodSync(f.path, 0o000);
-	try {
-		expect(() => new Config(f.path)).toThrow(/agent-smith config rewrite/);
-		expect(existsSync(f.backup)).toBe(false);
-	} finally {
-		chmodSync(f.path, 0o600);
-	}
-});
-
-test("refuses malformed existing config instead of starting with defaults", () => {
+test("unreadable and malformed configs keep the previous fallback behavior", () => {
 	const f = fixture(laptop);
 	writeFileSync(f.path, '{"team_routing":');
-	expect(() => new Config(f.path)).toThrow(/agent-smith config rewrite/);
+	expect(() => new Config(f.path)).not.toThrow();
+	expect(() => readClientRouting(f.path)).toThrow(
+		"Agent Smith client config could not be read",
+	);
 	expect(existsSync(f.backup)).toBe(false);
-});
-
-test("a concurrent load waits for a slow live rewrite owner", async () => {
-	const f = fixture(laptop);
-	const lock = join(f.root, ".config.json.rewrite.lock");
-	const owner = Bun.spawn(
-		[process.execPath, "--no-env-file", "-e", "await Bun.sleep(10000)"],
-		{ stdout: "pipe", stderr: "pipe" },
-	);
-	writeFileSync(lock, JSON.stringify({ pid: owner.pid }), { mode: 0o600 });
-	const modulePath = new URL("./index.ts", import.meta.url).pathname;
-	const program = `import {Config} from ${JSON.stringify(modulePath)}; const c=new Config(process.argv[1]); if(c.getProviderPool("anthropic-messages")[0]!=="anthropic") process.exit(4);`;
-	const waiting = Bun.spawn(
-		[process.execPath, "--no-env-file", "-e", program, f.path],
-		{
-			stdout: "pipe",
-			stderr: "pipe",
-			env: { HOME: f.root, PATH: "/usr/bin:/bin" },
-		},
-	);
-	try {
-		await Bun.sleep(2200);
-		expect(waiting.exitCode).toBeNull();
-		rmSync(lock);
-		const [code, error] = await Promise.all([
-			waiting.exited,
-			new Response(waiting.stderr).text(),
-		]);
-		expect({ code, error }).toEqual({ code: 0, error: "" });
-		expect(readFileSync(f.backup, "utf8")).toBe(f.source);
-	} finally {
-		owner.kill();
-		waiting.kill();
-	}
-}, 10_000);
-
-test("a lock left by a stopped process refuses safely with recovery details", async () => {
-	const f = fixture(laptop);
-	const owner = Bun.spawn([process.execPath, "--no-env-file", "-e", ""], {
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	await owner.exited;
-	const lock = join(f.root, ".config.json.rewrite.lock");
-	writeFileSync(lock, JSON.stringify({ pid: owner.pid }), { mode: 0o600 });
-	expect(() => new Config(f.path)).toThrow(
-		/stopped process.*agent-smith config rewrite/i,
-	);
-	expect(readFileSync(f.path, "utf8")).toBe(f.source);
-	expect(existsSync(f.backup)).toBe(false);
-});
-
-test("a live lock that never clears eventually refuses with a useful reason", async () => {
-	const f = fixture(laptop);
-	const lock = join(f.root, ".config.json.rewrite.lock");
-	writeFileSync(lock, JSON.stringify({ pid: process.pid }), { mode: 0o600 });
-	const modulePath = new URL("./index.ts", import.meta.url).pathname;
-	const program = `import {Config} from ${JSON.stringify(modulePath)}; let tick=0; Date.now=()=>tick++===0?0:31000; try { new Config(process.argv[1]); process.exit(5); } catch (e) { console.log(e.message); }`;
-	const child = Bun.spawn(
-		[process.execPath, "--no-env-file", "-e", program, f.path],
-		{
-			stdout: "pipe",
-			stderr: "pipe",
-			env: { HOME: f.root, PATH: "/usr/bin:/bin" },
-		},
-	);
-	const [code, output] = await Promise.all([
-		child.exited,
-		new Response(child.stdout).text(),
-	]);
-	expect(code).toBe(0);
-	expect(output).toMatch(/still running.*agent-smith config rewrite/i);
-	expect(readFileSync(f.path, "utf8")).toBe(f.source);
-	expect(existsSync(f.backup)).toBe(false);
-});
-
-test("a retargeted config link stops waiting for the old target", async () => {
-	const f = fixture(laptop);
-	const other = join(f.root, "other.json");
-	const alias = join(f.root, "linked.json");
-	const lock = join(f.root, ".config.json.rewrite.lock");
-	writeFileSync(other, f.source, { mode: 0o600 });
-	symlinkSync(f.path, alias);
-	writeFileSync(lock, JSON.stringify({ pid: process.pid }), { mode: 0o600 });
-	const modulePath = new URL("./index.ts", import.meta.url).pathname;
-	const program = `import {Config} from ${JSON.stringify(modulePath)}; const c=new Config(process.argv[1]); if(c.getProviderPool("anthropic-messages")[0]!=="anthropic")process.exit(4);`;
-	const child = Bun.spawn(
-		[process.execPath, "--no-env-file", "-e", program, alias],
-		{
-			stdout: "pipe",
-			stderr: "pipe",
-			env: { HOME: f.root, PATH: "/usr/bin:/bin" },
-		},
-	);
-	try {
-		for (
-			let n = 0;
-			n < 500 &&
-			!readdirSync(f.root).some((name) => name.endsWith(".lock.tmp"));
-			n++
-		)
-			await Bun.sleep(5);
-		expect(readdirSync(f.root).some((name) => name.endsWith(".lock.tmp"))).toBe(
-			true,
-		);
-		unlinkSync(alias);
-		symlinkSync(other, alias);
-		const code = await Promise.race([
-			child.exited,
-			Bun.sleep(3000).then(() => -1),
-		]);
-		if (code === -1) child.kill();
-		const error = await new Response(child.stderr).text();
-		expect({ code, error }).toEqual({ code: 0, error: "" });
-		expect(JSON.parse(readFileSync(other, "utf8"))).toHaveProperty("routing");
-		expect(readFileSync(`${other}.backup`, "utf8")).toBe(f.source);
-	} finally {
-		child.kill();
-	}
-}, 10_000);
-
-test("a client reread reports why an unreadable config cannot migrate", () => {
-	const f = fixture(laptop);
 	chmodSync(f.path, 0o000);
 	try {
+		expect(() => new Config(f.path)).not.toThrow();
 		expect(() => readClientRouting(f.path)).toThrow(
-			/agent-smith config rewrite/,
+			"Agent Smith client config could not be read",
 		);
-		expect(existsSync(f.backup)).toBe(false);
 	} finally {
 		chmodSync(f.path, 0o600);
 	}
-});
-
-test("an owner that finishes just before its PID is checked is not mistaken for a stale lock", async () => {
-	const f = fixture(laptop);
-	const lock = join(f.root, ".config.json.rewrite.lock");
-	writeFileSync(lock, JSON.stringify({ pid: 99999999 }), { mode: 0o600 });
-	const modulePath = new URL("./index.ts", import.meta.url).pathname;
-	const program = `import {Config,rewriteLegacyConfig} from ${JSON.stringify(modulePath)}; import {readFileSync,writeFileSync,unlinkSync} from "node:fs"; const path=process.argv[1], lock=process.argv[2]; process.kill=()=>{const old=JSON.parse(readFileSync(path,"utf8")); writeFileSync(path+".backup",JSON.stringify(old),{mode:0o600}); writeFileSync(path,JSON.stringify(rewriteLegacyConfig(old)),{mode:0o600}); unlinkSync(lock); throw Object.assign(new Error("gone"),{code:"ESRCH"});}; const c=new Config(path); if(c.getProviderPool("anthropic-messages")[0]!=="anthropic")process.exit(4);`;
-	const child = Bun.spawn(
-		[process.execPath, "--no-env-file", "-e", program, f.path, lock],
-		{
-			stdout: "pipe",
-			stderr: "pipe",
-			env: { HOME: f.root, PATH: "/usr/bin:/bin" },
-		},
-	);
-	const [code, error] = await Promise.all([
-		child.exited,
-		new Response(child.stderr).text(),
-	]);
-	expect({ code, error }).toEqual({ code: 0, error: "" });
-	expect(readFileSync(f.backup, "utf8")).toBe(f.source);
 });
