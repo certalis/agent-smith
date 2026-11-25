@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents } from "@agent-smith/core";
 import {
 	handleWebSocketUpgradeRequest,
@@ -388,5 +389,141 @@ describe("WebSocket proxy behavior", () => {
 		} finally {
 			requestEvents.off("event", requestEventHandler);
 		}
+	});
+});
+
+describe("WebSocket failover characterization", () => {
+	function startWithSeats() {
+		const first = createCodexAccount("first");
+		const second = {
+			...createCodexAccount("second"),
+			id: "second-account",
+			access_token: "second-access-token",
+		};
+		const ctx = createInMemoryProxyContext([first, second]);
+		ctx.runtime.teamRouting = {
+			enabled: true,
+			distributionEnabled: true,
+			preferExpiringQuota: false,
+			allowlistedAccountUuids: [],
+			maxUsage: 0.9,
+			weeklyMaxUsage: 0.9,
+			weeklyMaxUsageByEmail: {},
+			callerWeeklyMaxUsage: {},
+			callerProviderFallback: {},
+			admissionCap: 1,
+			admissionQueueLimit: 0,
+			admissionWaitMs: 0,
+			holdSeconds: 0,
+			quotaProbeSeconds: 0,
+			windowWarmup: WINDOW_WARMUP_DEFAULTS,
+		};
+		let admissionCalls = 0;
+		let inFlightCalls = 0;
+		ctx.teamAdmission = {
+			acquire() {
+				admissionCalls++;
+				throw new Error("unexpected admission");
+			},
+		} as unknown as NonNullable<typeof ctx.teamAdmission>;
+		ctx.teamRouter = {
+			order(accounts: ReturnType<typeof createCodexAccount>[]) {
+				return accounts;
+			},
+			begin() {
+				inFlightCalls++;
+			},
+			end() {
+				inFlightCalls++;
+			},
+		} as unknown as NonNullable<typeof ctx.teamRouter>;
+		const url = new URL("http://localhost:8080/v1/codex/responses");
+		let data: WebSocketProxyData | undefined;
+		const response = handleWebSocketUpgradeRequest(
+			new Request(url, {
+				headers: { connection: "Upgrade", upgrade: "websocket" },
+			}),
+			url,
+			ctx,
+			{
+				upgrade(_request: Request, options?: { data?: WebSocketProxyData }) {
+					data = options?.data;
+					return true;
+				},
+			} as unknown as Bun.Server<WebSocketProxyData>,
+		);
+		expect(response).toBeUndefined();
+		const downstream = new FakeServerWebSocket(data as WebSocketProxyData);
+		websocketProxyHandler.open?.(
+			downstream as unknown as Bun.ServerWebSocket<WebSocketProxyData>,
+		);
+		return { downstream, calls: () => ({ admissionCalls, inFlightCalls }) };
+	}
+
+	it("moves to the second account when the first websocket fails before opening", async () => {
+		class FailFirstWebSocket extends FakeUpstreamWebSocket {
+			constructor(url: string | URL, options?: unknown) {
+				super(url, options);
+				if (FakeUpstreamWebSocket.captures.length === 1) {
+					queueMicrotask(() => this.close(1013, "connection failed"));
+				}
+			}
+		}
+		globalThis.WebSocket =
+			FailFirstWebSocket as unknown as typeof globalThis.WebSocket;
+		const { downstream, calls } = startWithSeats();
+		const second = await waitFor(
+			() => FakeUpstreamWebSocket.captures[1] ?? null,
+			(value): value is FakeUpstreamCapture => value !== null,
+		);
+		await waitFor(
+			() => second.socket.readyState,
+			(state) => state === FakeUpstreamWebSocket.OPEN,
+		);
+		expect(FakeUpstreamWebSocket.captures).toHaveLength(2);
+		expect(second.headers.authorization).toBe("Bearer second-access-token");
+		expect(calls()).toEqual({ admissionCalls: 0, inFlightCalls: 0 });
+		websocketProxyHandler.close?.(
+			downstream as unknown as Bun.ServerWebSocket<WebSocketProxyData>,
+			1000,
+			"done",
+		);
+	});
+
+	it("does not retry a websocket after the upstream has opened", async () => {
+		globalThis.WebSocket =
+			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
+		const { downstream, calls } = startWithSeats();
+		const first = await waitFor(
+			() => FakeUpstreamWebSocket.captures[0] ?? null,
+			(value): value is FakeUpstreamCapture => value !== null,
+		);
+		await waitFor(
+			() => first.socket.readyState,
+			(state) => state === FakeUpstreamWebSocket.OPEN,
+		);
+		websocketProxyHandler.message(
+			downstream as unknown as Bun.ServerWebSocket<WebSocketProxyData>,
+			'{"type":"response.create","model":"gpt-4o","input":"hello"}',
+		);
+		await waitFor(
+			() => first.sent.length,
+			(count) => count > 0,
+		);
+		first.socket.emitMessage(
+			'{"type":"response.created","response":{"id":"resp_1","model":"gpt-4o"}}',
+		);
+		await waitFor(
+			() => downstream.sentTexts.length,
+			(count) => count > 0,
+		);
+		first.socket.close(1011, "upstream failed");
+		await waitFor(
+			() => downstream.closeCalls.length,
+			(count) => count > 0,
+		);
+		expect(FakeUpstreamWebSocket.captures).toHaveLength(1);
+		expect(downstream.closeCalls[0]?.reason).toBe("upstream failed");
+		expect(calls()).toEqual({ admissionCalls: 0, inFlightCalls: 0 });
 	});
 });
