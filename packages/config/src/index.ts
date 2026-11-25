@@ -824,7 +824,7 @@ export class Config extends EventEmitter {
 				)
 			) {
 				throw new Error(
-					"Legacy configuration keys are not supported. Use routing and providers.<name>.pool; run packages/config/src/rewrite-config-cli.ts to create a new configuration.",
+					"Legacy configuration keys are not supported. Use routing and providers.<name>.pool; run: agent-smith config rewrite",
 				);
 			}
 			this.data = sanitizeConfigData(parsed);
@@ -1374,6 +1374,7 @@ export class Config extends EventEmitter {
 export { resolveConfigPath } from "./paths";
 export { getPlatformConfigDir } from "./paths-common";
 export { rewriteLegacyConfig } from "./rewrite-config";
+export { rewriteConfigFile } from "./rewrite-file";
 export {
 	nextWindowWarmupAt,
 	WINDOW_WARMUP_DEFAULTS,

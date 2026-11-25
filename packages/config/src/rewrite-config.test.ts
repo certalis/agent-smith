@@ -68,7 +68,7 @@ test("disabled legacy team routing never enables its dormant fallback rules", ()
 	});
 });
 
-test("startup rejects legacy routing keys and points to the rewrite script", async () => {
+test("startup rejects legacy routing keys and points to the rewrite command", async () => {
 	const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
 	const { tmpdir } = await import("node:os");
 	const { join } = await import("node:path");
@@ -77,7 +77,7 @@ test("startup rejects legacy routing keys and points to the rewrite script", asy
 		const path = join(directory, "config.json");
 		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
 		expect(() => new config.Config(path)).toThrow(
-			/routing.*providers.*rewrite-config/i,
+			/routing.*providers.*agent-smith config rewrite/i,
 		);
 		writeFileSync(
 			path,
@@ -86,7 +86,7 @@ test("startup rejects legacy routing keys and points to the rewrite script", asy
 			}),
 		);
 		expect(() => new config.Config(path)).toThrow(
-			/routing.*providers.*rewrite-config/i,
+			/routing.*providers.*agent-smith config rewrite/i,
 		);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
@@ -117,7 +117,7 @@ test("rewrite writes a separate private file and refuses to overwrite", async ()
 		await import("node:fs");
 	const { tmpdir } = await import("node:os");
 	const { join } = await import("node:path");
-	const { rewriteConfigFile } = await import("./rewrite-config-cli");
+	const { rewriteConfigFile } = await import("./rewrite-file");
 	const directory = mkdtempSync(join(tmpdir(), "agent-smith-rewrite-"));
 	try {
 		const input = join(directory, "old.json"),

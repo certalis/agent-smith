@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rewriteConfigFile } from "@agent-smith/config/rewrite-config-cli";
+import { rewriteConfigFile } from "@agent-smith/config";
 import { startFakeUpstream } from "./scenarios/harness/fake-upstream";
 import { seedFleet } from "./scenarios/harness/fleet";
 import { spawnServer } from "./scenarios/harness/spawn-server";
