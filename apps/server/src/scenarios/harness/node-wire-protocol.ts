@@ -25,6 +25,7 @@ export type WireCommand =
 	| { type: "request"; clientId: string; request: WireRequest }
 	| { type: "client-chunk" | "cancel"; clientId: string }
 	| { type: "release"; ruleId: string }
+	| { type: "sync" }
 	| { type: "stop" };
 
 export type WireEvent =

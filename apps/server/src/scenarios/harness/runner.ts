@@ -499,6 +499,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 						clients.push(...(await responses));
 						pendingRequests.delete(step.id);
 					} else {
+						await nodeWire?.sync();
 						stepFailures.push(
 							...(await evaluateAssertions(step.assertions, {
 								clients,
@@ -525,6 +526,7 @@ async function runScenarioWithoutProxy(scenario: Scenario): Promise<void> {
 			);
 		}
 
+		await nodeWire?.sync();
 		const failures = [
 			...stepFailures,
 			...(await evaluateAssertions(scenario.assertions, {

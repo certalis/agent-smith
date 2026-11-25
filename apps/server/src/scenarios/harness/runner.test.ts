@@ -109,3 +109,36 @@ test("rejects a Unix request when the scenario has no private socket", async () 
 		"Scenario Unix transport requires privateSocket: true",
 	);
 }, 30_000);
+
+test("waits for upstream records before checking a successful direct response", async () => {
+	const { NodeWire } = await import("./node-wire");
+	const { reachScenarios } = await import("../api-key-account-reach.scenario");
+	const scenario = reachScenarios.find(
+		(item) =>
+			item.name === "API-key reach: team on, mixed, direct proxy, ordinary",
+	);
+	if (!scenario) throw new Error("Reachability scenario is missing");
+	// Delay the Node child's IPC channel while leaving its HTTP response unblocked.
+	const prototype = NodeWire.prototype as unknown as {
+		receive(event: unknown): void;
+		stop(): Promise<void>;
+	};
+	const receive = prototype.receive;
+	const stop = prototype.stop;
+	let stopping = false;
+	prototype.receive = function (event: unknown) {
+		if (stopping) receive.call(this, event);
+		else setTimeout(() => receive.call(this, event), 75);
+	};
+	prototype.stop = async function () {
+		await Bun.sleep(100);
+		stopping = true;
+		await stop.call(this);
+	};
+	try {
+		await runScenario(scenario);
+	} finally {
+		prototype.receive = receive;
+		prototype.stop = stop;
+	}
+}, 30_000);
