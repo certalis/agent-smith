@@ -139,6 +139,11 @@ export class NodeWire {
 		);
 	}
 
+	// The reply follows all previously sent request events on the IPC channel.
+	async sync(): Promise<void> {
+		await this.command({ type: "sync" });
+	}
+
 	async waitForHolds(): Promise<void> {}
 	async releaseHold(id: string): Promise<void> {
 		await this.command({ type: "release", ruleId: id });

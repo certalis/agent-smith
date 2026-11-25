@@ -220,6 +220,7 @@ class Client {
 }
 
 async function execute(command: WireCommand): Promise<unknown> {
+	if (command.type === "sync") return;
 	if (command.type === "initialize") {
 		rules = command.rules;
 		tokens = new Map(command.tokens);
