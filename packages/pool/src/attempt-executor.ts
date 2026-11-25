@@ -33,6 +33,7 @@ export type ProxyAttempt =
 export type AttemptExecutor = (
 	account: Account,
 	failoverAttempts: number,
+	report: (fact: import("./account-facts").AccountFact) => void,
 ) => Promise<ProxyAttempt>;
 
 export const MAX_INLINE_RATE_LIMIT_RETRY_MS = 60_000;

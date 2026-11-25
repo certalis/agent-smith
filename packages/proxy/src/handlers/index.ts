@@ -9,10 +9,7 @@ export {
 	type MessageThreadRequest,
 	parseMessageThreadRequest,
 } from "./message-thread";
-export {
-	proxySelectedAccounts,
-	quotaExhaustionResponse,
-} from "./proxy-attempts";
+export { quotaExhaustionResponse } from "./proxy-attempts";
 export { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
 export {
 	getRequestQuotaCapacityBlock,

@@ -1,6 +1,7 @@
 import { ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
 import type { Account } from "@agent-smith/types";
+import { applyAccountFact } from "./account-facts";
 import {
 	MAX_INLINE_RATE_LIMIT_RETRY_MS,
 	type PoolAttemptRequest,
@@ -106,7 +107,9 @@ export async function attemptAccount(
 		request.ctx.outsideSpendTracker?.end(account.id);
 	};
 	try {
-		const attempt = await request.execute(account, failoverAttempts);
+		const attempt = await request.execute(account, failoverAttempts, (fact) =>
+			applyAccountFact(account, request.ctx, fact),
+		);
 		if (attempt.kind === "response") {
 			const spentExtraUsage =
 				request.ctx.provider.spendsExtraUsage?.(attempt.response) ?? false;
@@ -303,54 +306,4 @@ export async function resolveTransportFailure(
 		default:
 			return new Response("Bad Gateway", { status: 502 });
 	}
-}
-
-export async function proxySelectedAccounts(
-	request: PoolAttemptRequest,
-	accounts: Account[],
-): Promise<Response> {
-	for (let index = 0; index < accounts.length; index += 1) {
-		const attempt = await attemptAccount(
-			request,
-			accounts[index] as Account,
-			index,
-		);
-		if (attempt.kind === "response") return attempt.response;
-		if (attempt.kind === "authentication-failure") {
-			return new Response("Bad Gateway", { status: 502 });
-		}
-		if (attempt.kind === "provider-capacity-block") {
-			return await attempt.forward();
-		}
-		if (attempt.kind === "per-minute-rate-limit") {
-			return await resolvePerMinuteRateLimit(
-				request,
-				accounts[index] as Account,
-				index,
-				attempt,
-			);
-		}
-		if (attempt.kind === "request-scoped-rate-limit") {
-			return await resolveRequestScopedRateLimit(
-				request,
-				accounts,
-				index,
-				attempt,
-			);
-		}
-		if (attempt.kind === "quota-rate-limit") {
-			return await resolveQuotaRateLimit(request, accounts, index, attempt);
-		}
-		if (attempt.kind === "upstream-failure") {
-			return await resolveUpstreamFailure(request, accounts, index, attempt);
-		}
-		if (attempt.kind === "transport-failure") {
-			return await resolveTransportFailure(request, accounts, index);
-		}
-	}
-
-	throw new ServiceUnavailableError(
-		`${"All accounts failed to proxy the request"} (${accounts.length} attempted)`,
-		request.ctx.providerName,
-	);
 }

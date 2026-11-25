@@ -1,4 +1,5 @@
 import type { PoolAttemptRequest } from "@agent-smith/pool";
+import { interactiveProviderChoiceRequested } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
 import type { TeamRoutingRequest } from "../team-router";
 import {
@@ -55,7 +56,7 @@ export function prepareProxyRequest(
 		teamRequest,
 		thread,
 		url,
-		execute: (account, failoverAttempts) =>
+		execute: (account, failoverAttempts, report) =>
 			proxyWithAccount(
 				req,
 				url,
@@ -68,6 +69,8 @@ export function prepareProxyRequest(
 				failoverAttempts,
 				mappedModel,
 				ctx,
+				interactiveProviderChoiceRequested(req.headers),
+				report,
 			),
 	};
 	return {

@@ -1,4 +1,5 @@
 export * from "./account-attempts";
+export * from "./account-facts";
 export * from "./attempt-executor";
 export * from "./background-tasks";
 export * from "./constants";
@@ -7,6 +8,7 @@ export * from "./handlers/message-thread";
 export * from "./handlers/token-manager";
 export * from "./outside-spend";
 export * from "./pool-context";
+export * from "./provider-supply";
 export * from "./quota-probe";
 export * from "./seat-alerts";
 export * from "./seat-router";

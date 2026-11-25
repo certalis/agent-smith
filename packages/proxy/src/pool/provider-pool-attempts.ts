@@ -1,6 +1,7 @@
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { requestEvents } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import { serveSelectedAccounts } from "@agent-smith/pool";
 import type { ResolvedProviderPool } from "@agent-smith/providers";
 import {
 	type ConversationProviderPreference,
@@ -16,15 +17,6 @@ import {
 	getSoonestQuotaReset,
 	isEveryAccountQuotaBlocked,
 } from "../handlers";
-import {
-	attemptAccount,
-	discardAttempt,
-	resolvePerMinuteRateLimit,
-	resolveQuotaRateLimit,
-	resolveRequestScopedRateLimit,
-	resolveTransportFailure,
-	resolveUpstreamFailure,
-} from "../handlers/proxy-attempts";
 import {
 	getRequestQuotaCapacityBlock,
 	getRequestRetryAt,
@@ -44,7 +36,7 @@ const log = new Logger("Proxy");
 type PoolCandidateResult =
 	| { block: ProviderCapacityBlock; kind: "capacity-block" }
 	| { block?: ProviderCapacityBlock; kind: "next-provider" }
-	| { account?: Account; kind: "response"; response: Response };
+	| { providerServed?: boolean; kind: "response"; response: Response };
 
 type ProviderPoolCandidateInput = {
 	candidates: ResolvedProviderPool["providers"];
@@ -85,110 +77,34 @@ async function proxyPoolCandidate(
 	accounts: Account[],
 	allowNextProvider: boolean,
 ): Promise<PoolCandidateResult> {
-	for (let index = 0; index < accounts.length; index += 1) {
-		const account = accounts[index] as Account;
-		const attempt = await attemptAccount(request, account, index);
-		if (attempt.kind === "response") {
-			return { account, kind: "response", response: attempt.response };
-		}
-		if (attempt.kind === "authentication-failure") {
-			return {
-				kind: "response",
-				response: new Response("Bad Gateway", { status: 502 }),
-			};
-		}
-		if (attempt.kind === "provider-capacity-block") {
-			await attempt.discard?.();
-			if (accounts[index + 1]) continue;
-			if (allowNextProvider) {
-				return { block: attempt.block, kind: "next-provider" };
-			}
-			return { block: attempt.block, kind: "capacity-block" };
-		}
-		if (attempt.kind === "per-minute-rate-limit") {
-			return {
-				kind: "response",
-				response: await resolvePerMinuteRateLimit(
-					request,
-					account,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "request-scoped-rate-limit") {
-			return {
-				kind: "response",
-				response: await resolveRequestScopedRateLimit(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "quota-rate-limit") {
-			if (!accounts[index + 1]) {
-				if (!allowNextProvider) {
-					return { kind: "response", response: await attempt.forward() };
-				}
-				await attempt.discard?.();
-				return { kind: "next-provider" };
-			}
-			return {
-				kind: "response",
-				response: await resolveQuotaRateLimit(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "upstream-failure") {
-			if (!accounts[index + 1]) {
-				if (!allowNextProvider) {
-					return { kind: "response", response: await attempt.forward() };
-				}
-				await discardAttempt(attempt);
-				return { kind: "next-provider" };
-			}
-			return {
-				kind: "response",
-				response: await resolveUpstreamFailure(
-					request,
-					accounts,
-					index,
-					attempt,
-				),
-			};
-		}
-		if (attempt.kind === "transport-failure") {
-			if (!accounts[index + 1]) {
-				return allowNextProvider
-					? { kind: "next-provider" }
-					: {
-							kind: "response",
-							response: new Response("Bad Gateway", { status: 502 }),
-						};
-			}
-			return {
-				kind: "response",
-				response: await resolveTransportFailure(request, accounts, index),
-			};
-		}
+	const result = await serveSelectedAccounts(request, accounts, "pool-route");
+	if (result.kind === "final") {
+		return {
+			kind: "response",
+			response: result.response,
+			providerServed: result.providerServed,
+		};
 	}
-	return allowNextProvider
-		? { kind: "next-provider" }
-		: {
-				kind: "response",
-				response: new Response("Bad Gateway", { status: 502 }),
-			};
+	if (result.reason === "capacity-block" && result.block) {
+		await result.discard?.();
+		return allowNextProvider
+			? { kind: "next-provider", block: result.block }
+			: { kind: "capacity-block", block: result.block };
+	}
+	if (allowNextProvider) {
+		await result.discard?.();
+		return { kind: "next-provider" };
+	}
+	return {
+		kind: "response",
+		response: result.forward
+			? await result.forward()
+			: new Response("Bad Gateway", { status: 502 }),
+	};
 }
 
 function resolvePoolCandidateResult({
 	candidate,
-	candidateContext,
 	conversationKey,
 	interactive,
 	interactiveInput,
@@ -198,7 +114,6 @@ function resolvePoolCandidateResult({
 	routing,
 }: {
 	candidate: ResolvedPoolCandidate;
-	candidateContext: ReturnType<typeof createResolvedProxyContext>;
 	conversationKey: string | undefined;
 	interactive: boolean;
 	interactiveInput: InteractivePoolRequest;
@@ -226,7 +141,7 @@ function resolvePoolCandidateResult({
 		});
 	}
 	if (result.kind !== "response") return null;
-	if (result.account) {
+	if (result.providerServed) {
 		if (conversationKey) {
 			routing.clearBlock(conversationKey, candidate.provider.name);
 		}
@@ -237,13 +152,6 @@ function resolvePoolCandidateResult({
 				Date.now(),
 			);
 		}
-		candidateContext.teamRouter?.rebind(
-			interactiveInput.teamRequest,
-			result.account.id,
-			candidateContext.runtime.teamRouting,
-			candidateContext.provider,
-			candidateContext.dbOps,
-		);
 	}
 	if (!interactive) return result.response;
 	const served = withServedProviderHeaders(result.response, {
@@ -339,7 +247,7 @@ export async function proxyPoolCandidates({
 	};
 
 	for (const [candidateIndex, candidate] of candidates.entries()) {
-		const { accounts, context, request } = preparePoolCandidate(
+		const { accounts, request } = preparePoolCandidate(
 			interactiveInput,
 			candidate,
 			pinnedId,
@@ -380,7 +288,6 @@ export async function proxyPoolCandidates({
 		}
 		const response = resolvePoolCandidateResult({
 			candidate,
-			candidateContext: context,
 			conversationKey,
 			interactive,
 			interactiveInput,

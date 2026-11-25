@@ -1,5 +1,6 @@
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
+import { serveSelectedAccounts } from "@agent-smith/pool";
 import { isRequestPayload, isRequestSummary } from "@agent-smith/types";
 import {
 	createRequestMetadata,
@@ -8,7 +9,6 @@ import {
 	type ProxyContext,
 	prepareProxyRequest,
 	prepareRequestBody,
-	proxySelectedAccounts,
 	quotaExhaustionResponse,
 	readRequestModel,
 	resolveProxyContext,
@@ -231,5 +231,13 @@ export async function handleProxy(
 		`Selected ${accounts.length} accounts: ${accounts.map((a) => a.name).join(", ")}`,
 	);
 	log.info(`Request: ${req.method} ${url.pathname}`);
-	return await proxySelectedAccounts(request, accounts);
+	const outcome = await serveSelectedAccounts(request, accounts, "direct");
+	if (outcome.kind === "final") return outcome.response;
+	if (outcome.forward) return await outcome.forward();
+	if (outcome.reason === "transport")
+		return new Response("Bad Gateway", { status: 502 });
+	throw new ServiceUnavailableError(
+		`${ERROR_MESSAGES.ALL_ACCOUNTS_FAILED} (${accounts.length} attempted)`,
+		requestContext.providerName,
+	);
 }
