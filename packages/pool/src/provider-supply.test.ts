@@ -292,7 +292,7 @@ test("a provider without a team pool reports a usable direct account", async () 
 		},
 		sessionId: null,
 		openingDigest: null,
-		apiKeyAccounts: false,
+		apiKeyAccounts: true,
 		inlineRateLimitRetry: false,
 		signal: new AbortController().signal,
 	} as const;
@@ -660,8 +660,11 @@ test.each([
 		inlineRateLimitRetry: false,
 		signal: new AbortController().signal,
 	} as const;
-	expect((await supply.availability(route)).capacity.state).toBe("unknown");
-	expect(await supply.serve(route)).toEqual({
+	expect((await supply.availability(route)).capacity).toMatchObject({
+		state: "blocked",
+		block: { category: "unknown" },
+	});
+	expect(await supply.serve(route)).toMatchObject({
 		kind: "exhausted",
 		reason: "no-eligible-account",
 	});
@@ -728,7 +731,7 @@ test("a provider does not execute an unsupported mapped model", async () => {
 		inlineRateLimitRetry: false,
 		signal: new AbortController().signal,
 	} as const;
-	expect(await supply.serve(route)).toEqual({
+	expect(await supply.serve(route)).toMatchObject({
 		kind: "exhausted",
 		reason: "no-eligible-account",
 	});
@@ -782,9 +785,9 @@ test("preparing and serving a route keeps selected accounts inside the pool and 
 		inlineRateLimitRetry: false,
 		signal: new AbortController().signal,
 	} as const;
-	const prepared = supply.prepareRoute(route);
-	expect(prepared.hasAccounts).toBe(true);
-	expect(JSON.stringify(prepared)).not.toContain("seat-1");
+	const snapshot = await supply.availability(route);
+	expect(snapshot.capacity.state).toBe("available");
+	expect(JSON.stringify(snapshot)).not.toContain("seat-1");
 	const result = await supply.serve(route);
 	expect(result.kind).toBe("final");
 	expect(attempts).toBe(1);
@@ -951,8 +954,11 @@ test("a pooled thread uses the serving provider session parser while pins use th
 		inlineRateLimitRetry: false,
 		signal: new AbortController().signal,
 	} as const;
-	expect((await supply.availability(route)).capacity.state).toBe("unknown");
-	expect(await supply.serve(route)).toEqual({
+	expect((await supply.availability(route)).capacity).toMatchObject({
+		state: "blocked",
+		block: { category: "unknown" },
+	});
+	expect(await supply.serve(route)).toMatchObject({
 		kind: "exhausted",
 		reason: "no-eligible-account",
 	});

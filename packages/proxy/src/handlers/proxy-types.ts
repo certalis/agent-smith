@@ -1,7 +1,8 @@
-import type { PoolContext, ProviderSupply } from "@agent-smith/pool";
+import type { RoutedProvider, RouteRequest } from "@agent-smith/capacity";
+import type { PoolContext } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
+import type { QuotaHold, Router } from "@agent-smith/routing";
 import type { AccountProvider } from "@agent-smith/types";
-import type { QuotaHold } from "../quota-hold";
 import type { UsageWorkerTransport } from "../usage-worker";
 
 export interface ProxyContext
@@ -9,7 +10,11 @@ export interface ProxyContext
 		PoolContext,
 		"strategy" | "dbOps" | "runtime" | "providerRegistry" | "asyncWriter"
 	> {
-	routedProviders: Map<string, ProviderSupply>;
+	routedProviders: Map<string, RoutedProvider>;
+	router: Router;
+	conversationPinsEnabled?: boolean;
+	onRouteFull?: (scope: string, resetAt: number) => void;
+	onProviderFull?: (route: RouteRequest, holdSeconds: number) => void;
 	quotaHold?: QuotaHold;
 	usageWorker: UsageWorkerTransport;
 }

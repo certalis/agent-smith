@@ -1,4 +1,5 @@
 import { type APIContext, APIRouter } from "@agent-smith/api";
+import type { RouteRequest } from "@agent-smith/capacity";
 import { Config, type RuntimeConfig } from "@agent-smith/config";
 import {
 	container,
@@ -14,7 +15,6 @@ import {
 	getValidAccessToken,
 	OutsideSpendTracker,
 	type PoolContext,
-	type ProviderSupply,
 	QuotaProbe,
 	SeatAlerts,
 	type SeatTokenReader,
@@ -34,7 +34,9 @@ import {
 	type ProxyContext,
 	QuotaHold,
 	SessionStrategy,
+	SqliteConversationProviderRoutingStore,
 } from "@agent-smith/proxy";
+import { getCallerPoolStatus, Router } from "@agent-smith/routing";
 import { deviceKeyName } from "./device-keys";
 import { createExposureConfig, type ExposureConfig } from "./exposure";
 
@@ -51,7 +53,7 @@ export type BootstrappedRuntime = {
 	runtimeConfig: RuntimeConfig;
 };
 
-type StatusRequest = Parameters<ProviderSupply["status"]>[0];
+type StatusRequest = RouteRequest;
 
 function createStatusRequest(
 	scope: StatusRequest["scope"],
@@ -251,53 +253,28 @@ export function bootstrapRuntime(
 		},
 		getCallerPoolStatus: async (pool, model, callerId) => {
 			const members = providerRegistry.poolCapacityMembers(pool, model);
-			const first = members[0];
-			if (!first) return null;
-			const ordered = hasOrderedProviderFallback(
-				runtimeConfig.teamRouting,
-				callerId,
-			);
-			const reachable = !runtimeConfig.teamRouting.enabled
-				? []
-				: ordered
-					? members
-					: [first];
 			const url = new URL(`http://localhost/v1/pool/${pool}/`);
-			const statuses = await Promise.all(
-				reachable.map(({ provider }) => {
-					const supply = proxyContext.routedProviders.get(provider.name);
-					if (!supply) throw new Error("Provider supply unavailable");
-					return supply.status(
-						createStatusRequest(
-							{ kind: "pool-route", wire: pool },
-							url,
-							model,
-							callerId,
-							ordered,
-						),
-					);
-				}),
-			);
-			const eligibleAccounts = statuses.reduce(
-				(sum, status) => sum + status.servableSeats,
-				0,
-			);
-			const retryTimes = statuses.flatMap((status) =>
-				status.retryAt === null ? [] : [status.retryAt],
-			);
-			return {
-				version: 1,
-				pool,
-				provider: first.provider.name,
-				routingEnabled: runtimeConfig.teamRouting.enabled,
-				eligibleAccounts,
-				retryAtMs:
-					eligibleAccounts === 0 && retryTimes.length
-						? Math.min(...retryTimes)
-						: null,
+			const providers = members.map(({ provider }) => {
+				const supply = proxyContext.routedProviders.get(provider.name);
+				if (!supply) throw new Error("Provider supply unavailable");
+				return supply;
+			});
+			return getCallerPoolStatus({
+				route: createStatusRequest(
+					{ kind: "pool-route", wire: pool },
+					url,
+					model,
+					callerId,
+				),
+				providers,
+				orderedFallback: hasOrderedProviderFallback(
+					runtimeConfig.teamRouting,
+					callerId,
+				),
+				teamRoutingEnabled: runtimeConfig.teamRouting.enabled,
 				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
 				admissionWaitMs: runtimeConfig.teamRouting.admissionWaitMs,
-			};
+			});
 		},
 		callerForDeviceKey: (key) =>
 			deviceKeyName(key, exposureConfig.clientKeysFile),
@@ -340,6 +317,7 @@ export function bootstrapRuntime(
 		providerRegistry,
 		asyncWriter,
 		routedProviders: new Map(),
+		router: new Router(new SqliteConversationProviderRoutingStore(dbOps)),
 		quotaHold,
 		usageWorker: getUsageWorker(),
 	};

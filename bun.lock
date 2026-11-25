@@ -230,6 +230,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@agent-smith/api": "workspace:*",
+        "@agent-smith/capacity": "workspace:*",
         "@agent-smith/config": "workspace:*",
         "@agent-smith/core": "workspace:*",
         "@agent-smith/database": "workspace:*",
@@ -238,6 +239,7 @@
         "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/proxy": "workspace:*",
+        "@agent-smith/routing": "workspace:*",
         "@agent-smith/web": "workspace:*",
       },
     },

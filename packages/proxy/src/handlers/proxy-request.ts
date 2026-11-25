@@ -5,7 +5,6 @@ import {
 	stripProviderChoiceHeaders,
 } from "@agent-smith/routing";
 import type { RequestMeta } from "@agent-smith/types";
-import { hasOrderedProviderFallback } from "../provider-routing";
 import type { ResolvedProxyContext } from "./proxy-types";
 
 // Keep client-only headers on the proxy side, outside the pool's route view.
@@ -44,7 +43,6 @@ export function buildRouteRequest(
 	const openingDigest = shouldParseOpening
 		? (teamRequest.lookupOpeningDigest ?? null)
 		: null;
-	if (ctx.runtime.teamRouting.enabled) teamRequest.seatPinLookup ??= {};
 	const interactive = interactiveProviderChoiceRequested(req.headers);
 	const route: RouteRequest = {
 		scope:
@@ -62,15 +60,8 @@ export function buildRouteRequest(
 		callerId: teamRequest.callerId,
 		sessionId: teamRequest.sessionId,
 		openingDigest,
-		seatPinLookup: teamRequest.seatPinLookup,
 		seatHint: teamRequest.manualAccountName,
-		apiKeyAccounts:
-			scope === "pool-route" &&
-			(interactive ||
-				hasOrderedProviderFallback(
-					ctx.runtime.teamRouting,
-					teamRequest.callerId,
-				)),
+		apiKeyAccounts: false,
 		inlineRateLimitRetry: interactive,
 		signal: req.signal,
 		beforeAttempt,

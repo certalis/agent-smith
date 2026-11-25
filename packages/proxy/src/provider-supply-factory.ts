@@ -1,4 +1,8 @@
-import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
+import {
+	alertWhenFleetFull,
+	type PoolContext,
+	ProviderSupply,
+} from "@agent-smith/pool";
 import type { ProxyContext } from "./handlers/proxy-types";
 import { createSupplyExecutorFactory } from "./supply-executor";
 import { createWebSocketSupplyAttempt } from "./websocket-proxy";
@@ -9,6 +13,26 @@ export function createProviderSupplies(
 	proxy: ProxyContext,
 ): Map<string, ProviderSupply> {
 	const registry = proxy.providerRegistry;
+	proxy.conversationPinsEnabled = pool.teamRouter !== undefined;
+	proxy.onRouteFull = (scope, resetAt) =>
+		pool.seatAlerts?.allAccountsFull(scope, resetAt, {
+			blocked: true,
+			holdSeconds: 0,
+		});
+	proxy.onProviderFull = (route, holdSeconds) => {
+		const resolved = registry.resolveProvider(route.edge.url.pathname);
+		if (!resolved) return;
+		alertWhenFleetFull(
+			route.edge.meta,
+			{
+				...pool,
+				provider: resolved.provider,
+				providerName: resolved.provider.name,
+				upstreamPath: resolved.upstreamPath,
+			},
+			holdSeconds,
+		);
+	};
 	const createExecutor = createSupplyExecutorFactory(proxy);
 	const createSessionAttempt = createWebSocketSupplyAttempt(proxy);
 	return new Map(

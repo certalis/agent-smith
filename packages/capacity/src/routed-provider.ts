@@ -21,8 +21,6 @@ export type RouteRequest = {
 	callerId?: string;
 	sessionId: string | null;
 	openingDigest: string | null;
-	/** Opaque identity shared by provider candidates for this request. */
-	seatPinLookup?: object;
 	seatHint?: string;
 	apiKeyAccounts: boolean;
 	inlineRateLimitRetry: boolean;
@@ -41,6 +39,8 @@ export type Availability = {
 		  }
 		| { state: "unknown" };
 	holdsConversation: boolean;
+	/** A valid conversation pin exists, possibly outside this route. */
+	hasConversationPin?: boolean;
 	threadRequest: boolean;
 };
 
@@ -62,6 +62,10 @@ export type ServeOutcome =
 				| "all-failed"
 				| "no-eligible-account";
 			block?: ProviderCapacityBlock;
+			retryAt?: number | null;
+			fleetFull?: boolean;
+			fleetResetAt?: number | null;
+			attemptedAccounts?: number;
 			forward?: () => Promise<Response>;
 			discard?: () => Promise<void>;
 	  };
@@ -81,6 +85,10 @@ export interface RoutedProvider {
 	readonly name: string;
 	readonly wire: ProviderWire;
 	mapModel(model: string | undefined): string | undefined | null;
+	conversationAffinity(request: RouteRequest): Promise<{
+		holdsConversation: boolean;
+		hasConversationPin: boolean;
+	}>;
 	availability(request: RouteRequest): Promise<Availability>;
 	status(request: RouteRequest): Promise<ProviderStatus>;
 	serve(request: RouteRequest): Promise<ServeOutcome>;

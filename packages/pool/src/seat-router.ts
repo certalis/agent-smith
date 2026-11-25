@@ -12,6 +12,7 @@ export type TeamRoutingRequest = {
 	callerId?: string;
 	contentType: string | null;
 	manualAccountName?: string;
+	apiKeyAccounts?: boolean;
 	model: string | undefined;
 	pinBucket?: string;
 	pinScope?: string;
@@ -171,8 +172,10 @@ export class TeamRouter {
 		config: TeamRoutingConfig,
 	): Account[] {
 		if (!config.enabled) return accounts;
-		const eligible = accounts.filter((account) =>
-			isAllowlisted(account, config),
+		const eligible = accounts.filter(
+			(account) =>
+				isAllowlisted(account, config) ||
+				(request?.apiKeyAccounts === true && account.auth_method === "api_key"),
 		);
 		if (!request?.manualAccountName) return eligible;
 		return eligible.filter(

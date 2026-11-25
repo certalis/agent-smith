@@ -3,11 +3,9 @@ import type { Provider } from "@agent-smith/providers";
 import {
 	type Account,
 	type AccountProvider,
-	type CallerPoolStatus,
 	isCurrentQuotaWindow,
 	isOpenQuotaWindow,
 	type PoolStatus,
-	type ProviderWire,
 	quotaThresholdFor,
 	type RequestMeta,
 } from "@agent-smith/types";
@@ -443,63 +441,6 @@ export function getProviderCallerStatus(
 						callerId,
 					)
 				: null,
-		admissionWaitMs: config.admissionWaitMs,
-	};
-}
-
-/**
- * getPoolStatus for one registered caller on a provider pool: the first
- * provider under the caller's weekly ceiling, later providers only under its
- * ordered fallback. Null when no provider of the pool serves the model.
- */
-export function getCallerPoolStatus(
-	wire: ProviderWire,
-	model: string | undefined,
-	callerId: string,
-	ctx: PoolStatusContext,
-	orderedFallback: boolean,
-): CallerPoolStatus | null {
-	const members = ctx.providerRegistry.poolCapacityMembers(wire, model);
-	const [first] = members;
-	if (!first) return null;
-	const config = ctx.runtime.teamRouting;
-	const now = Date.now();
-	const reachable = !config.enabled ? [] : orderedFallback ? members : [first];
-	const fleets = reachable.map((member) => ({
-		...member,
-		accounts: callerPoolAccounts(member.provider.name, ctx, orderedFallback),
-	}));
-	const eligibleAccounts = fleets.reduce(
-		(total, fleet) =>
-			total +
-			fleet.accounts.filter((account) =>
-				isServableNow(fleet.provider, account, fleet.model, ctx, now, callerId),
-			).length,
-		0,
-	);
-	const retryTimes =
-		eligibleAccounts === 0
-			? fleets.flatMap((fleet) => {
-					const at = soonestServableAt(
-						fleet.provider,
-						fleet.accounts,
-						fleet.accounts,
-						fleet.model,
-						ctx,
-						now,
-						callerId,
-					);
-					return at === null ? [] : [at];
-				})
-			: [];
-	return {
-		version: 1,
-		pool: wire,
-		provider: first.provider.name,
-		routingEnabled: config.enabled,
-		eligibleAccounts,
-		retryAtMs: retryTimes.length > 0 ? Math.min(...retryTimes) : null,
-		holdSeconds: config.holdSeconds,
 		admissionWaitMs: config.admissionWaitMs,
 	};
 }

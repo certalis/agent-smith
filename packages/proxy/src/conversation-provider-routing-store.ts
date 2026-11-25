@@ -6,8 +6,8 @@ import type {
 	ConversationProviderRoutingStore,
 } from "@agent-smith/routing";
 
-/** Pool-side database adapter. Routing sees this interface, never SQL. */
-export class PoolConversationProviderRoutingStore
+/** SQLite adapter for the Router conversation store. */
+export class SqliteConversationProviderRoutingStore
 	implements ConversationProviderRoutingStore
 {
 	constructor(private readonly dbOps: DatabaseOperations) {}

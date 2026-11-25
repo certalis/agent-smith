@@ -5,7 +5,7 @@ import {
 } from "@agent-smith/config";
 import { TeamRouter, type TeamRoutingRequest } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
-import { getConversationProviderKey } from "./provider-routing";
+import { getConversationProviderKey } from "@agent-smith/routing";
 
 const config: TeamRoutingConfig = {
 	admissionCap: 5,
