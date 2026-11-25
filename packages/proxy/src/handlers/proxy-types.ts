@@ -1,17 +1,24 @@
 import type { Provider } from "@agent-smith/providers";
-import type { PoolContext, ResolvedPoolContext } from "../pool-context";
+import type { AccountProvider } from "@agent-smith/types";
+import type { PoolContext } from "../pool-context";
 import type { QuotaHold } from "../quota-hold";
 import type { UsageWorkerTransport } from "../usage-worker";
 
-export interface ProxyContext extends PoolContext {
-	routedProviders?: Map<string, import("@agent-smith/pool").ProviderSupply>;
+export interface ProxyContext
+	extends Pick<
+		PoolContext,
+		"strategy" | "dbOps" | "runtime" | "providerRegistry" | "asyncWriter"
+	> {
+	routedProviders: Map<string, import("@agent-smith/pool").ProviderSupply>;
 	quotaHold?: QuotaHold;
 	usageWorker: UsageWorkerTransport;
 }
 
-export interface ResolvedProxyContext
-	extends ProxyContext,
-		ResolvedPoolContext {}
+export interface ResolvedProxyContext extends ProxyContext {
+	provider: Provider;
+	providerName: AccountProvider;
+	upstreamPath: string;
+}
 
 export function createResolvedProxyContext(
 	ctx: ProxyContext,

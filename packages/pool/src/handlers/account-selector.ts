@@ -411,6 +411,42 @@ export function getPoolStatus(
 	};
 }
 
+/** Factual capacity for one caller on one provider, without routing policy. */
+export function getProviderCallerStatus(
+	provider: AccountProvider,
+	model: string | undefined,
+	callerId: string,
+	ctx: PoolStatusContext,
+	apiKeyAccounts: boolean,
+): import("@agent-smith/capacity").ProviderStatus {
+	const strategy = ctx.providerRegistry.getProvider(provider);
+	if (!strategy) throw new Error(`Unknown provider '${provider}'`);
+	const config = ctx.runtime.teamRouting;
+	const now = Date.now();
+	const accounts = config.enabled
+		? callerPoolAccounts(provider, ctx, apiKeyAccounts)
+		: [];
+	const servableSeats = accounts.filter((account) =>
+		isServableNow(strategy, account, model, ctx, now, callerId),
+	).length;
+	return {
+		servableSeats,
+		retryAt:
+			servableSeats === 0
+				? soonestServableAt(
+						strategy,
+						accounts,
+						accounts,
+						model,
+						ctx,
+						now,
+						callerId,
+					)
+				: null,
+		admissionWaitMs: config.admissionWaitMs,
+	};
+}
+
 /**
  * getPoolStatus for one registered caller on a provider pool: the first
  * provider under the caller's weekly ceiling, later providers only under its

@@ -1,4 +1,9 @@
-import type { SupplyExecutorFactory } from "@agent-smith/pool";
+import type {
+	ProviderSupply,
+	SupplyExecutorFactory,
+	SupplySessionExecutor,
+} from "@agent-smith/pool";
+import type { Provider } from "@agent-smith/providers";
 import { proxyWithAccount } from "./handlers/proxy-operations";
 import type { ProxyContext } from "./handlers/proxy-types";
 
@@ -17,8 +22,26 @@ export function createSupplyExecutorFactory(
 			request.thread,
 			failoverAttempts,
 			request.mappedModel,
-			{ ...proxy, ...request.ctx },
+			{
+				...proxy,
+				provider: request.ctx.provider,
+				providerName: request.ctx.providerName,
+				upstreamPath: request.ctx.upstreamPath,
+			},
+			request.ctx,
 			route.inlineRateLimitRetry,
 			report,
 		);
+}
+
+/** Constructed once per provider, including in lightweight test contexts. */
+export function getProviderSupply(
+	proxy: ProxyContext,
+	provider: Provider,
+	sessionExecutor?: SupplySessionExecutor,
+): ProviderSupply {
+	const supply = proxy.routedProviders.get(provider.name);
+	if (!supply) throw new Error(`Provider supply unavailable: ${provider.name}`);
+	if (sessionExecutor) supply.setSessionExecutor(sessionExecutor);
+	return supply;
 }

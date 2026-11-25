@@ -22,6 +22,7 @@
         "@agent-smith/database": "workspace:*",
         "@agent-smith/http": "workspace:*",
         "@agent-smith/logger": "workspace:*",
+        "@agent-smith/pool": "workspace:*",
         "@agent-smith/providers": "workspace:*",
         "@agent-smith/proxy": "workspace:*",
         "@agent-smith/runtime-server": "workspace:*",

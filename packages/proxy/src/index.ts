@@ -27,9 +27,14 @@ export {
 	TeamAdmission,
 	TeamAdmissionError,
 } from "./team-admission";
-export { TeamRouter, type TeamRoutingRequest } from "./team-router";
+export {
+	hasOrderedProviderFallback,
+	TeamRouter,
+	type TeamRoutingRequest,
+} from "./team-router";
 export type { UsageWorkerHealthSnapshot } from "./usage-worker";
 export {
+	createWebSocketSupplyAttempt,
 	handleWebSocketUpgradeRequest,
 	isWebSocketUpgradeRequest,
 	type WebSocketProxyData,

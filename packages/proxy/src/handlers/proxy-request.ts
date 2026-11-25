@@ -1,144 +1,63 @@
-import type { PoolAttemptRequest } from "@agent-smith/pool";
-import { interactiveProviderChoiceRequested } from "@agent-smith/routing";
-import type { Account, RequestMeta } from "@agent-smith/types";
-import type { TeamRoutingRequest } from "../team-router";
+import { getOpeningDigest } from "@agent-smith/pool";
 import {
-	type AccountSelectionOptions,
-	getQuotaCapacityBlock,
-	getSoonestQuotaReset,
-	selectAccountsForRequest,
-} from "./account-selector";
+	interactiveProviderChoiceRequested,
+	stripProviderChoiceHeaders,
+} from "@agent-smith/routing";
+import type { RequestMeta } from "@agent-smith/types";
 import {
-	getThreadBoundAccountId,
-	parseMessageThreadRequest,
-} from "./message-thread";
-import { proxyWithAccount } from "./proxy-operations";
+	hasOrderedProviderFallback,
+	type TeamRoutingRequest,
+} from "../team-router";
 import type { ResolvedProxyContext } from "./proxy-types";
 
-export type ProxyRequest = PoolAttemptRequest & {
-	ctx: ResolvedProxyContext;
-};
-
-export function prepareProxyRequest(
+/** Transitional route builder until Router owns request creation in the next PR. */
+export function buildRouteRequest(
 	req: Request,
 	url: URL,
 	ctx: ResolvedProxyContext,
 	meta: RequestMeta,
 	body: ArrayBuffer | null,
-	manualAccountName?: string,
-	teamRequestOverride?: TeamRoutingRequest,
-	mappedModel: string | undefined = undefined,
-	selectionOptions?: AccountSelectionOptions,
-	callerId?: string,
-): { accounts: Account[]; request: ProxyRequest } {
-	const thread = parseMessageThreadRequest(
-		body,
-		ctx.upstreamPath,
-		req.headers.get("content-type"),
-		ctx.provider.getClientSessionId?.(req.headers) ?? null,
-	);
-	const sessionId = ctx.provider.getClientSessionId?.(req.headers) ?? null;
-	const teamRequest = teamRequestOverride ?? {
-		body,
-		contentType: req.headers.get("content-type"),
-		manualAccountName,
-		model: meta.model,
-		provider: ctx.providerName,
-		sessionId,
-		callerId,
-	};
-	const request: ProxyRequest = {
-		body,
-		ctx,
-		mappedModel,
-		meta,
-		req,
-		teamRequest,
-		thread,
-		url,
-		execute: (account, failoverAttempts, report) =>
-			proxyWithAccount(
-				req,
-				url,
-				account,
-				meta,
-				body,
-				(payload) =>
-					payload ? (new Response(payload).body ?? undefined) : undefined,
-				thread,
-				failoverAttempts,
-				mappedModel,
-				ctx,
-				interactiveProviderChoiceRequested(req.headers),
-				report,
-			),
-	};
+	teamRequest: TeamRoutingRequest,
+	scope: "direct" | "pool-route",
+	beforeAttempt?: () => void,
+): import("@agent-smith/capacity").RouteRequest {
+	const openingDigest =
+		teamRequest.lookupOpeningDigest !== undefined
+			? teamRequest.lookupOpeningDigest
+			: getOpeningDigest(
+					teamRequest,
+					scope === "pool-route"
+						? (ctx.providerRegistry.resolvePool(url.pathname, teamRequest.model)
+								?.providers[0]?.provider ?? ctx.provider)
+						: ctx.provider,
+				);
+	const interactive = interactiveProviderChoiceRequested(req.headers);
 	return {
-		accounts: selectRequestAccounts(request, selectionOptions),
-		request,
+		scope:
+			scope === "pool-route"
+				? { kind: "pool-route", wire: ctx.provider.wire }
+				: { kind: "direct", provider: ctx.providerName },
+		edge: {
+			method: req.method,
+			url,
+			headers: stripProviderChoiceHeaders(req.headers),
+			body,
+			meta: { ...meta, model: teamRequest.model },
+		},
+		model: teamRequest.model,
+		callerId: teamRequest.callerId,
+		sessionId: teamRequest.sessionId,
+		openingDigest,
+		seatHint: teamRequest.manualAccountName,
+		apiKeyAccounts:
+			scope === "pool-route" &&
+			(interactive ||
+				hasOrderedProviderFallback(
+					ctx.runtime.teamRouting,
+					teamRequest.callerId,
+				)),
+		inlineRateLimitRetry: interactive,
+		signal: req.signal,
+		beforeAttempt,
 	};
-}
-
-/** A message-thread continuation must reach the seat that holds the thread. */
-function onThreadSeat(request: ProxyRequest, accounts: Account[]): Account[] {
-	const threadAccountId = getThreadBoundAccountId(
-		request.ctx.messageThreads,
-		request.thread,
-	);
-	return threadAccountId
-		? accounts.filter((account) => account.id === threadAccountId)
-		: accounts;
-}
-
-export function selectRequestAccounts(
-	request: ProxyRequest,
-	selectionOptions?: AccountSelectionOptions,
-): Account[] {
-	return onThreadSeat(
-		request,
-		selectAccountsForRequest(
-			request.meta,
-			request.ctx,
-			request.teamRequest,
-			selectionOptions,
-		),
-	);
-}
-
-/** When this request may retry: the soonest of its seats, one when a manual pin or a message thread binds it. */
-export function getRequestRetryAt(request: ProxyRequest): number | null {
-	const { ctx, teamRequest } = request;
-	return getSoonestQuotaReset(
-		request.meta,
-		ctx,
-		(fleet) =>
-			onThreadSeat(
-				request,
-				ctx.teamRouter?.eligibleAccounts(
-					fleet,
-					teamRequest,
-					ctx.runtime.teamRouting,
-				) ?? fleet,
-			),
-		teamRequest.callerId,
-	);
-}
-
-/** The known quota category for the earliest seat this request may use. */
-export function getRequestQuotaCapacityBlock(request: ProxyRequest) {
-	const { ctx, teamRequest } = request;
-	return getQuotaCapacityBlock(
-		request.meta,
-		ctx,
-		(fleet) =>
-			onThreadSeat(
-				request,
-				ctx.teamRouter?.eligibleAccounts(
-					fleet,
-					teamRequest,
-					ctx.runtime.teamRouting,
-				) ?? fleet,
-			),
-		teamRequest.callerId,
-	);
 }

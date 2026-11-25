@@ -25,6 +25,7 @@ export type RouteRequest = {
 	apiKeyAccounts: boolean;
 	inlineRateLimitRetry: boolean;
 	signal: AbortSignal;
+	beforeAttempt?: () => void;
 };
 
 export type Availability = {
@@ -63,9 +64,15 @@ export type ServeOutcome =
 			discard?: () => Promise<void>;
 	  };
 
-/** A connected upstream socket or an unavailable provider; account details stay private. */
+/** Opaque websocket attempts are created by the edge executor, without exposing accounts to routing. */
 export type SessionOutcome =
-	| { kind: "opened"; socket: WebSocket }
+	| {
+			kind: "prepared";
+			session: {
+				close(): void;
+				next(): Promise<{ handle: object; attemptNumber: number } | null>;
+			};
+	  }
 	| { kind: "unavailable"; reason: string };
 
 export interface RoutedProvider {

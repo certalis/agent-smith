@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
 import { type Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
-import * as accountSelector from "./handlers/account-selector";
 import type { ProxyContext } from "./handlers/proxy-types";
+import { createSupplyExecutorFactory } from "./supply-executor";
 import {
 	handleWebSocketUpgradeRequest,
 	type WebSocketProxyData,
@@ -67,7 +68,7 @@ function createTestAccount(): Account {
 }
 
 function createProxyContext(accounts: Account[]): ProxyContext {
-	return {
+	const fixture = {
 		providerRegistry: new ProviderRegistry([createTestProvider()]),
 		strategy: {
 			select() {
@@ -99,6 +100,21 @@ function createProxyContext(accounts: Account[]): ProxyContext {
 			postMessage() {},
 		} as unknown as Worker,
 	} as unknown as ProxyContext;
+	const pool = fixture as unknown as PoolContext;
+	const context = {
+		...fixture,
+		routedProviders: new Map<string, ProviderSupply>(),
+	};
+	const provider = context.providerRegistry.getProvider("codex");
+	if (!provider) throw new Error("provider missing");
+	context.routedProviders.set(
+		provider.name,
+		new ProviderSupply(provider, pool, {
+			mapModel: (model) => model,
+			createExecutor: createSupplyExecutorFactory(context),
+		}),
+	);
+	return context;
 }
 
 function createUpgradeRequest(headers: HeadersInit = {}): Request {
@@ -117,11 +133,11 @@ afterEach(() => {
 });
 
 describe("handleWebSocketUpgradeRequest", () => {
-	it("answers 503 and does not upgrade when no account is eligible", () => {
+	it("answers 503 and does not upgrade when no account is eligible", async () => {
 		const upgrade = mock(() => true);
 		const server = { upgrade } as unknown as Bun.Server<WebSocketProxyData>;
 
-		const response = handleWebSocketUpgradeRequest(
+		const response = await handleWebSocketUpgradeRequest(
 			createUpgradeRequest(),
 			URL_UNDER_TEST,
 			createProxyContext([]),
@@ -132,11 +148,11 @@ describe("handleWebSocketUpgradeRequest", () => {
 		expect(upgrade).not.toHaveBeenCalled();
 	});
 
-	it("upgrades the connection when one account is eligible", () => {
+	it("upgrades the connection when one account is eligible", async () => {
 		const upgrade = mock(() => true);
 		const server = { upgrade } as unknown as Bun.Server<WebSocketProxyData>;
 
-		const response = handleWebSocketUpgradeRequest(
+		const response = await handleWebSocketUpgradeRequest(
 			createUpgradeRequest(),
 			URL_UNDER_TEST,
 			createProxyContext([createTestAccount()]),
@@ -147,31 +163,83 @@ describe("handleWebSocketUpgradeRequest", () => {
 		expect(upgrade).toHaveBeenCalledTimes(1);
 	});
 
-	it("passes a Codex session ID into team pin selection", () => {
+	it("passes a Codex session ID into team pin selection", async () => {
 		const account = createTestAccount();
-		const selectAccounts = spyOn(
-			accountSelector,
-			"selectAccountsForRequest",
-		).mockReturnValue([account]);
+		const openSession = spyOn(ProviderSupply.prototype, "openSession");
 		const upgrade = mock(() => true);
 		const server = { upgrade } as unknown as Bun.Server<WebSocketProxyData>;
 
-		handleWebSocketUpgradeRequest(
+		await handleWebSocketUpgradeRequest(
 			createUpgradeRequest({ "session-id": "stable" }),
 			URL_UNDER_TEST,
 			createProxyContext([account]),
 			server,
 		);
 
-		expect(selectAccounts).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.anything(),
-			expect.objectContaining({
-				body: null,
-				contentType: null,
-				provider: "codex",
-				sessionId: "stable",
-			}),
+		expect(openSession).toHaveBeenCalledWith(
+			expect.objectContaining({ sessionId: "stable" }),
 		);
 	});
+});
+
+it("keeps account and authorization data behind an opaque websocket handle", async () => {
+	const { createWebSocketSupplyAttempt } = await import("./websocket-proxy");
+	const { createResolvedProxyContext } = await import("./handlers/proxy-types");
+	const account = createTestAccount();
+	const ctx = createProxyContext([account]);
+	const provider = ctx.providerRegistry.getProvider("codex");
+	if (!provider) throw new Error("provider missing");
+	const requestContext = createResolvedProxyContext(
+		ctx,
+		provider,
+		"/responses",
+	);
+	const req = createUpgradeRequest();
+	const route = {
+		scope: { kind: "direct", provider: "codex" },
+		edge: {
+			method: "GET",
+			url: URL_UNDER_TEST,
+			headers: req.headers,
+			body: null,
+			meta: {
+				id: "test",
+				method: "GET",
+				path: URL_UNDER_TEST.pathname,
+				timestamp: 0,
+			},
+		},
+		sessionId: null,
+		openingDigest: null,
+		apiKeyAccounts: false,
+		inlineRateLimitRetry: false,
+		signal: req.signal,
+	} as const;
+	const prepared = {
+		req,
+		url: URL_UNDER_TEST,
+		ctx: {
+			...requestContext,
+			refreshInFlight: new Map<string, Promise<string>>(),
+		},
+		body: null,
+		mappedModel: undefined,
+		meta: route.edge.meta,
+		teamRequest: {
+			body: null,
+			contentType: null,
+			model: undefined,
+			provider: "codex",
+			sessionId: null,
+		},
+		thread: null,
+		execute: async () => ({ kind: "failed" as const }),
+	};
+	const handle = await createWebSocketSupplyAttempt(ctx)(
+		route,
+		prepared,
+		account,
+	);
+	expect(Reflect.ownKeys(handle)).toEqual([]);
+	expect(JSON.stringify(handle)).not.toContain(account.access_token);
 });

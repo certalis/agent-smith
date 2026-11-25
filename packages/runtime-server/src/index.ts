@@ -215,6 +215,7 @@ export default function startServer(
 		apiRouter,
 		exposureConfig,
 		proxyContext,
+		poolContext,
 		providerRegistry,
 		runtimeConfig,
 	} = bootstrapRuntime(port, serverLog, drain.control);
@@ -268,7 +269,7 @@ export default function startServer(
 		port: activePort,
 		stop: () => stopServerRuntime(),
 		advanceRoutingClock: () => {
-			proxyContext.teamAdmission?.advance();
+			poolContext.teamAdmission?.advance();
 			proxyContext.quotaHold?.advance();
 			checkShutdownDrain?.();
 		},

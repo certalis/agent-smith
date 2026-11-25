@@ -11,13 +11,8 @@ export {
 } from "./message-thread";
 export { quotaExhaustionResponse } from "./proxy-attempts";
 export { type ProxyAttempt, proxyWithAccount } from "./proxy-operations";
-export {
-	getRequestQuotaCapacityBlock,
-	getRequestRetryAt,
-	type ProxyRequest,
-	prepareProxyRequest,
-	selectRequestAccounts,
-} from "./proxy-request";
+export { buildRouteRequest } from "./proxy-request";
+
 export {
 	createResolvedProxyContext,
 	ERROR_MESSAGES,

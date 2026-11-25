@@ -40,7 +40,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function openingDigest(
+export function getOpeningDigest(
 	request: TeamRoutingRequest,
 	provider: Provider,
 ): string | null {
@@ -73,7 +73,7 @@ function pinKey(
 	const digest =
 		(request.lookupOpeningDigest !== undefined
 			? request.lookupOpeningDigest
-			: openingDigest(request, provider)) ?? "no-opening";
+			: getOpeningDigest(request, provider)) ?? "no-opening";
 	return createHash("sha256")
 		.update(
 			[

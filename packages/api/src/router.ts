@@ -358,7 +358,11 @@ export class APIRouter {
 		);
 	}
 
-	private callerPoolStatus(req: Request, url: URL, pool: string): Response {
+	private async callerPoolStatus(
+		req: Request,
+		url: URL,
+		pool: string,
+	): Promise<Response> {
 		const model = url.searchParams.get("model") ?? undefined;
 		if (
 			!isProviderWire(pool) ||
@@ -383,7 +387,7 @@ export class APIRouter {
 				{ status: 401 },
 			);
 		}
-		const status = getCallerPoolStatus(pool, model, callerId);
+		const status = await getCallerPoolStatus(pool, model, callerId);
 		if (!status) {
 			return Response.json(
 				{ error: "No provider in this pool serves the model" },

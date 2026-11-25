@@ -1,6 +1,6 @@
 import { TokenRefreshError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import type { AccountFact } from "@agent-smith/pool";
+import type { AccountFact, ResolvedPoolContext } from "@agent-smith/pool";
 import { ProviderRequestTransformError } from "@agent-smith/providers";
 import { stripProviderChoiceHeaders } from "@agent-smith/routing";
 import type { Account, RequestMeta } from "@agent-smith/types";
@@ -41,6 +41,7 @@ type ProxyOperationInput = {
 	account: Account;
 	createBodyStream: BodyStreamFactory;
 	ctx: ResolvedProxyContext;
+	pool: ResolvedPoolContext;
 	failoverAttempts: number;
 	mappedModel: string | undefined;
 	requestBody: ArrayBuffer | null;
@@ -109,7 +110,7 @@ async function sendAuthorizedRequest(
 	input: ProxyOperationInput,
 	send: SendUpstream,
 ): Promise<ProxyAttempt | UpstreamResponse> {
-	let accessToken = await getValidAccessToken(input.account, input.ctx);
+	let accessToken = await getValidAccessToken(input.account, input.pool);
 	let upstream = await send(accessToken);
 	if (upstream.response.status !== 401) return upstream;
 
@@ -124,7 +125,7 @@ async function sendAuthorizedRequest(
 	}
 
 	try {
-		accessToken = await refreshAccessTokenSafe(input.account, input.ctx);
+		accessToken = await refreshAccessTokenSafe(input.account, input.pool);
 		upstream = await send(accessToken);
 	} catch {
 		return { kind: "failed" };
@@ -290,6 +291,7 @@ export async function proxyWithAccount(
 	failoverAttempts: number,
 	mappedModel: string | undefined,
 	ctx: ResolvedProxyContext,
+	pool: ResolvedPoolContext,
 	inlineRateLimitRetry: boolean,
 	report: (fact: AccountFact) => void,
 ): Promise<ProxyAttempt> {
@@ -297,6 +299,7 @@ export async function proxyWithAccount(
 		account,
 		createBodyStream,
 		ctx,
+		pool,
 		failoverAttempts,
 		mappedModel,
 		requestBody: requestBodyBuffer

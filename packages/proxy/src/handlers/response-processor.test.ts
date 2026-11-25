@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { CodexProvider } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
-import type { ResolvedProxyContext } from "./proxy-types";
+import type { ResolvedPoolContext } from "../pool-context";
 import { isQuotaRejection, processProxyResponse } from "./response-processor";
 
 function createAccount(): Account {
@@ -71,7 +71,7 @@ function createContext(rateLimitInfo: {
 				calls.push("markAccountRateLimited");
 			},
 		},
-	} as unknown as ResolvedProxyContext;
+	} as unknown as ResolvedPoolContext;
 
 	return {
 		ctx,

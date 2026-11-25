@@ -1,22 +1,19 @@
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import { Logger } from "@agent-smith/logger";
-import { serveSelectedAccounts } from "@agent-smith/pool";
 import { isRequestPayload, isRequestSummary } from "@agent-smith/types";
 import {
+	buildRouteRequest,
 	createRequestMetadata,
 	ERROR_MESSAGES,
-	getRequestRetryAt,
 	type ProxyContext,
-	prepareProxyRequest,
 	prepareRequestBody,
 	quotaExhaustionResponse,
 	readRequestModel,
 	resolveProxyContext,
-	selectRequestAccounts,
 	TIMING,
 } from "./handlers";
 import { proxyProviderPool } from "./provider-pool";
-import { alertWhenFleetFull } from "./seat-alerts";
+import { getProviderSupply } from "./supply-executor";
 import {
 	UsageWorkerController,
 	type UsageWorkerHealthSnapshot,
@@ -177,26 +174,44 @@ export async function handleProxy(
 	);
 	const body = buffer ?? null;
 	requestMeta.model = readRequestModel(body);
-	const { accounts: initiallySelectedAccounts, request } = prepareProxyRequest(
+	const teamRequest = {
+		body,
+		contentType: req.headers.get("content-type"),
+		manualAccountName: manualPin?.accountName,
+		model: requestMeta.model,
+		provider: requestContext.providerName,
+		sessionId:
+			requestContext.provider.getClientSessionId?.(req.headers) ?? null,
+		callerId,
+	};
+	const supply = getProviderSupply(ctx, requestContext.provider);
+	const route = buildRouteRequest(
 		req,
 		upstreamUrl,
 		requestContext,
 		requestMeta,
 		body,
-		manualPin?.accountName,
-		undefined,
-		undefined,
-		undefined,
-		callerId,
+		teamRequest,
+		"direct",
+		() => {
+			requestEvents.emit("event", {
+				type: "ingress",
+				id: requestMeta.id,
+				timestamp: requestMeta.timestamp,
+				method: requestMeta.method,
+				path: requestMeta.path,
+			});
+			log.info(`Request: ${req.method} ${url.pathname}`);
+		},
 	);
-	let accounts = initiallySelectedAccounts;
-	if (accounts.length === 0) {
+	let prepared = supply.prepareRoute(route);
+	if (!prepared.hasAccounts) {
 		const holdSeconds =
 			requestContext.runtime.teamRouting.enabled && requestContext.quotaHold
 				? requestContext.runtime.teamRouting.holdSeconds
 				: 0;
-		alertWhenFleetFull(requestMeta, requestContext, holdSeconds);
-		const retryAt = getRequestRetryAt(request);
+		supply.alertFleetFull(route, holdSeconds);
+		const retryAt = prepared.retryAt;
 		if (retryAt !== null) {
 			const holdMs = holdSeconds * 1_000;
 			if (
@@ -205,14 +220,11 @@ export async function handleProxy(
 				requestContext.quotaHold
 			) {
 				await requestContext.quotaHold.waitUntil(retryAt, req.signal);
-				const resumedAccounts = selectRequestAccounts(request);
-				if (resumedAccounts.length > 0) {
-					accounts = resumedAccounts;
-				}
+				prepared = supply.prepareRoute(route);
 			}
-			if (accounts.length === 0) return quotaExhaustionResponse(retryAt);
+			if (!prepared.hasAccounts) return quotaExhaustionResponse(retryAt);
 		}
-		if (accounts.length === 0) {
+		if (!prepared.hasAccounts) {
 			log.warn(ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT);
 			throw new ServiceUnavailableError(
 				ERROR_MESSAGES.NO_ELIGIBLE_ACCOUNT,
@@ -220,27 +232,13 @@ export async function handleProxy(
 			);
 		}
 	}
-	requestEvents.emit("event", {
-		type: "ingress",
-		id: requestMeta.id,
-		timestamp: requestMeta.timestamp,
-		method: requestMeta.method,
-		path: requestMeta.path,
-	});
-	log.info(
-		`Selected ${accounts.length} accounts: ${accounts.map((a) => a.name).join(", ")}`,
-	);
-	log.info(`Request: ${req.method} ${url.pathname}`);
-	const supply = ctx.routedProviders?.get(requestContext.providerName);
-	const outcome = supply
-		? await supply.servePrepared(request, accounts, "direct")
-		: await serveSelectedAccounts(request, accounts, "direct");
+	const outcome = await supply.serve(route);
 	if (outcome.kind === "final") return outcome.response;
 	if (outcome.forward) return await outcome.forward();
 	if (outcome.reason === "transport")
 		return new Response("Bad Gateway", { status: 502 });
 	throw new ServiceUnavailableError(
-		`${ERROR_MESSAGES.ALL_ACCOUNTS_FAILED} (${accounts.length} attempted)`,
+		`${ERROR_MESSAGES.ALL_ACCOUNTS_FAILED} (${prepared.attemptedAccounts} attempted)`,
 		requestContext.providerName,
 	);
 }

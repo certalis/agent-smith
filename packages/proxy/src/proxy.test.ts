@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
 import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
+import { type PoolContext, ProviderSupply } from "@agent-smith/pool";
 import {
 	ClaudeCodeProvider,
 	GoogleGeminiProvider,
@@ -10,6 +11,7 @@ import {
 } from "@agent-smith/providers";
 import type { Account } from "@agent-smith/types";
 import { handleProxy, type ProxyContext } from "./proxy";
+import { createSupplyExecutorFactory } from "./supply-executor";
 import { TeamRouter } from "./team-router";
 
 const originalFetch = globalThis.fetch;
@@ -84,7 +86,7 @@ function createProxyContext(
 	providers: Provider[],
 	accounts: Account[] = [],
 	providerRouting: Record<string, readonly string[]> | ProviderRegistry = {},
-): ProxyContext {
+): ProxyContext & { testPool: PoolContext } {
 	const preferences = new Map<
 		string,
 		{ provider: string; promotionDeclined: boolean; lastSeenAt: number }
@@ -93,7 +95,7 @@ function createProxyContext(
 		string,
 		{ category: string; lastSeenAt: number; retryAt: number | undefined }
 	>();
-	return {
+	const fixture = {
 		providerRegistry:
 			providerRouting instanceof ProviderRegistry
 				? providerRouting
@@ -189,6 +191,26 @@ function createProxyContext(
 			postMessage() {},
 		} as unknown as Worker,
 	} as unknown as ProxyContext;
+	const testPool = fixture as unknown as PoolContext;
+	const context = {
+		...fixture,
+		testPool,
+		routedProviders: new Map<string, ProviderSupply>(),
+	};
+	for (const name of context.providerRegistry.listProviders()) {
+		const provider = context.providerRegistry.getProvider(name);
+		if (!provider) continue;
+		context.routedProviders.set(
+			name,
+			new ProviderSupply(provider, testPool, {
+				mapModel: (model) =>
+					context.providerRegistry.mapModel(name, model) ??
+					(model === undefined ? undefined : null),
+				createExecutor: createSupplyExecutorFactory(context),
+			}),
+		);
+	}
+	return context;
 }
 
 afterEach(() => {
@@ -1620,7 +1642,7 @@ describe("handleProxy routing", () => {
 			[qwenAccount, kimiAccount],
 			{ "anthropic-messages": ["qwen-claude", "kimi-claude"] },
 		);
-		context.messageThreads = new Map([
+		context.testPool.messageThreads = new Map([
 			[
 				"message-from-qwen",
 				{
@@ -1709,6 +1731,7 @@ describe("pool pin parser compatibility", () => {
 			deleteExpiredConversationPins: () => undefined,
 			countConversationPinsByAccount: () => new Map<string, number>(),
 		} as unknown as typeof ctx.dbOps;
+		ctx.testPool.dbOps = ctx.dbOps;
 		const urls: string[] = [];
 		globalThis.fetch = mock((url: string) => {
 			urls.push(url);
@@ -1737,4 +1760,82 @@ describe("pool pin parser compatibility", () => {
 			)?.accountId,
 		).toBe("second-seat");
 	});
+});
+
+it("parses the first provider opening once while building a pool chooser", async () => {
+	const first = createTestProvider("first");
+	const second = createTestProvider("second");
+	let parses = 0;
+	first.getConversationOpening = (value: unknown) => {
+		parses += 1;
+		return (value as { messages?: unknown }).messages ?? null;
+	};
+	const accounts = [
+		{ ...createTestAccount(), id: "first-seat", provider: "first" },
+		{ ...createTestAccount(), id: "second-seat", provider: "second" },
+	] as Account[];
+	const context = createProxyContext([first, second], accounts, {
+		"anthropic-messages": ["first", "second"],
+	});
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const response = await handleProxy(
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-agent-smith-interactive-provider-choice": "v1",
+				"x-agent-smith-provider-menu": "v1",
+				"x-claude-code-session-id": "session",
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}]}',
+		}),
+		url,
+		context,
+	);
+	expect(response.status).toBe(409);
+	expect(parses).toBe(1);
+});
+
+it("reuses the first opening digest when an interactive wait retries", async () => {
+	const retryAt = Date.now() + 10_000;
+	const provider = createTestProvider("qwen-claude", {
+		category: "request-rate",
+		retryAt,
+	});
+	let parses = 0;
+	provider.getConversationOpening = (value: unknown) => {
+		parses += 1;
+		return (value as { messages?: unknown }).messages ?? null;
+	};
+	const seat = { ...createTestAccount(), provider: "qwen-claude" } as Account;
+	const ctx = createProxyContext([provider], [seat], {
+		"anthropic-messages": ["qwen-claude"],
+	});
+	ctx.quotaHold = { waitUntil: async () => {} } as unknown as NonNullable<
+		typeof ctx.quotaHold
+	>;
+	ctx.runtime.teamRouting.holdSeconds = 60;
+	globalThis.fetch = mock(() =>
+		Promise.resolve(new Response("limited", { status: 429 })),
+	) as unknown as typeof fetch;
+	const url = new URL(
+		"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+	);
+	const request = (wait: boolean) =>
+		new Request(url, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-agent-smith-interactive-provider-choice": "v1",
+				"x-claude-code-session-id": "wait-session",
+				...(wait ? { "x-agent-smith-provider-wait": "v1" } : {}),
+			},
+			body: '{"model":"claude-sonnet-4-5","messages":[]}',
+		});
+	await handleProxy(request(false), url, ctx);
+	parses = 0;
+	await handleProxy(request(true), url, ctx);
+	expect(parses).toBe(1);
 });
