@@ -28,20 +28,55 @@ export default defineScenario({
 		AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
 	},
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: [
-				"acct-a",
-				"acct-b",
-				"paused",
-				"cooling",
-				"api",
-				"other",
-			],
-			max_usage: 0.9,
-			weekly_max_usage: 0.9,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b", "paused", "cooling", "api", "other"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.9,
+					admission: {
+						wait_ms: 1000,
+					},
+				},
+			},
+			openai: {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b", "paused", "cooling", "api", "other"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.9,
+					admission: {
+						wait_ms: 1000,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b", "paused", "cooling", "api", "other"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.9,
+					admission: {
+						wait_ms: 1000,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b", "paused", "cooling", "api", "other"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.9,
+					admission: {
+						wait_ms: 1000,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
 			hold_seconds: 0,
-			admission_wait_ms: 1000,
 		},
 	},
 	fleet: [
@@ -85,7 +120,7 @@ export default defineScenario({
 		{
 			type: "request",
 			method: "POST",
-			path: "/api/config/team-routing",
+			path: "/api/config/providers/claude-code/pool",
 			headers,
 			body: '{"enabled":false}',
 		},

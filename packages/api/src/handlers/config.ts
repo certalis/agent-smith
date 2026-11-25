@@ -16,14 +16,19 @@ import {
 } from "@agent-smith/types";
 import { parseJsonObject } from "../utils/json";
 
-/** Named caller ceilings are routing policy, not dashboard configuration. */
-function publicTeamRouting(config: Config) {
+function publicProviderPool(config: Config, name: string) {
 	const {
-		callerProviderFallback: _callerProviderFallback,
-		callerWeeklyMaxUsage: _callerWeeklyMaxUsage,
-		weeklyMaxUsageByEmail: _weeklyMaxUsageByEmail,
-		...routing
-	} = config.getTeamRouting();
+		weeklyMaxUsageByEmail: _weekly,
+		callerWeeklyMaxUsage: _caller,
+		callerProviderFallback: _fallback,
+		holdSeconds: _hold,
+		...pool
+	} = config.getTeamRouting(name);
+	return { ...pool, blockWhenAllFull: config.getBlockWhenAllFull(name) };
+}
+
+function publicRouting(config: Config) {
+	const { callers: _callers, ...routing } = config.getRouting();
 	return routing;
 }
 
@@ -89,21 +94,33 @@ export function createConfigHandlers(config: Config) {
 			return jsonResponse(LB_STRATEGIES);
 		},
 
-		getTeamRouting: (): Response => jsonResponse(publicTeamRouting(config)),
-
-		setTeamRouting: async (req: Request): Promise<Response> => {
+		getProviderPool: (name: string): Response =>
+			jsonResponse(publicProviderPool(config, name)),
+		setProviderPool: async (req: Request, name: string): Promise<Response> => {
 			try {
-				const body = await parseJsonObject(req);
-				config.setTeamRouting(body);
+				config.setProviderPool(name, await parseJsonObject(req));
 				return jsonResponse({
 					success: true,
-					message: "Team routing settings updated",
-					data: publicTeamRouting(config),
+					data: publicProviderPool(config, name),
 				});
 			} catch (error) {
-				if (error instanceof ValidationError || error instanceof Error) {
+				if (error instanceof Error)
 					return errorResponse(BadRequest(error.message));
-				}
+				throw error;
+			}
+		},
+		removeProviderPool: (name: string): Response => {
+			config.removeProviderPool(name);
+			return jsonResponse({ success: true });
+		},
+		getRouting: (): Response => jsonResponse(publicRouting(config)),
+		setRouting: async (req: Request): Promise<Response> => {
+			try {
+				config.setRouting(await parseJsonObject(req));
+				return jsonResponse({ success: true, data: publicRouting(config) });
+			} catch (error) {
+				if (error instanceof Error)
+					return errorResponse(BadRequest(error.message));
 				throw error;
 			}
 		},

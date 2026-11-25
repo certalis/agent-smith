@@ -281,10 +281,19 @@ function configForScenario(scenario: Scenario): Record<string, unknown> {
 	return {
 		...scenario.config,
 		providers: {
-			...Object.fromEntries(
-				[...scenarioProviders].map((provider) => [provider, { enabled: true }]),
-			),
 			...configuredProviders,
+			...Object.fromEntries(
+				[...scenarioProviders].map((provider) => [
+					provider,
+					{
+						enabled: true,
+						...(typeof configuredProviders[provider] === "object" &&
+						configuredProviders[provider] !== null
+							? configuredProviders[provider]
+							: {}),
+					},
+				]),
+			),
 		},
 	};
 }

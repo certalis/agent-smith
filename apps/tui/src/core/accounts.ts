@@ -177,14 +177,13 @@ export async function addAccount(options: AddAccountOptions): Promise<void> {
 export async function getAccounts(): Promise<LocalPoolAccount[]> {
 	const dbOps = DatabaseFactory.getInstance();
 	const config = new Config();
-	const routing = config.getTeamRouting();
 	const providerRegistry = createConfiguredProviderRegistry(
 		config.getProviderConfigs(),
 	);
 	const now = Date.now();
 	return dbOps.getAllAccounts().map((account) => ({
 		...toAccountDisplay(account, now),
-		poolState: localPoolState(account, routing),
+		poolState: localPoolState(account, config.getTeamRouting(account.provider)),
 		poolLimits: formatPoolLimits(account.quota_state ?? null),
 		providerDisabled: !providerRegistry.getProvider(account.provider),
 	}));
@@ -202,11 +201,31 @@ export function setAccountPoolMembership(
 	}
 
 	const nextRouting = nextTeamRoutingConfig(
-		config.getTeamRouting(),
+		config.getTeamRouting(account.provider),
 		account,
 		pooled,
 	);
-	config.setTeamRouting(teamRoutingFileConfig(nextRouting));
+	const old = teamRoutingFileConfig(nextRouting);
+	const {
+		enabled,
+		allowlisted_account_uuids,
+		caller_provider_fallback: _fallback,
+		hold_seconds: _hold,
+		admission_cap,
+		admission_queue_limit,
+		admission_wait_ms,
+		...pool
+	} = old;
+	config.setProviderPool(account.provider, {
+		...pool,
+		enabled,
+		members: allowlisted_account_uuids,
+		admission: {
+			cap: admission_cap,
+			queue_limit: admission_queue_limit,
+			wait_ms: admission_wait_ms,
+		},
+	});
 }
 
 export async function removeAccount(name: string): Promise<void> {

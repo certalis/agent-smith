@@ -14,14 +14,46 @@ export default defineScenario({
 	name: "a pooled seat and API key serve the same route and appear in caller status",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			acme: { enabled: true, strategy: "anthropic-api" },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			acme: {
+				enabled: true,
+				strategy: "anthropic-api",
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["claude-code", "acme"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b"],
-			caller_provider_fallback: { "synthetic-device": "ordered" },
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "acme"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

@@ -9,16 +9,25 @@ export default defineScenario({
 			"qwen-claude": {
 				enabled: true,
 				strategy: "model-studio-anthropic-api",
-				models: { "claude-sonnet-*": "qwen3-coder-flash" },
+				models: {
+					"claude-sonnet-*": "qwen3-coder-flash",
+				},
 			},
 			"kimi-claude": {
 				enabled: true,
 				strategy: "model-studio-anthropic-api",
-				models: { "claude-sonnet-*": "kimi-k3.1-pro" },
+				models: {
+					"claude-sonnet-*": "kimi-k3.1-pro",
+				},
 			},
 		},
-		provider_pools: {
-			"anthropic-messages": ["qwen-claude", "kimi-claude"],
+		routing: {
+			routes: {
+				"anthropic-messages": ["qwen-claude", "kimi-claude"],
+			},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

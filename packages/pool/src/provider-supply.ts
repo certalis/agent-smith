@@ -6,6 +6,7 @@ import type {
 	ServeOutcome,
 	SessionOutcome,
 } from "@agent-smith/capacity";
+import { runtimeForProvider } from "@agent-smith/config";
 import { Logger } from "@agent-smith/logger";
 import type { Provider } from "@agent-smith/providers";
 import type { Account, ProviderWire } from "@agent-smith/types";
@@ -210,6 +211,7 @@ export class ProviderSupply implements RoutedProvider {
 					);
 		return {
 			...this.context,
+			runtime: runtimeForProvider(this.context.runtime, this.name),
 			provider: this.provider,
 			providerName: this.name,
 			upstreamPath: resolved?.upstreamPath ?? "/",
@@ -378,13 +380,16 @@ export class ProviderSupply implements RoutedProvider {
 	async conversationAffinity(
 		route: RouteRequest,
 	): Promise<{ holdsConversation: boolean; hasConversationPin: boolean }> {
+		const view = this.requestView(route);
+		if (!view.ctx.runtime.teamRouting.enabled)
+			return { holdsConversation: false, hasConversationPin: false };
 		let pins = conversationPins.get(this.context);
 		if (!pins) {
 			pins = new WeakMap();
 			conversationPins.set(this.context, pins);
 		}
 		if (!pins.has(route)) {
-			const { ctx, teamRequest } = this.requestView(route);
+			const { ctx, teamRequest } = view;
 			const pinnedId = ctx.teamRouter?.getPinnedAccountId(
 				teamRequest,
 				ctx.runtime.teamRouting,
@@ -462,6 +467,10 @@ export class ProviderSupply implements RoutedProvider {
 	}
 
 	async status(route: RouteRequest): Promise<ProviderStatus> {
+		const context = {
+			...this.context,
+			runtime: runtimeForProvider(this.context.runtime, this.name),
+		};
 		const mapped =
 			route.scope.kind === "pool-route"
 				? this.mapModel(route.model)
@@ -470,18 +479,18 @@ export class ProviderSupply implements RoutedProvider {
 			return {
 				servableSeats: 0,
 				retryAt: null,
-				admissionWaitMs: this.context.runtime.teamRouting.admissionWaitMs,
+				admissionWaitMs: context.runtime.teamRouting.admissionWaitMs,
 			};
 		if (route.scope.kind === "pool-route" && route.callerId) {
 			return getProviderCallerStatus(
 				this.name,
 				mapped,
 				route.callerId,
-				this.context,
+				context,
 				route.apiKeyAccounts,
 			);
 		}
-		const snapshot = getPoolStatus(this.name, mapped, this.context);
+		const snapshot = getPoolStatus(this.name, mapped, context);
 		return {
 			servableSeats: snapshot.eligibleAccounts,
 			retryAt: snapshot.retryAtMs,

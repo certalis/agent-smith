@@ -25,23 +25,74 @@ export default defineScenario({
 	name: "a caller's pool status counts the providers its own policy reaches",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["claude-seat"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+					caller_weekly_max_usage: {
+						"synthetic-device": 0.7,
+					},
+				},
+			},
 			acme: {
 				enabled: true,
 				strategy: "anthropic-api",
-				models: { "claude-sonnet-*": "acme-sonnet" },
+				models: {
+					"claude-sonnet-*": "acme-sonnet",
+				},
+				pool: {
+					members: ["claude-seat"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+					caller_weekly_max_usage: {
+						"synthetic-device": 0.7,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["claude-seat"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+					caller_weekly_max_usage: {
+						"synthetic-device": 0.7,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["claude-seat"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+					caller_weekly_max_usage: {
+						"synthetic-device": 0.7,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["claude-seat"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+					caller_weekly_max_usage: {
+						"synthetic-device": 0.7,
+					},
+				},
 			},
 		},
-		provider_pools: {
-			"anthropic-messages": ["claude-code", "acme"],
-		},
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["claude-seat"],
-			max_usage: 0.9,
-			weekly_max_usage: 0.95,
-			caller_weekly_max_usage: { "synthetic-device": 0.7 },
-			caller_provider_fallback: { "synthetic-device": "ordered" },
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "acme"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

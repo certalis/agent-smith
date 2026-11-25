@@ -282,7 +282,7 @@ export function createAccountAddHandler(
 					}
 					const oauthProvider = providerRegistry.getOAuthProvider(provider);
 					let identity: OAuthAccountIdentity | undefined;
-					if (config.getTeamRouting().enabled) {
+					if (config.getTeamRouting(provider).enabled) {
 						try {
 							identity = oauthProvider?.getAccountIdentity
 								? await oauthProvider.getAccountIdentity({
@@ -291,7 +291,7 @@ export function createAccountAddHandler(
 										expiresAt: 0,
 									})
 								: undefined;
-							assertSeatAllowlisted(config, identity?.accountUuid);
+							assertSeatAllowlisted(config, identity?.accountUuid, provider);
 						} catch (error) {
 							if (
 								error instanceof Error &&

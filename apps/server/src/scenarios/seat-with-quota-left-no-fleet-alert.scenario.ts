@@ -7,10 +7,37 @@ const body = '{"model":"claude-opus-4-5","messages":[]}' as const;
 export default defineScenario({
 	name: "a full seat beside one cooling with quota left is not a full fleet",
 	config: {
-		alerts: { slack_webhook_url: `https://hooks.slack.com${slackPath}` },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
+		alerts: {
+			slack_webhook_url: "https://hooks.slack.com/services/T000/B000/scenario",
+		},
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

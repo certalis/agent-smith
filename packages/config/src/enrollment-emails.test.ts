@@ -19,7 +19,9 @@ function fixture(enrollment_emails: string[]) {
 		path,
 		JSON.stringify({
 			enrollment_emails,
-			team_routing: { enabled: false, max_usage: 0.8 },
+			providers: {
+				"claude-code": { pool: { enabled: false, max_usage: 0.8 } },
+			},
 		}),
 	);
 	return { config: new Config(path), path };

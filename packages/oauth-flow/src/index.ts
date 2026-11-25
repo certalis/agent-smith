@@ -87,8 +87,9 @@ export interface VerifiedClaudeSeat {
 export function assertSeatAllowlisted(
 	config: Config,
 	accountUuid: string | undefined,
+	provider = "claude-code",
 ): void {
-	const teamRouting = config.getTeamRouting();
+	const teamRouting = config.getTeamRouting(provider);
 	if (
 		teamRouting.enabled &&
 		(!accountUuid || !teamRouting.allowlistedAccountUuids.includes(accountUuid))
@@ -280,6 +281,7 @@ export class OAuthFlow {
 			assertSeatAllowlisted(
 				this.config,
 				identity?.accountUuid ?? tokens.accountId,
+				provider,
 			);
 		}
 		const account = this.createAccountWithOAuth(

@@ -5,14 +5,57 @@ export default defineScenario({
 	...poolWire,
 	name: "before-header and mid-stream cancellations release the seat admission slot",
 	config: {
-		provider_pools: { "anthropic-messages": ["claude-code"] },
 		payload_storage_enabled: false,
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["seat-a"],
-			admission_cap: 1,
-			admission_queue_limit: 0,
-			quota_probe_seconds: 0,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["seat-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["seat-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["seat-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [{ name: "primary", provider: "claude-code", accountUuid: "seat-a" }],

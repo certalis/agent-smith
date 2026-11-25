@@ -1,3 +1,4 @@
+import { rewriteLegacyConfig } from "@agent-smith/config";
 import type { Scenario } from "./scenario";
 
 export const wireDeviceKey = "synthetic-scenario-device-key-0001";
@@ -8,11 +9,11 @@ export const wireProxyKey = "synthetic-scenario-internal-proxy-key-0001";
 export const poolWire = {
 	edge: {},
 	upstreamRuntime: "node",
-	config: {
+	config: rewriteLegacyConfig({
 		provider_pools: { "anthropic-messages": ["claude-code"] },
 		payload_storage_enabled: false,
 		team_routing: { enabled: false, quota_probe_seconds: 0 },
-	},
+	}),
 	fleet: [
 		{ name: "primary", provider: "claude-code" },
 		{ name: "sibling", provider: "claude-code" },

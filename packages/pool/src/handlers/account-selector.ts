@@ -423,7 +423,11 @@ export function getProviderCallerStatus(
 	const now = Date.now();
 	const accounts = config.enabled
 		? callerPoolAccounts(provider, ctx, apiKeyAccounts)
-		: [];
+		: apiKeyAccounts
+			? ctx.dbOps
+					.getAccountsByProvider(provider)
+					.filter((account) => !account.paused)
+			: [];
 	const servableSeats = accounts.filter((account) =>
 		isServableNow(strategy, account, model, ctx, now, callerId),
 	).length;

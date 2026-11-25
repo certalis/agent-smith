@@ -79,14 +79,16 @@ export async function routePoolRequest(
 		),
 		headers: req.headers,
 		orderedFallback: hasOrderedProviderFallback(
-			ctx.runtime.teamRouting,
+			ctx.runtime.routing ?? ctx.runtime.teamRouting,
 			callerId,
 		),
 		teamRoutingEnabled: ctx.runtime.teamRouting.enabled,
+		apiKeyAccounts: ctx.runtime.routing?.apiKeyAccounts,
 		conversationKey: ctx.conversationPinsEnabled
 			? getConversationProviderKey(teamRequest)
 			: undefined,
-		holdSeconds: ctx.runtime.teamRouting.holdSeconds,
+		holdSeconds:
+			ctx.runtime.routing?.holdSeconds ?? ctx.runtime.teamRouting.holdSeconds,
 		waitUntil: quotaHold
 			? (at, signal) => quotaHold.waitUntil(at, signal)
 			: undefined,
@@ -152,6 +154,7 @@ export async function routeDirectRequest(
 		headers: req.headers,
 		orderedFallback: false,
 		teamRoutingEnabled: resolved.runtime.teamRouting.enabled,
+		apiKeyAccounts: ctx.runtime.routing?.apiKeyAccounts,
 		holdSeconds,
 		waitUntil: quotaHold
 			? (at, signal) => quotaHold.waitUntil(at, signal)

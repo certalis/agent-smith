@@ -34,7 +34,7 @@ function on(overrides: Partial<WindowWarmupConfig> = {}) {
 
 describe("window warm-up configuration", () => {
 	it("is off until an operator turns it on, even with team routing on", () => {
-		const config = configFrom({ team_routing: { enabled: true } });
+		const config = configFrom({ providers: { "claude-code": { pool: {} } } });
 
 		expect(config.getTeamRouting().windowWarmup).toEqual({
 			enabled: false,
@@ -55,8 +55,11 @@ describe("window warm-up configuration", () => {
 			{ enabled: true, every_day: true },
 		]) {
 			expect(() =>
-				config.setTeamRouting({ enabled: true, window_warmup: windowWarmup }),
-			).toThrow("Invalid team routing field: window_warmup");
+				config.setProviderPool("claude-code", {
+					enabled: true,
+					window_warmup: windowWarmup,
+				}),
+			).toThrow("Invalid provider pool field: window_warmup");
 		}
 		expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
 	});
@@ -65,9 +68,12 @@ describe("window warm-up configuration", () => {
 		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
 		tempDirs.push(directory);
 		const path = join(directory, "config.json");
-		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+		writeFileSync(
+			path,
+			JSON.stringify({ providers: { "claude-code": { pool: {} } } }),
+		);
 
-		new Config(path).setTeamRouting({
+		new Config(path).setProviderPool("claude-code", {
 			enabled: true,
 			window_warmup: { enabled: true },
 		});
@@ -79,13 +85,16 @@ describe("window warm-up configuration", () => {
 		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
 		tempDirs.push(directory);
 		const path = join(directory, "config.json");
-		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+		writeFileSync(
+			path,
+			JSON.stringify({ providers: { "claude-code": { pool: {} } } }),
+		);
 		const config = new Config(path);
 		chmodSync(directory, 0o500);
 
 		try {
 			expect(() =>
-				config.setTeamRouting({
+				config.setProviderPool("claude-code", {
 					enabled: true,
 					window_warmup: { enabled: true },
 				}),

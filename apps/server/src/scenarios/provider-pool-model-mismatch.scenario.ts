@@ -7,10 +7,19 @@ export default defineScenario({
 			acme: {
 				enabled: true,
 				strategy: "anthropic-api",
-				models: { "claude-sonnet-*": "acme-sonnet" },
+				models: {
+					"claude-sonnet-*": "acme-sonnet",
+				},
 			},
 		},
-		provider_pools: { "anthropic-messages": ["acme"] },
+		routing: {
+			routes: {
+				"anthropic-messages": ["acme"],
+			},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
+		},
 	},
 	fleet: [{ name: "acme", provider: "acme", authMethod: "api_key" }],
 	upstream: [],

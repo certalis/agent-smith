@@ -5,7 +5,8 @@
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./standalone": "./src/standalone.ts"
+		"./standalone": "./src/standalone.ts",
+		"./rewrite-config-cli": "./src/rewrite-config-cli.ts"
 	},
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit"

@@ -43,11 +43,50 @@ const continuation = JSON.stringify({
 export default defineScenario({
 	name: "a new conversation takes the lowest five-hour seat below the cap; a pinned one stays",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-busy", "acct-quiet", "acct-ahead"],
-			admission_cap: 5,
-			max_usage: 0.9,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-busy", "acct-quiet", "acct-ahead"],
+					max_usage: 0.9,
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-busy", "acct-quiet", "acct-ahead"],
+					max_usage: 0.9,
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-busy", "acct-quiet", "acct-ahead"],
+					max_usage: 0.9,
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-busy", "acct-quiet", "acct-ahead"],
+					max_usage: 0.9,
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

@@ -30,10 +30,46 @@ const capped = (account: string, utilization: string) => ({
 export default defineScenario({
 	name: "weekly cap admits below 95% or the email cap and leaves the five-hour cap unchanged",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["normal", "tech", "five-hour"],
-			weekly_max_usage_by_email: { " Tech@Example.test ": 0.3 },
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["normal", "tech", "five-hour"],
+					weekly_max_usage_by_email: {
+						" Tech@Example.test ": 0.3,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["normal", "tech", "five-hour"],
+					weekly_max_usage_by_email: {
+						" Tech@Example.test ": 0.3,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["normal", "tech", "five-hour"],
+					weekly_max_usage_by_email: {
+						" Tech@Example.test ": 0.3,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["normal", "tech", "five-hour"],
+					weekly_max_usage_by_email: {
+						" Tech@Example.test ": 0.3,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

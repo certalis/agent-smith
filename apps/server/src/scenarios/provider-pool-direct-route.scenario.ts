@@ -6,11 +6,21 @@ export default defineScenario({
 	name: "a direct provider route remains direct when its wire has a pool",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			acme: { enabled: true, strategy: "anthropic-api" },
+			"claude-code": {
+				enabled: true,
+			},
+			acme: {
+				enabled: true,
+				strategy: "anthropic-api",
+			},
 		},
-		provider_pools: {
-			"anthropic-messages": ["claude-code", "acme"],
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "acme"],
+			},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

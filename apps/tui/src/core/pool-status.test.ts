@@ -1,5 +1,13 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
-import { type PoolStatusSources, summarizePool } from "./pool-status";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+	type PoolStatusSources,
+	readPoolStatus,
+	summarizePool,
+} from "./pool-status";
 
 const FIVE_HOUR = {
 	utilization: 0.4,
@@ -43,9 +51,24 @@ function sources(
 		},
 		emails: ["alice@example.test"],
 		memberships: [
-			{ id: "alice", account_uuid: "uuid-alice", auth_method: "oauth" },
-			{ id: "bob", account_uuid: "uuid-bob", auth_method: "api_key" },
-			{ id: "carol", account_uuid: "uuid-carol", auth_method: "oauth" },
+			{
+				id: "alice",
+				account_uuid: "uuid-alice",
+				auth_method: "oauth",
+				provider: "claude-code",
+			},
+			{
+				id: "bob",
+				account_uuid: "uuid-bob",
+				auth_method: "api_key",
+				provider: "claude-code",
+			},
+			{
+				id: "carol",
+				account_uuid: "uuid-carol",
+				auth_method: "oauth",
+				provider: "claude-code",
+			},
 		],
 		origin: "https://pool.example.test",
 		...overrides,
@@ -104,4 +127,50 @@ describe("summarizePool", () => {
 			}),
 		).toEqual([false, false, false]);
 	});
+});
+
+it("reads the Claude pool endpoint and excludes other providers", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "agent-smith-pool-status-"));
+	const dbPath = join(directory, "pool.db");
+	const database = new Database(dbPath);
+	database.run(
+		"CREATE TABLE accounts (id TEXT, account_uuid TEXT, auth_method TEXT, provider TEXT)",
+	);
+	database.run(
+		"INSERT INTO accounts VALUES ('alice', 'uuid-alice', 'oauth', 'claude-code'), ('codex', 'uuid-alice', 'oauth', 'codex')",
+	);
+	database.close();
+	const originalFetch = globalThis.fetch;
+	const requested: string[] = [];
+	globalThis.fetch = Object.assign(
+		async (url: RequestInfo | URL) => {
+			const path = new URL(String(url)).pathname;
+			requested.push(path);
+			if (path === "/api/status")
+				return Response.json({
+					accounts: [fleetAccount("alice"), fleetAccount("codex")],
+				});
+			if (path === "/api/config/providers/claude-code/pool")
+				return Response.json(sources().routing);
+			if (path === "/api/enrollment-emails")
+				return Response.json({ emails: [] });
+			return new Response(null, { status: 404 });
+		},
+		{ preconnect: originalFetch.preconnect },
+	) as typeof fetch;
+	try {
+		const status = await readPoolStatus({
+			origin: "https://pool.example.test",
+			socketPath: "/tmp/unused.sock",
+			dbPath,
+			adminKey: "test",
+		});
+		expect(requested).toContain("/api/config/providers/claude-code/pool");
+		expect(
+			status.accounts.map((account) => [account.name, account.poolAllowed]),
+		).toEqual([["alice", true]]);
+	} finally {
+		globalThis.fetch = originalFetch;
+		rmSync(directory, { recursive: true, force: true });
+	}
 });

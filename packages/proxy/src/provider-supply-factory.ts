@@ -1,3 +1,4 @@
+import { runtimeForProvider } from "@agent-smith/config";
 import {
 	alertWhenFleetFull,
 	type PoolContext,
@@ -26,6 +27,7 @@ export function createProviderSupplies(
 			route.edge.meta,
 			{
 				...pool,
+				runtime: runtimeForProvider(pool.runtime, resolved.provider.name),
 				provider: resolved.provider,
 				providerName: resolved.provider.name,
 				upstreamPath: resolved.upstreamPath,

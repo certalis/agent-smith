@@ -34,6 +34,7 @@ type Input = {
 	headers: Headers;
 	orderedFallback: boolean;
 	teamRoutingEnabled: boolean;
+	apiKeyAccounts?: "everyone" | "chooser_or_fallback";
 	conversationKey?: string;
 	holdSeconds?: number;
 	waitUntil?: (time: number, signal: AbortSignal) => Promise<void>;
@@ -76,8 +77,11 @@ export class Router {
 	private async preparePoolRoute(input: Input): Promise<PoolRoute | Response> {
 		const { route, providers, headers, conversationKey } = input;
 		const interactive = interactiveProviderChoiceRequested(headers);
-		route.apiKeyAccounts =
-			!input.teamRoutingEnabled || interactive || input.orderedFallback;
+		route.apiKeyAccounts = input.apiKeyAccounts
+			? input.apiKeyAccounts === "everyone" ||
+				interactive ||
+				input.orderedFallback
+			: !input.teamRoutingEnabled || interactive || input.orderedFallback;
 		const choices = providers.map((provider) => ({
 			provider: provider.name,
 			model: provider.mapModel(route.model) ?? route.model ?? "",
@@ -347,7 +351,9 @@ export class Router {
 	private async direct(input: Input): Promise<Response> {
 		const provider = input.providers[0];
 		if (!provider) return input.noEligible();
-		input.route.apiKeyAccounts = !input.teamRoutingEnabled;
+		input.route.apiKeyAccounts = input.apiKeyAccounts
+			? input.apiKeyAccounts === "everyone"
+			: !input.teamRoutingEnabled;
 		let result = await provider.serve(input.route);
 		if (
 			result.kind === "exhausted" &&
@@ -410,6 +416,7 @@ export async function getCallerPoolStatus(input: {
 	route: RouteRequest;
 	providers: readonly RoutedProvider[];
 	orderedFallback: boolean;
+	apiKeyAccounts?: boolean;
 	teamRoutingEnabled: boolean;
 	holdSeconds: number;
 	admissionWaitMs: number;
@@ -421,7 +428,7 @@ export async function getCallerPoolStatus(input: {
 		: input.orderedFallback
 			? input.providers
 			: [first];
-	input.route.apiKeyAccounts = input.orderedFallback;
+	input.route.apiKeyAccounts = input.apiKeyAccounts ?? input.orderedFallback;
 	const statuses = await Promise.all(
 		reachable.map((provider) => provider.status(input.route)),
 	);

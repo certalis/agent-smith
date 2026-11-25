@@ -27,12 +27,48 @@ export default defineScenario({
 	...standaloneWire,
 	name: "a caller-specific weekly ceiling skips only that caller's full seat",
 	config: {
-		provider_pools: { "anthropic-messages": ["claude-code"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			max_usage: 0.9,
-			weekly_max_usage: 0.95,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					weekly_max_usage: 0.95,
+				},
+			},
+		},
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [
@@ -76,18 +112,17 @@ export default defineScenario({
 			transport: "unix",
 			id: "set-alice-policy",
 			method: "POST",
-			path: "/api/config/team-routing",
+			path: "/api/config/providers/claude-code/pool",
 			headers: {
 				"content-type": "application/json",
 				"x-api-key": wireAdminKey,
 			},
 			body: JSON.stringify({
 				enabled: true,
-				allowlisted_account_uuids: ["acct-a", "acct-b"],
+				members: ["acct-a", "acct-b"],
 				max_usage: 0.9,
 				weekly_max_usage: 0.95,
 				caller_weekly_max_usage: { "synthetic-device": 0.7 },
-				caller_provider_fallback: { "synthetic-device": "ordered" },
 			}),
 		},
 		{
@@ -95,7 +130,7 @@ export default defineScenario({
 			transport: "unix",
 			id: "policy",
 			method: "GET",
-			path: "/api/config/team-routing",
+			path: "/api/config/providers/claude-code/pool",
 			headers: { "x-api-key": wireProxyKey },
 			body: "",
 		},

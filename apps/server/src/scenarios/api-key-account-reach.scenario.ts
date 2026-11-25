@@ -1,3 +1,4 @@
+import { rewriteLegacyConfig } from "@agent-smith/config";
 import { defineScenario, type Scenario } from "./harness/scenario";
 import {
 	standaloneRequest,
@@ -31,7 +32,7 @@ function reachScenario(
 		...standaloneWire,
 		...(pool ? {} : { standalone: false, edge: {} }),
 		name: `API-key reach: team ${team ? "on" : "off"}, ${mixed ? "mixed" : "keys only"}, ${pool ? "pool device" : "direct proxy"}, ${caller}`,
-		config: {
+		config: rewriteLegacyConfig({
 			providers: {
 				"reach-provider": { enabled: true, strategy: "anthropic-api" },
 			},
@@ -42,7 +43,7 @@ function reachScenario(
 				caller_provider_fallback:
 					caller === "ordered" ? { "synthetic-device": "ordered" } : {},
 			},
-		},
+		}),
 		fleet: [
 			{ name: "key", provider: "reach-provider", authMethod: "api_key" },
 			...(mixed

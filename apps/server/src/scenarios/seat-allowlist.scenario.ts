@@ -3,9 +3,34 @@ import { defineScenario } from "./harness/scenario";
 export default defineScenario({
 	name: "a protected Claude seat outside the allowlist never receives pooled traffic",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["pooled-account"],
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["pooled-account"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["pooled-account"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["pooled-account"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["pooled-account"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

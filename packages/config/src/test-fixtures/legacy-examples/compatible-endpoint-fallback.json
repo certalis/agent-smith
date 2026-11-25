@@ -1,0 +1,13 @@
+{
+	"providers": {
+		"acme": {
+			"enabled": true,
+			"strategy": "anthropic-api",
+			"base_url": "https://api.acme.example",
+			"models": { "claude-sonnet-*": "acme-large" }
+		}
+	},
+	"provider_pools": {
+		"anthropic-messages": ["anthropic", "acme"]
+	}
+}

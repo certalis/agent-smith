@@ -272,11 +272,26 @@ export class APIRouter {
 		this.staticHandlers.set("POST:/api/config/strategy", (req) =>
 			configHandlers.setStrategy(req),
 		);
-		this.staticHandlers.set("GET:/api/config/team-routing", () =>
-			configHandlers.getTeamRouting(),
+		this.staticHandlers.set("GET:/api/config/routing", () =>
+			configHandlers.getRouting(),
 		);
-		this.staticHandlers.set("POST:/api/config/team-routing", (req) =>
-			configHandlers.setTeamRouting(req),
+		this.staticHandlers.set("POST:/api/config/routing", (req) =>
+			configHandlers.setRouting(req),
+		);
+		this.addDynamicRoute(
+			"GET",
+			"/api/config/providers/:name/pool",
+			(_req, _url, params) => configHandlers.getProviderPool(params.name),
+		);
+		this.addDynamicRoute(
+			"POST",
+			"/api/config/providers/:name/pool",
+			(req, _url, params) => configHandlers.setProviderPool(req, params.name),
+		);
+		this.addDynamicRoute(
+			"DELETE",
+			"/api/config/providers/:name/pool",
+			(_req, _url, params) => configHandlers.removeProviderPool(params.name),
 		);
 		this.staticHandlers.set("GET:/api/strategies", () =>
 			configHandlers.getStrategies(),

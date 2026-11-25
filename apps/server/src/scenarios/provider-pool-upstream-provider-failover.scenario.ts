@@ -8,16 +8,46 @@ export default defineScenario({
 	name: "an ordered-fallback caller uses the next provider for a 529 when the first provider has no sibling",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			acme: { enabled: true, strategy: "anthropic-api" },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["claude-seat"],
+				},
+			},
+			acme: {
+				enabled: true,
+				strategy: "anthropic-api",
+				pool: {
+					members: ["claude-seat"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["claude-seat"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["claude-seat"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["claude-seat"],
+				},
+			},
 		},
-		provider_pools: {
-			"anthropic-messages": ["claude-code", "acme"],
-		},
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["claude-seat"],
-			caller_provider_fallback: { "synthetic-device": "ordered" },
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "acme"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

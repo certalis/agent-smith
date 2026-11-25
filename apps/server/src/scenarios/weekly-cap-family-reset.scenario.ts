@@ -9,11 +9,42 @@ const path = `/api/pool-status?provider=claude-code&model=${model}`;
 export default defineScenario({
 	name: "weekly cap applies to model families, prevents stale revalidation and reopens at reset",
 	config: {
-		block_when_all_full: false,
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["tech"],
-			weekly_max_usage: 0.3,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["tech"],
+					weekly_max_usage: 0.3,
+					block_when_all_full: false,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage: 0.3,
+					block_when_all_full: false,
+				},
+			},
+			openai: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage: 0.3,
+					block_when_all_full: false,
+				},
+			},
+			codex: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage: 0.3,
+					block_when_all_full: false,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

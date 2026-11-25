@@ -1,14 +1,21 @@
 {
-	"providers": {
-		"gemini": {
-			"enabled": true,
-			"strategy": "google-gemini-api",
-			"models": {
-				"claude-sonnet-*": "gemini-2.5-flash"
-			}
-		}
-	},
-	"provider_pools": {
-		"anthropic-messages": ["gemini"]
-	}
+  "providers": {
+    "gemini": {
+      "enabled": true,
+      "strategy": "google-gemini-api",
+      "models": {
+        "claude-sonnet-*": "gemini-2.5-flash"
+      }
+    }
+  },
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "gemini"
+      ]
+    },
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
+  }
 }

@@ -726,7 +726,9 @@ export async function handleWebSocketUpgradeRequest(
 		callerId,
 		sessionId: teamRequest.sessionId,
 		openingDigest: null,
-		apiKeyAccounts: !requestContext.runtime.teamRouting?.enabled,
+		apiKeyAccounts: requestContext.runtime.routing
+			? requestContext.runtime.routing.apiKeyAccounts === "everyone"
+			: !requestContext.runtime.teamRouting?.enabled,
 		inlineRateLimitRetry: false,
 		signal: req.signal,
 	};

@@ -7,25 +7,81 @@ const window = (utilization: number | null, resetIn: number, seenAt = now) => ({
 	seenAt,
 	status: "allowed" as const,
 });
-const seats = [
-	"ordinary",
-	"stale",
-	"reset",
-	"irrelevant",
-	"unknown",
-	"distant",
-	"spent",
-	"paused",
-];
-
 export default defineScenario({
 	name: "expiry urgency ignores stale reset irrelevant unknown and out-of-horizon windows and preserves seat exclusions",
 	config: {
-		team_routing: {
-			enabled: true,
-			prefer_expiring_quota: true,
-			quota_probe_seconds: 0,
-			allowlisted_account_uuids: seats,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: [
+						"ordinary",
+						"stale",
+						"reset",
+						"irrelevant",
+						"unknown",
+						"distant",
+						"spent",
+						"paused",
+					],
+					prefer_expiring_quota: true,
+					quota_probe_seconds: 0,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: [
+						"ordinary",
+						"stale",
+						"reset",
+						"irrelevant",
+						"unknown",
+						"distant",
+						"spent",
+						"paused",
+					],
+					prefer_expiring_quota: true,
+					quota_probe_seconds: 0,
+				},
+			},
+			openai: {
+				pool: {
+					members: [
+						"ordinary",
+						"stale",
+						"reset",
+						"irrelevant",
+						"unknown",
+						"distant",
+						"spent",
+						"paused",
+					],
+					prefer_expiring_quota: true,
+					quota_probe_seconds: 0,
+				},
+			},
+			codex: {
+				pool: {
+					members: [
+						"ordinary",
+						"stale",
+						"reset",
+						"irrelevant",
+						"unknown",
+						"distant",
+						"spent",
+						"paused",
+					],
+					prefer_expiring_quota: true,
+					quota_probe_seconds: 0,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

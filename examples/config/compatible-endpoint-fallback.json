@@ -1,13 +1,23 @@
 {
-	"providers": {
-		"acme": {
-			"enabled": true,
-			"strategy": "anthropic-api",
-			"base_url": "https://api.acme.example",
-			"models": { "claude-sonnet-*": "acme-large" }
-		}
-	},
-	"provider_pools": {
-		"anthropic-messages": ["anthropic", "acme"]
-	}
+  "providers": {
+    "acme": {
+      "enabled": true,
+      "strategy": "anthropic-api",
+      "base_url": "https://api.acme.example",
+      "models": {
+        "claude-sonnet-*": "acme-large"
+      }
+    }
+  },
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "anthropic",
+        "acme"
+      ]
+    },
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
+  }
 }

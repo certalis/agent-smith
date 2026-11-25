@@ -1,6 +1,10 @@
 import { type APIContext, APIRouter } from "@agent-smith/api";
 import type { RouteRequest } from "@agent-smith/capacity";
-import { Config, type RuntimeConfig } from "@agent-smith/config";
+import {
+	Config,
+	type RuntimeConfig,
+	runtimeForProvider,
+} from "@agent-smith/config";
 import {
 	container,
 	registerDisposable,
@@ -111,6 +115,8 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 		port,
 		storeRequestPayloads: config.storesRequestPayloads(),
 		teamRouting: config.getTeamRouting(),
+		routing: config.getRouting(),
+		providerPools: config.getProviderPoolSettings(),
 	};
 }
 
@@ -120,8 +126,8 @@ function wireStrategyHotReload(
 	dbOps: DatabaseOperations,
 	proxyContext: ProxyContext,
 	runtimeConfig: RuntimeConfig,
-	quotaProbe: QuotaProbe,
-	windowWarmup: WindowWarmup,
+	quotaProbe: Pick<QuotaProbe, "reschedule">,
+	windowWarmup: Pick<WindowWarmup, "reschedule">,
 	poolContext: PoolContext,
 ): void {
 	config.on("change", (change: { key?: string }) => {
@@ -138,11 +144,14 @@ function wireStrategyHotReload(
 		if (change.key === "data_retention_days") {
 			runtimeConfig.storeRequestPayloads = config.storesRequestPayloads();
 		}
-		if (change.key === "team_routing") {
+		if (change.key === "providers" || change.key === "routing") {
 			runtimeConfig.teamRouting = config.getTeamRouting();
+			runtimeConfig.providerPools = config.getProviderPoolSettings();
+			runtimeConfig.routing = config.getRouting();
+			proxyContext.providerRegistry.setProviderPools(config.getProviderPools());
 			quotaProbe.reschedule();
 			windowWarmup.reschedule();
-			log.info("Team routing configuration changed");
+			log.info("Provider pool or routing configuration changed");
 		}
 	});
 }
@@ -152,7 +161,10 @@ function startSeatSchedulers(
 	config: Config,
 	poolContext: PoolContext,
 	outsideSpendTracker: OutsideSpendTracker,
-): { quotaProbe: QuotaProbe; windowWarmup: WindowWarmup } {
+): {
+	quotaProbe: Pick<QuotaProbe, "reschedule">;
+	windowWarmup: Pick<WindowWarmup, "reschedule">;
+} {
 	const { dbOps, providerRegistry, runtime } = poolContext;
 	const readSeatToken: SeatTokenReader = async (account) => {
 		const provider = providerRegistry.getProvider(account.provider);
@@ -164,25 +176,50 @@ function startSeatSchedulers(
 			upstreamPath: "/",
 		});
 	};
-	const quotaProbe = new QuotaProbe(
-		() => config.getTeamRouting(),
-		dbOps,
-		outsideSpendTracker,
-		providerRegistry,
-		readSeatToken,
-	);
-	const windowWarmup = new WindowWarmup(
-		() => runtime,
-		dbOps,
-		outsideSpendTracker,
-		providerRegistry,
-		readSeatToken,
-	);
-	for (const scheduler of [quotaProbe, windowWarmup]) {
-		scheduler.start();
-		registerDisposable(scheduler);
+	const quotaProbes: QuotaProbe[] = [];
+	const warmups: WindowWarmup[] = [];
+	for (const name of providerRegistry.listProviders()) {
+		const store = {
+			getAllAccounts: () =>
+				dbOps.getAllAccounts().filter((account) => account.provider === name),
+			updateAccountQuotaState: dbOps.updateAccountQuotaState.bind(dbOps),
+			getEnrollmentContact: dbOps.getEnrollmentContact.bind(dbOps),
+		};
+		const probe = new QuotaProbe(
+			() => config.getTeamRouting(name),
+			store,
+			outsideSpendTracker,
+			providerRegistry,
+			readSeatToken,
+		);
+		const warmup = new WindowWarmup(
+			() => runtimeForProvider(runtime, name),
+			store,
+			outsideSpendTracker,
+			providerRegistry,
+			readSeatToken,
+		);
+		quotaProbes.push(probe);
+		warmups.push(warmup);
+		for (const scheduler of [probe, warmup]) {
+			scheduler.start();
+			registerDisposable(scheduler);
+		}
 	}
-	return { quotaProbe, windowWarmup };
+	return {
+		quotaProbe: {
+			reschedule: () =>
+				quotaProbes.forEach((probe) => {
+					probe.reschedule();
+				}),
+		},
+		windowWarmup: {
+			reschedule: () =>
+				warmups.forEach((warmup) => {
+					warmup.reschedule();
+				}),
+		},
+	};
 }
 
 export function bootstrapRuntime(
@@ -244,10 +281,10 @@ export function bootstrapRuntime(
 			return {
 				version: 1,
 				provider,
-				routingEnabled: runtimeConfig.teamRouting.enabled,
+				routingEnabled: config.getTeamRouting(provider).enabled,
 				eligibleAccounts: status.servableSeats,
 				retryAtMs: status.retryAt,
-				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				holdSeconds: runtimeConfig.routing?.holdSeconds ?? 0,
 				admissionWaitMs: status.admissionWaitMs,
 			};
 		},
@@ -268,11 +305,24 @@ export function bootstrapRuntime(
 				),
 				providers,
 				orderedFallback: hasOrderedProviderFallback(
-					runtimeConfig.teamRouting,
+					runtimeConfig.routing ?? runtimeConfig.teamRouting,
 					callerId,
 				),
-				teamRoutingEnabled: runtimeConfig.teamRouting.enabled,
-				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				apiKeyAccounts:
+					runtimeConfig.routing?.apiKeyAccounts === "everyone" ||
+					hasOrderedProviderFallback(
+						runtimeConfig.routing ?? runtimeConfig.teamRouting,
+						callerId,
+					),
+				teamRoutingEnabled:
+					Object.values(runtimeConfig.providerPools ?? {}).some(
+						(pool) => pool.teamRouting.enabled,
+					) ||
+					hasOrderedProviderFallback(
+						runtimeConfig.routing ?? runtimeConfig.teamRouting,
+						callerId,
+					),
+				holdSeconds: runtimeConfig.routing?.holdSeconds ?? 0,
 				admissionWaitMs: runtimeConfig.teamRouting.admissionWaitMs,
 			});
 		},
