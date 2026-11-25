@@ -9,5 +9,8 @@
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit",
 		"test": "bun test ./src"
+	},
+	"dependencies": {
+		"@agent-smith/types": "workspace:*"
 	}
 }

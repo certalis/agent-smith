@@ -30,7 +30,7 @@
     },
     "apps/tui": {
       "name": "@certalis/agent-smith",
-      "version": "0.1.19",
+      "version": "0.1.21",
       "bin": {
         "agent-smith": "dist/bin.js",
       },
@@ -119,6 +119,9 @@
     "packages/capacity": {
       "name": "@agent-smith/capacity",
       "version": "0.1.0",
+      "dependencies": {
+        "@agent-smith/types": "workspace:*",
+      },
     },
     "packages/config": {
       "name": "@agent-smith/config",

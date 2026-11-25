@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import {
 	collectSourceFiles,
 	extractImports,
@@ -11,13 +11,13 @@ import {
 
 function findImportViolations(
 	workspaceRoot: string,
-	isViolation: (specifier: string) => boolean,
+	isViolation: (specifier: string, sourceFile: string) => boolean,
 ): string[] {
 	const violations: string[] = [];
 
 	for (const sourceFile of collectSourceFiles(workspaceRoot)) {
 		for (const specifier of extractImports(sourceFile)) {
-			if (isViolation(specifier)) {
+			if (isViolation(specifier, sourceFile)) {
 				violations.push(
 					`${relative(REPO_ROOT, sourceFile)} imports ${specifier}`,
 				);
@@ -26,6 +26,26 @@ function findImportViolations(
 	}
 
 	return violations.sort();
+}
+
+function violatesPackageBoundary(
+	specifier: string,
+	sourceFile: string,
+	forbidden: string[],
+): boolean {
+	return forbidden.some((entry) => {
+		if (specifier === entry || specifier.startsWith(`${entry}/`)) return true;
+		if (!specifier.startsWith(".")) return false;
+		const target = resolve(dirname(sourceFile), specifier);
+		const forbiddenRoot = join(
+			REPO_ROOT,
+			"packages",
+			entry.slice("@agent-smith/".length),
+		);
+		return (
+			target === forbiddenRoot || target.startsWith(`${forbiddenRoot}${sep}`)
+		);
+	});
 }
 
 function findWorkspaceCycles(workspaces: Workspace[]): string[] {
@@ -135,5 +155,61 @@ describe("workspace package boundaries", () => {
 		];
 
 		expect(violations.sort()).toEqual([]);
+	});
+
+	it("keeps routing and pool dependencies pointed toward the provider interface", () => {
+		const workspaces = getWorkspaceManifests();
+		const workspaceByName = new Map(
+			workspaces.map((workspace) => [workspace.manifest.name, workspace]),
+		);
+		const restrictions = [
+			{
+				name: "@agent-smith/routing",
+				forbidden: [
+					"@agent-smith/pool",
+					"@agent-smith/database",
+					"@agent-smith/providers",
+					"@agent-smith/proxy",
+				],
+			},
+			{
+				name: "@agent-smith/pool",
+				forbidden: ["@agent-smith/routing", "@agent-smith/proxy"],
+			},
+		];
+		const violations: string[] = [];
+		for (const { name, forbidden } of restrictions) {
+			const workspace = workspaceByName.get(name);
+			if (!workspace) continue;
+			const isForbidden = (specifier: string, sourceFile: string) =>
+				violatesPackageBoundary(specifier, sourceFile, forbidden);
+			violations.push(
+				...getAgentSmithDependencies(workspace.manifest)
+					.filter((dependency) =>
+						isForbidden(dependency, workspace.manifestPath),
+					)
+					.map((dependency) => `${name} declares ${dependency}`),
+			);
+			violations.push(...findImportViolations(workspace.root, isForbidden));
+		}
+		expect(violations.sort()).toEqual([]);
+	});
+
+	it("detects package subpaths and relative imports across a forbidden boundary", () => {
+		const sourceFile = join(REPO_ROOT, "packages/routing/src/route.ts");
+		const forbidden = ["@agent-smith/pool"];
+		expect(
+			violatesPackageBoundary(
+				"@agent-smith/pool/internal",
+				sourceFile,
+				forbidden,
+			),
+		).toBe(true);
+		expect(
+			violatesPackageBoundary("../../pool/src/internal", sourceFile, forbidden),
+		).toBe(true);
+		expect(violatesPackageBoundary("./local", sourceFile, forbidden)).toBe(
+			false,
+		);
 	});
 });
