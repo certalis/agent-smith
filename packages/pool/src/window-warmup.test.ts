@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import {
-	type RuntimeConfig,
-	type TeamRoutingConfig,
+	type ProviderPoolSettings,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 import type { Provider } from "@agent-smith/providers";
@@ -12,7 +11,7 @@ import { WindowWarmup } from "./window-warmup";
 const NOW = Date.parse("2026-03-27T05:00:00Z");
 const HOUR = 3_600_000;
 
-const routing: TeamRoutingConfig = {
+const routing: ProviderPoolSettings = {
 	enabled: true,
 	distributionEnabled: true,
 	preferExpiringQuota: false,
@@ -29,13 +28,12 @@ const routing: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1,
-	holdSeconds: 0,
 	quotaProbeSeconds: 0,
 	windowWarmup: { ...WINDOW_WARMUP_DEFAULTS, enabled: true },
+	blockWhenAllFull: true,
 };
 
 function window(utilization: number, resetAt: number | null) {
@@ -96,9 +94,9 @@ function warmupProvider(sent: string[]): Provider {
 function warmup(accounts: Account[], config = routing, now = () => NOW) {
 	const sent: string[] = [];
 	const stored = new Map<string, AccountQuotaState>();
-	const runtime: Pick<RuntimeConfig, "quotaThreshold" | "teamRouting"> = {
+	const runtime = {
 		quotaThreshold: 0.98,
-		teamRouting: config,
+		pool: config,
 	};
 	const provider = warmupProvider(sent);
 	const subject = new WindowWarmup(

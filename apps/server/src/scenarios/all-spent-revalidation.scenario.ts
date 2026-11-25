@@ -14,7 +14,45 @@ const spentWindow = (resetAt: number) => ({
 
 export default defineScenario({
 	name: "an all-spent fleet permits one real revalidation request per minute",
-	config: { block_when_all_full: false },
+	config: {
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					enabled: false,
+					members: [],
+					block_when_all_full: false,
+				},
+			},
+			anthropic: {
+				pool: {
+					enabled: false,
+					members: [],
+					block_when_all_full: false,
+				},
+			},
+			openai: {
+				pool: {
+					enabled: false,
+					members: [],
+					block_when_all_full: false,
+				},
+			},
+			codex: {
+				pool: {
+					enabled: false,
+					members: [],
+					block_when_all_full: false,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
+		},
+	},
 	fleet: [
 		{ name: "a", quotaState: spentWindow(1_700_000_060_000) },
 		{ name: "b", quotaState: spentWindow(1_700_000_120_000) },

@@ -31,9 +31,34 @@ const taggedTwo = body(
 export default defineScenario({
 	name: "Codex conversation fingerprints ignore only known injected context",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
+		providers: {
+			codex: {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			"claude-code": {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

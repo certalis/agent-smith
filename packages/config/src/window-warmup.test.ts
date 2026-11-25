@@ -34,16 +34,18 @@ function on(overrides: Partial<WindowWarmupConfig> = {}) {
 
 describe("window warm-up configuration", () => {
 	it("is off until an operator turns it on, even with team routing on", () => {
-		const config = configFrom({ team_routing: { enabled: true } });
+		const config = configFrom({ providers: { "claude-code": { pool: {} } } });
 
-		expect(config.getTeamRouting().windowWarmup).toEqual({
+		expect(config.getTeamRouting("claude-code").windowWarmup).toEqual({
 			enabled: false,
 			times: ["06:00"],
 			timeZone: "Europe/Paris",
 			weekdaysOnly: true,
 			model: null,
 		});
-		expect(nextWindowWarmupAt(config.getTeamRouting(), Date.now())).toBeNull();
+		expect(
+			nextWindowWarmupAt(config.getTeamRouting("claude-code"), Date.now()),
+		).toBeNull();
 	});
 
 	it("refuses a schedule with an unknown time zone or field instead of half-applying it", () => {
@@ -55,42 +57,57 @@ describe("window warm-up configuration", () => {
 			{ enabled: true, every_day: true },
 		]) {
 			expect(() =>
-				config.setTeamRouting({ enabled: true, window_warmup: windowWarmup }),
-			).toThrow("Invalid team routing field: window_warmup");
+				config.setProviderPool("claude-code", {
+					enabled: true,
+					window_warmup: windowWarmup,
+				}),
+			).toThrow("Invalid provider pool field: window_warmup");
 		}
-		expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+		expect(config.getTeamRouting("claude-code").windowWarmup.enabled).toBe(
+			false,
+		);
 	});
 
 	it("survives a restart once switched on", () => {
 		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
 		tempDirs.push(directory);
 		const path = join(directory, "config.json");
-		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+		writeFileSync(
+			path,
+			JSON.stringify({ providers: { "claude-code": { pool: {} } } }),
+		);
 
-		new Config(path).setTeamRouting({
+		new Config(path).setProviderPool("claude-code", {
 			enabled: true,
 			window_warmup: { enabled: true },
 		});
 
-		expect(new Config(path).getTeamRouting().windowWarmup.enabled).toBe(true);
+		expect(
+			new Config(path).getTeamRouting("claude-code").windowWarmup.enabled,
+		).toBe(true);
 	});
 
 	it("refuses the change and keeps the running policy when the file cannot be written", () => {
 		const directory = mkdtempSync(join(tmpdir(), "agent-smith-warmup-"));
 		tempDirs.push(directory);
 		const path = join(directory, "config.json");
-		writeFileSync(path, JSON.stringify({ team_routing: { enabled: true } }));
+		writeFileSync(
+			path,
+			JSON.stringify({ providers: { "claude-code": { pool: {} } } }),
+		);
 		const config = new Config(path);
 		chmodSync(directory, 0o500);
 
 		try {
 			expect(() =>
-				config.setTeamRouting({
+				config.setProviderPool("claude-code", {
 					enabled: true,
 					window_warmup: { enabled: true },
 				}),
 			).toThrow();
-			expect(config.getTeamRouting().windowWarmup.enabled).toBe(false);
+			expect(config.getTeamRouting("claude-code").windowWarmup.enabled).toBe(
+				false,
+			);
 		} finally {
 			chmodSync(directory, 0o700);
 		}

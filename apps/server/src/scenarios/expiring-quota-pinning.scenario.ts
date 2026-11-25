@@ -17,10 +17,38 @@ const allowlist = ["low", "weekly", "five-hour", "later-tier"];
 export default defineScenario({
 	name: "expiry routing is opt-in and only changes new pins within the best priority tier",
 	config: {
-		team_routing: {
-			enabled: true,
-			quota_probe_seconds: 0,
-			allowlisted_account_uuids: allowlist,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["low", "weekly", "five-hour", "later-tier"],
+					quota_probe_seconds: 0,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["low", "weekly", "five-hour", "later-tier"],
+					quota_probe_seconds: 0,
+				},
+			},
+			openai: {
+				pool: {
+					members: ["low", "weekly", "five-hour", "later-tier"],
+					quota_probe_seconds: 0,
+				},
+			},
+			codex: {
+				pool: {
+					members: ["low", "weekly", "five-hour", "later-tier"],
+					quota_probe_seconds: 0,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	environment: { AGENT_SMITH_ADMIN_KEY: "scenario-admin-key" },
@@ -63,12 +91,12 @@ export default defineScenario({
 		{
 			type: "request",
 			id: "enable",
-			path: "/api/config/team-routing",
+			path: "/api/config/providers/claude-code/pool",
 			headers: { "x-api-key": "scenario-admin-key" },
 			body: JSON.stringify({
 				enabled: true,
 				prefer_expiring_quota: true,
-				allowlisted_account_uuids: allowlist,
+				members: allowlist,
 			}),
 		},
 		{ type: "request", body: body("ordinary default"), sessionId: "default" },

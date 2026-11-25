@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { ProviderCapacityBlock } from "@agent-smith/capacity";
-import { WINDOW_WARMUP_DEFAULTS } from "@agent-smith/config";
+import { POOL_DEFAULTS, type ProviderPoolSettings } from "@agent-smith/config";
 import { requestEvents, ServiceUnavailableError } from "@agent-smith/core";
 import {
 	type PoolContext,
@@ -161,31 +161,23 @@ function createProxyContext(
 			},
 		},
 		runtime: {
-			blockWhenAllFull: true,
 			clientId: "test-client",
 			quotaThreshold: 0.9,
-			retry: {
-				attempts: 1,
-				delayMs: 0,
-				backoff: 1,
-			},
+			retry: { attempts: 1, delayMs: 0, backoff: 1 },
 			sessionDurationMs: 0,
 			port: 8080,
-			teamRouting: {
-				enabled: false,
-				distributionEnabled: true,
-				preferExpiringQuota: false,
-				allowlistedAccountUuids: [],
-				maxUsage: 0.9,
-				weeklyMaxUsage: 0.9,
-				weeklyMaxUsageByEmail: {},
-				admissionCap: 5,
-				admissionQueueLimit: 25,
-				admissionWaitMs: 30_000,
+			routing: {
+				routes: {},
+				apiKeyAccounts: "everyone",
+				callers: {},
 				holdSeconds: 0,
-				quotaProbeSeconds: 0,
-				windowWarmup: WINDOW_WARMUP_DEFAULTS,
 			},
+			providerPools: Object.fromEntries(
+				providers.map(({ name }) => [
+					name,
+					{ ...POOL_DEFAULTS, weeklyMaxUsage: 0.9 },
+				]),
+			),
 		},
 		refreshInFlight: new Map(),
 		teamRouter: new TeamRouter(),
@@ -207,6 +199,26 @@ function createProxyContext(
 	);
 	context.routedProviders = createProviderSupplies(testPool, context);
 	return context;
+}
+
+/** Translate the old global test setup to equivalent settings for each provider. */
+function setPoolPolicy(
+	context: ProxyContext,
+	updates: Partial<ProviderPoolSettings> & {
+		orderedCallers?: string[];
+	},
+) {
+	const { orderedCallers, ...poolSettings } = updates;
+	for (const pool of Object.values(context.runtime.providerPools))
+		Object.assign(pool, poolSettings);
+	if (updates.enabled !== undefined)
+		context.runtime.routing.apiKeyAccounts = updates.enabled
+			? "chooser_or_fallback"
+			: "everyone";
+	if (orderedCallers)
+		context.runtime.routing.callers = Object.fromEntries(
+			orderedCallers.map((name) => [name, { allowFallbacks: true }]),
+		);
 }
 
 afterEach(() => {
@@ -746,10 +758,10 @@ describe("handleProxy routing", () => {
 		const context = createProxyContext([qwen, kimi], accounts, {
 			"anthropic-messages": ["qwen-claude", "kimi-claude"],
 		});
-		Object.assign(context.runtime.teamRouting, {
+		setPoolPolicy(context, {
 			enabled: true,
 			allowlistedAccountUuids: ["qwen-seat"],
-			callerProviderFallback: { "agents-box": "ordered" },
+			orderedCallers: ["agents-box"],
 		});
 
 		const response = await handleProxy(
@@ -807,10 +819,10 @@ describe("handleProxy routing", () => {
 		const context = createProxyContext([qwen, kimi], accounts, {
 			"anthropic-messages": ["qwen-claude", "kimi-claude"],
 		});
-		Object.assign(context.runtime.teamRouting, {
+		setPoolPolicy(context, {
 			enabled: true,
 			allowlistedAccountUuids: ["qwen-seat"],
-			callerProviderFallback: { "agents-box": "ordered" },
+			orderedCallers: ["agents-box"],
 		});
 
 		const response = await handleProxy(
@@ -871,10 +883,10 @@ describe("handleProxy routing", () => {
 			const context = createProxyContext([qwen, kimi], accounts, {
 				"anthropic-messages": ["qwen-claude", "kimi-claude"],
 			});
-			Object.assign(context.runtime.teamRouting, {
+			setPoolPolicy(context, {
 				enabled: true,
 				allowlistedAccountUuids: ["qwen-seat"],
-				callerProviderFallback: { "agents-box": "ordered" },
+				orderedCallers: ["agents-box"],
 			});
 			const request = (callerId: string, interactive = true) =>
 				handleProxy(
@@ -976,11 +988,11 @@ describe("handleProxy routing", () => {
 		const context = createProxyContext([claude, kimi], accounts, {
 			"anthropic-messages": ["claude-code", "kimi-claude"],
 		});
-		Object.assign(context.runtime.teamRouting, {
+		setPoolPolicy(context, {
 			enabled: true,
 			allowlistedAccountUuids: ["claude-seat"],
 			callerWeeklyMaxUsage: { "agents-box": 0.7 },
-			callerProviderFallback: { "agents-box": "ordered" },
+			orderedCallers: ["agents-box"],
 		});
 
 		const response = await handleProxy(
@@ -1543,7 +1555,7 @@ describe("handleProxy routing", () => {
 		context.quotaHold = { waitUntil } as unknown as NonNullable<
 			typeof context.quotaHold
 		>;
-		context.runtime.teamRouting.holdSeconds = 60;
+		context.runtime.routing.holdSeconds = 60;
 		const url = new URL(
 			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
 		);
@@ -1699,13 +1711,12 @@ describe("pool pin parser compatibility", () => {
 		const ctx = createProxyContext([first, second], accounts, {
 			"anthropic-messages": ["first-parser", "second-parser"],
 		});
-		ctx.runtime.teamRouting = {
-			...ctx.runtime.teamRouting,
+		setPoolPolicy(ctx, {
 			enabled: true,
 			allowlistedAccountUuids: ["first-uuid", "second-uuid"],
 			callerWeeklyMaxUsage: {},
-			callerProviderFallback: {},
-		};
+			orderedCallers: [],
+		});
 		const pins = new Map([
 			[
 				"cdd09933e1e8dd79417c5f52f8cf61e5b3c2d122854fdc2c24a60abad3d2516a",
@@ -1785,8 +1796,8 @@ it("parses the first provider opening once while building a pool chooser", async
 	const context = createProxyContext([first, second], accounts, {
 		"anthropic-messages": ["first", "second"],
 	});
-	context.runtime.teamRouting.enabled = true;
-	context.runtime.teamRouting.allowlistedAccountUuids = ["first", "second"];
+	setPoolPolicy(context, { enabled: true });
+	setPoolPolicy(context, { allowlistedAccountUuids: ["first", "second"] });
 	Object.assign(context.dbOps, {
 		deleteExpiredConversationPins() {},
 		getConversationPin() {
@@ -1843,8 +1854,8 @@ it("reuses the first opening digest when an interactive wait retries", async () 
 	const ctx = createProxyContext([provider], [seat], {
 		"anthropic-messages": ["qwen-claude"],
 	});
-	ctx.runtime.teamRouting.enabled = true;
-	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	setPoolPolicy(ctx, { enabled: true });
+	setPoolPolicy(ctx, { allowlistedAccountUuids: ["seat"] });
 	Object.assign(ctx.dbOps, {
 		deleteExpiredConversationPins() {
 			cleanups += 1;
@@ -1864,7 +1875,7 @@ it("reuses the first opening digest when an interactive wait retries", async () 
 	ctx.quotaHold = { waitUntil: async () => {} } as unknown as NonNullable<
 		typeof ctx.quotaHold
 	>;
-	ctx.runtime.teamRouting.holdSeconds = 60;
+	ctx.runtime.routing.holdSeconds = 60;
 	globalThis.fetch = mock(() =>
 		Promise.resolve(new Response("limited", { status: 429 })),
 	) as unknown as typeof fetch;
@@ -1913,8 +1924,8 @@ it.each([
 	const ctx = createProxyContext([provider], [seat], {
 		"anthropic-messages": ["first"],
 	});
-	ctx.runtime.teamRouting.enabled = enabled;
-	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	setPoolPolicy(ctx, { enabled: enabled });
+	setPoolPolicy(ctx, { allowlistedAccountUuids: ["seat"] });
 	Object.assign(ctx.dbOps, {
 		deleteExpiredConversationPins() {},
 		getConversationPin() {
@@ -1973,8 +1984,8 @@ it("looks up and cleans a pooled seat pin once across chooser checks", async () 
 	const ctx = createProxyContext([first, second], accounts, {
 		"anthropic-messages": ["first", "second"],
 	});
-	ctx.runtime.teamRouting.enabled = true;
-	ctx.runtime.teamRouting.allowlistedAccountUuids = ["first", "second"];
+	setPoolPolicy(ctx, { enabled: true });
+	setPoolPolicy(ctx, { allowlistedAccountUuids: ["first", "second"] });
 	let cleanups = 0;
 	let lookups = 0;
 	Object.assign(ctx.dbOps, {
@@ -2033,8 +2044,8 @@ it("cleans a direct seat pin once when selecting an account", async () => {
 		account_uuid: "seat",
 	} as Account;
 	const ctx = createProxyContext([provider], [seat]);
-	ctx.runtime.teamRouting.enabled = true;
-	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	setPoolPolicy(ctx, { enabled: true });
+	setPoolPolicy(ctx, { allowlistedAccountUuids: ["seat"] });
 	let cleanups = 0;
 	let lookups = 0;
 	Object.assign(ctx.dbOps, {
@@ -2196,7 +2207,7 @@ it("the provider honors the Router's API-key reach on a direct route", async () 
 		api_key: "synthetic",
 	} as Account;
 	const ctx = createProxyContext([provider], [key]);
-	Object.assign(ctx.runtime.teamRouting, {
+	setPoolPolicy(ctx, {
 		enabled: true,
 		allowlistedAccountUuids: [],
 	});
@@ -2263,10 +2274,10 @@ it("ordered fallback starts at the first provider when a saved pin belongs to a 
 	const ctx = createProxyContext([first, second], accounts, {
 		"anthropic-messages": ["first", "second"],
 	});
-	Object.assign(ctx.runtime.teamRouting, {
+	setPoolPolicy(ctx, {
 		enabled: true,
 		allowlistedAccountUuids: ["one", "two", "old"],
-		callerProviderFallback: { box: "ordered" },
+		orderedCallers: ["box"],
 	});
 	Object.assign(ctx.dbOps, {
 		deleteExpiredConversationPins() {},
@@ -2324,8 +2335,8 @@ it("finds a pinned provider once without scanning provider seats", async () => {
 	const ctx = createProxyContext([first, second], [seat], {
 		"anthropic-messages": ["first", "second"],
 	});
-	ctx.runtime.teamRouting.enabled = true;
-	ctx.runtime.teamRouting.allowlistedAccountUuids = ["seat"];
+	setPoolPolicy(ctx, { enabled: true });
+	setPoolPolicy(ctx, { allowlistedAccountUuids: ["seat"] });
 	let reads = 0;
 	Object.assign(ctx.dbOps, {
 		deleteExpiredConversationPins() {},

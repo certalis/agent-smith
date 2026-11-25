@@ -1,3 +1,4 @@
+import { rewriteLegacyConfig } from "@agent-smith/config";
 import type { RequestStep, UpstreamRule } from "./scenario";
 
 export const enrollmentEnvironment = {
@@ -6,14 +7,14 @@ export const enrollmentEnvironment = {
 	AGENT_SMITH_TRUST_LOOPBACK: "false",
 	AGENT_SMITH_ENROLLMENT_ORIGIN: "https://pool.example.test",
 };
-export const enrollmentConfig = {
+export const enrollmentConfig = rewriteLegacyConfig({
 	team_routing: {
 		enabled: false,
 		allowlisted_account_uuids: ["existing-seat"],
 		max_usage: 0.85,
 		admission_cap: 3,
 	},
-};
+});
 export const publicHeaders = {
 	host: "pool.example.test",
 	origin: "https://pool.example.test",
@@ -125,5 +126,8 @@ export function readAccounts(id: string): RequestStep {
 	};
 }
 export function readRouting(id: string): RequestStep {
-	return { ...readAccounts(id), path: "/api/config/team-routing" };
+	return {
+		...readAccounts(id),
+		path: "/api/config/providers/claude-code/pool",
+	};
 }

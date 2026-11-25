@@ -1,4 +1,8 @@
 import type { RoutedProvider, RouteRequest } from "@agent-smith/capacity";
+import {
+	type ResolvedRuntimeConfig,
+	runtimeForProvider,
+} from "@agent-smith/config";
 import type { PoolContext } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
 import type { QuotaHold, Router } from "@agent-smith/routing";
@@ -20,6 +24,7 @@ export interface ProxyContext
 }
 
 export interface ResolvedProxyContext extends ProxyContext {
+	runtime: ResolvedRuntimeConfig;
 	provider: Provider;
 	providerName: AccountProvider;
 	upstreamPath: string;
@@ -32,6 +37,7 @@ export function createResolvedProxyContext(
 ): ResolvedProxyContext {
 	return {
 		...ctx,
+		runtime: runtimeForProvider(ctx.runtime, provider.name),
 		provider,
 		providerName: provider.name,
 		upstreamPath,

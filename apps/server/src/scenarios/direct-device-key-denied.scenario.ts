@@ -8,12 +8,45 @@ export default defineScenario({
 	name: "a device key cannot call a direct provider route",
 	config: {
 		providers: {
-			"reach-provider": { enabled: true, strategy: "anthropic-api" },
+			"reach-provider": {
+				enabled: true,
+				strategy: "anthropic-api",
+				pool: {
+					members: [],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: [],
+				},
+			},
+			openai: {
+				pool: {
+					members: [],
+				},
+			},
+			"claude-code": {
+				pool: {
+					members: [],
+				},
+			},
+			codex: {
+				pool: {
+					members: [],
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["reach-provider"] },
-		team_routing: {
-			enabled: true,
-			caller_provider_fallback: { "synthetic-device": "ordered" },
+		routing: {
+			routes: {
+				"anthropic-messages": ["reach-provider"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [{ name: "key", provider: "reach-provider", authMethod: "api_key" }],

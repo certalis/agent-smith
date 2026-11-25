@@ -45,6 +45,8 @@ export type Availability = {
 };
 
 export type ProviderStatus = {
+	/** Whether this provider has an enabled shared-seat pool. */
+	poolEnabled: boolean;
 	servableSeats: number;
 	retryAt: number | null;
 	admissionWaitMs: number;

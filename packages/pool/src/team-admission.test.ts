@@ -11,13 +11,12 @@ const config = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1_000,
-	holdSeconds: 0,
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
 
 test("queues one request behind a full account and grants it FIFO on release", async () => {

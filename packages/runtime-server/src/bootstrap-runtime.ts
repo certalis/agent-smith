@@ -88,7 +88,6 @@ function createStatusRequest(
 
 function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 	return {
-		blockWhenAllFull: config.getBlockWhenAllFull(),
 		clientId: config.get(
 			"client_id",
 			"9d1c250a-e61b-44d9-88ed-5944d1962f5e",
@@ -110,7 +109,8 @@ function createRuntimeConfig(config: Config, port: number): RuntimeConfig {
 		) as number,
 		port,
 		storeRequestPayloads: config.storesRequestPayloads(),
-		teamRouting: config.getTeamRouting(),
+		routing: config.getRouting(),
+		providerPools: config.getProviderPoolSettings(),
 	};
 }
 
@@ -120,8 +120,8 @@ function wireStrategyHotReload(
 	dbOps: DatabaseOperations,
 	proxyContext: ProxyContext,
 	runtimeConfig: RuntimeConfig,
-	quotaProbe: QuotaProbe,
-	windowWarmup: WindowWarmup,
+	quotaProbe: Pick<QuotaProbe, "reschedule">,
+	windowWarmup: Pick<WindowWarmup, "reschedule">,
 	poolContext: PoolContext,
 ): void {
 	config.on("change", (change: { key?: string }) => {
@@ -138,11 +138,13 @@ function wireStrategyHotReload(
 		if (change.key === "data_retention_days") {
 			runtimeConfig.storeRequestPayloads = config.storesRequestPayloads();
 		}
-		if (change.key === "team_routing") {
-			runtimeConfig.teamRouting = config.getTeamRouting();
+		if (change.key === "providers" || change.key === "routing") {
+			runtimeConfig.providerPools = config.getProviderPoolSettings();
+			runtimeConfig.routing = config.getRouting();
+			proxyContext.providerRegistry.setProviderPools(config.getProviderPools());
 			quotaProbe.reschedule();
 			windowWarmup.reschedule();
-			log.info("Team routing configuration changed");
+			log.info("Provider pool or routing configuration changed");
 		}
 	});
 }
@@ -152,37 +154,72 @@ function startSeatSchedulers(
 	config: Config,
 	poolContext: PoolContext,
 	outsideSpendTracker: OutsideSpendTracker,
-): { quotaProbe: QuotaProbe; windowWarmup: WindowWarmup } {
+): {
+	quotaProbe: Pick<QuotaProbe, "reschedule">;
+	windowWarmup: Pick<WindowWarmup, "reschedule">;
+} {
 	const { dbOps, providerRegistry, runtime } = poolContext;
 	const readSeatToken: SeatTokenReader = async (account) => {
 		const provider = providerRegistry.getProvider(account.provider);
 		if (!provider) return null;
 		return await getValidAccessToken(account, {
 			...poolContext,
+			runtime: {
+				...poolContext.runtime,
+				pool: config.getTeamRouting(account.provider),
+			},
 			provider,
 			providerName: account.provider,
 			upstreamPath: "/",
 		});
 	};
-	const quotaProbe = new QuotaProbe(
-		() => config.getTeamRouting(),
-		dbOps,
-		outsideSpendTracker,
-		providerRegistry,
-		readSeatToken,
-	);
-	const windowWarmup = new WindowWarmup(
-		() => runtime,
-		dbOps,
-		outsideSpendTracker,
-		providerRegistry,
-		readSeatToken,
-	);
-	for (const scheduler of [quotaProbe, windowWarmup]) {
-		scheduler.start();
-		registerDisposable(scheduler);
+	const quotaProbes: QuotaProbe[] = [];
+	const warmups: WindowWarmup[] = [];
+	for (const name of providerRegistry.listProviders()) {
+		const store = {
+			getAllAccounts: () =>
+				dbOps.getAllAccounts().filter((account) => account.provider === name),
+			updateAccountQuotaState: dbOps.updateAccountQuotaState.bind(dbOps),
+			getEnrollmentContact: dbOps.getEnrollmentContact.bind(dbOps),
+		};
+		const probe = new QuotaProbe(
+			() => config.getTeamRouting(name),
+			store,
+			outsideSpendTracker,
+			providerRegistry,
+			readSeatToken,
+		);
+		const warmup = new WindowWarmup(
+			() => ({
+				quotaThreshold: runtime.quotaThreshold,
+				pool: config.getTeamRouting(name),
+			}),
+			store,
+			outsideSpendTracker,
+			providerRegistry,
+			readSeatToken,
+		);
+		quotaProbes.push(probe);
+		warmups.push(warmup);
+		for (const scheduler of [probe, warmup]) {
+			scheduler.start();
+			registerDisposable(scheduler);
+		}
 	}
-	return { quotaProbe, windowWarmup };
+	return {
+		quotaProbe: {
+			reschedule: () =>
+				quotaProbes.forEach((probe) => {
+					probe.reschedule();
+				}),
+		},
+		windowWarmup: {
+			reschedule: () =>
+				warmups.forEach((warmup) => {
+					warmup.reschedule();
+				}),
+		},
+	};
 }
 
 export function bootstrapRuntime(
@@ -229,6 +266,10 @@ export function bootstrapRuntime(
 			if (!provider) throw new Error("Provider unavailable");
 			return getValidAccessToken(account, {
 				...poolContext,
+				runtime: {
+					...poolContext.runtime,
+					pool: config.getTeamRouting(account.provider),
+				},
 				provider,
 				providerName: account.provider,
 				upstreamPath: "/",
@@ -244,10 +285,10 @@ export function bootstrapRuntime(
 			return {
 				version: 1,
 				provider,
-				routingEnabled: runtimeConfig.teamRouting.enabled,
+				routingEnabled: status.poolEnabled,
 				eligibleAccounts: status.servableSeats,
 				retryAtMs: status.retryAt,
-				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
+				holdSeconds: runtimeConfig.routing.holdSeconds,
 				admissionWaitMs: status.admissionWaitMs,
 			};
 		},
@@ -268,12 +309,14 @@ export function bootstrapRuntime(
 				),
 				providers,
 				orderedFallback: hasOrderedProviderFallback(
-					runtimeConfig.teamRouting,
+					runtimeConfig.routing,
 					callerId,
 				),
-				teamRoutingEnabled: runtimeConfig.teamRouting.enabled,
-				holdSeconds: runtimeConfig.teamRouting.holdSeconds,
-				admissionWaitMs: runtimeConfig.teamRouting.admissionWaitMs,
+				apiKeyAccounts:
+					runtimeConfig.routing.apiKeyAccounts === "everyone" ||
+					hasOrderedProviderFallback(runtimeConfig.routing, callerId),
+
+				holdSeconds: runtimeConfig.routing.holdSeconds,
 			});
 		},
 		callerForDeviceKey: (key) =>

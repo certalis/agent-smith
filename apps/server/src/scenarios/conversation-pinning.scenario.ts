@@ -22,10 +22,46 @@ const continuationA = JSON.stringify({
 export default defineScenario({
 	name: "different openings in one Claude session spread and each stay pinned",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			admission_cap: 5,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

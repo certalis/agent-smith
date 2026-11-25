@@ -213,7 +213,7 @@ describe("selectAccountsForRequest", () => {
 			provider: quotaProvider,
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
@@ -270,7 +270,7 @@ describe("selectAccountsForRequest", () => {
 			provider: quotaProvider,
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["capped-seat", "available-seat"],
 					maxUsage: 0.9,
@@ -321,7 +321,7 @@ describe("selectAccountsForRequest", () => {
 			provider: quotaProvider,
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["unknown-reset-seat"],
 					maxUsage: 0.9,
@@ -366,7 +366,10 @@ describe("selectAccountsForRequest", () => {
 			providerName: "claude-code",
 			provider: { quotaBucketsFor: () => ["providerWeekly"] },
 			quotaProbeAt: new Map([["claude-code", now]]),
-			runtime: { quotaThreshold: 0.98 },
+			runtime: {
+				quotaThreshold: 0.98,
+				pool: { enabled: false, blockWhenAllFull: false },
+			},
 			strategy: { select: (accounts: Account[]) => accounts },
 			dbOps: {
 				getAvailableAccountsByProvider: () => [account],
@@ -412,7 +415,7 @@ describe("selectAccountsForRequest", () => {
 			},
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
@@ -475,7 +478,7 @@ describe("selectAccountsForRequest", () => {
 			},
 			runtime: {
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
@@ -549,7 +552,7 @@ describe("selectAccountsForRequest", () => {
 			},
 			runtime: {
 				quotaThreshold: 0.8,
-				teamRouting: {
+				pool: {
 					enabled: true,
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,
@@ -604,9 +607,9 @@ describe("selectAccountsForRequest", () => {
 				isWeeklyBucket: () => true,
 			},
 			runtime: {
-				blockWhenAllFull: false,
 				quotaThreshold: 0.98,
-				teamRouting: {
+				pool: {
+					blockWhenAllFull: false,
 					enabled: true,
 					allowlistedAccountUuids: ["seat"],
 					maxUsage: 0.9,

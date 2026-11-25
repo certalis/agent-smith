@@ -6,10 +6,38 @@ const fiveHours = 5 * 60 * 60 * 1_000;
 export default defineScenario({
 	name: "a pooled seat at ninety percent never serves another request",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			max_usage: 0.9,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

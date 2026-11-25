@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Config } from "./index";
+import { Config, rewriteLegacyConfig } from "./index";
 
 const tempDirs: string[] = [];
 
@@ -16,7 +16,7 @@ function configFrom(data: unknown): Config {
 	const directory = mkdtempSync(join(tmpdir(), "agent-smith-config-"));
 	tempDirs.push(directory);
 	const path = join(directory, "config.json");
-	writeFileSync(path, JSON.stringify(data));
+	writeFileSync(path, JSON.stringify(rewriteLegacyConfig(data)));
 	return new Config(path);
 }
 

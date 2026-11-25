@@ -19,7 +19,9 @@ function fixture(enrollment_emails: string[]) {
 		path,
 		JSON.stringify({
 			enrollment_emails,
-			team_routing: { enabled: false, max_usage: 0.8 },
+			providers: {
+				"claude-code": { pool: { enabled: false, max_usage: 0.8 } },
+			},
 		}),
 	);
 	return { config: new Config(path), path };
@@ -58,7 +60,7 @@ describe("enrollment email and exact-domain rules", () => {
 		]);
 		config.setEnrollmentEmails(["invited@outside.test"]);
 		expect(config.isEnrollmentEmailAllowed("new@example.test")).toBe(false);
-		expect(new Config(path).getTeamRouting()).toMatchObject({
+		expect(new Config(path).getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			maxUsage: 0.8,
 		});

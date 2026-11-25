@@ -7,13 +7,42 @@ export default defineScenario({
 	name: "manual seat pins work on the first and selected second provider of a pool",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			"second-claude": { enabled: true, strategy: "claude-code" },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+				},
+			},
+			"second-claude": {
+				enabled: true,
+				strategy: "claude-code",
+				pool: {
+					members: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["claude-code", "second-claude"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "second-claude"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

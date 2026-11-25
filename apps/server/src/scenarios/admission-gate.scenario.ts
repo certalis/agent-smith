@@ -3,12 +3,54 @@ import { defineScenario } from "./harness/scenario";
 export default defineScenario({
 	name: "one full pooled account queues the next request until its slot is released",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a"],
-			admission_cap: 1,
-			admission_queue_limit: 1,
-			admission_wait_ms: 1_000,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a"],
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a"],
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a"],
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a"],
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [{ name: "a", accountUuid: "acct-a" }],

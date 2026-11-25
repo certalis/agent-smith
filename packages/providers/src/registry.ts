@@ -44,9 +44,7 @@ export class ProviderRegistry {
 		string,
 		Record<string, string> | undefined
 	>;
-	private readonly providerPools: Partial<
-		Record<ProviderWire, readonly string[]>
-	>;
+	private providerPools: Partial<Record<ProviderWire, readonly string[]>>;
 
 	constructor(providers: Provider[] = [], routing: ProviderRoutingConfig = {}) {
 		this.modelMaps = routing.modelMaps ?? {};
@@ -54,6 +52,12 @@ export class ProviderRegistry {
 		for (const provider of providers) {
 			this.registerProvider(provider);
 		}
+	}
+
+	setProviderPools(
+		pools: Partial<Record<ProviderWire, readonly string[]>>,
+	): void {
+		this.providerPools = pools;
 	}
 
 	mapModel(

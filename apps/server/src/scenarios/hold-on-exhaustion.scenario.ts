@@ -5,9 +5,33 @@ const now = 1_700_000_000_000;
 export default defineScenario({
 	name: "a pooled request waits for a near quota reset instead of receiving a 429",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a"],
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
 			hold_seconds: 2,
 		},
 	},

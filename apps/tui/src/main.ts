@@ -1,6 +1,10 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process";
-import { Config, resolveConfigPath } from "@agent-smith/config";
+import {
+	Config,
+	resolveConfigPath,
+	rewriteConfigFile,
+} from "@agent-smith/config";
 import { container, NETWORK, SERVICE_KEYS, shutdown } from "@agent-smith/core";
 import { DatabaseFactory } from "@agent-smith/database";
 import { Logger } from "@agent-smith/logger";
@@ -69,6 +73,25 @@ function printAccountsTable(accounts: AccountDisplay[]) {
 }
 
 async function main() {
+	if (process.argv[2] === "config") {
+		const [action, ...paths] = process.argv.slice(3);
+		if (action !== "rewrite" || (paths.length !== 0 && paths.length !== 2))
+			throw new Error(
+				"Usage: agent-smith config rewrite [<old.json> <new.json>]",
+			);
+		const result =
+			paths.length === 0
+				? rewriteConfigFile(resolveConfigPath())
+				: rewriteConfigFile(paths[0] as string, paths[1]);
+		console.log(
+			result.backup
+				? `Configuration rewritten. Backup: ${result.backup}`
+				: result.changed
+					? "Rewritten configuration saved."
+					: "Configuration is already current.",
+		);
+		return;
+	}
 	if (process.argv[2] === "client") {
 		await runClientCommand(process.argv.slice(3));
 		return;
@@ -99,6 +122,7 @@ ${POC_NOTICE}
 Usage: agent-smith [options]
        agent-smith run [--port <number>] -- [claude arguments]
        agent-smith install-client
+       agent-smith config rewrite [<old.json> <new.json>]
        agent-smith client on|off|status [--raw]
        agent-smith menubar install|uninstall|render
 

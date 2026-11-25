@@ -1,0 +1,14 @@
+{
+	"providers": {
+		"gemini": {
+			"enabled": true,
+			"strategy": "google-gemini-api",
+			"models": {
+				"claude-sonnet-*": "gemini-2.5-flash"
+			}
+		}
+	},
+	"provider_pools": {
+		"anthropic-messages": ["gemini"]
+	}
+}

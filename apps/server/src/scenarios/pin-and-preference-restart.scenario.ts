@@ -10,13 +10,42 @@ export default defineScenario({
 	name: "a chosen provider and its seat survive a server restart",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			"second-claude": { enabled: true, strategy: "claude-code" },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat-a", "seat-b", "seat-preferred"],
+				},
+			},
+			"second-claude": {
+				enabled: true,
+				strategy: "claude-code",
+				pool: {
+					members: ["seat-a", "seat-b", "seat-preferred"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["seat-a", "seat-b", "seat-preferred"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["seat-a", "seat-b", "seat-preferred"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["seat-a", "seat-b", "seat-preferred"],
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["claude-code", "second-claude"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b", "seat-preferred"],
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "second-claude"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

@@ -9,17 +9,31 @@ afterEach(() => {
 	for (const directory of directories.splice(0))
 		rmSync(directory, { recursive: true, force: true });
 });
-function configFrom(team_routing: unknown = {}) {
+function configFrom(pool: Record<string, unknown> = {}) {
 	const directory = mkdtempSync(join(tmpdir(), "agent-smith-weekly-cap-"));
 	directories.push(directory);
 	const path = join(directory, "config.json");
-	writeFileSync(path, JSON.stringify({ team_routing }));
+	const { caller_provider_fallback, ...poolSettings } = pool;
+	const callers =
+		caller_provider_fallback &&
+		Object.fromEntries(
+			Object.entries(caller_provider_fallback as Record<string, string>).map(
+				([name, value]) => [name, { allow_fallbacks: value === "ordered" }],
+			),
+		);
+	writeFileSync(
+		path,
+		JSON.stringify({
+			providers: { "claude-code": { pool: poolSettings } },
+			routing: callers ? { callers } : {},
+		}),
+	);
 	return { config: new Config(path), path };
 }
 
 describe("weekly cap configuration", () => {
 	it("defaults weekly usage to 95% while preserving the five-hour cap", () => {
-		expect(configFrom().config.getTeamRouting()).toMatchObject({
+		expect(configFrom().config.getTeamRouting("claude-code")).toMatchObject({
 			maxUsage: 0.9,
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: {},
@@ -30,7 +44,7 @@ describe("weekly cap configuration", () => {
 		expect(
 			configFrom({
 				weekly_max_usage_by_email: { "full@example.test": 1 },
-			}).config.getTeamRouting(),
+			}).config.getTeamRouting("claude-code"),
 		).toMatchObject({
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "full@example.test": 1 },
@@ -43,39 +57,40 @@ describe("weekly cap configuration", () => {
 			caller_weekly_max_usage: { alice: 0.7 },
 			caller_provider_fallback: { "agents-box": "ordered" },
 		});
-		expect(config.getTeamRouting()).toMatchObject({
+		expect(config.getTeamRouting("claude-code")).toMatchObject({
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
 			callerWeeklyMaxUsage: { alice: 0.7 },
-			callerProviderFallback: { "agents-box": "ordered" },
 		});
-		config.setTeamRouting({ enabled: false });
-		expect(new Config(path).getTeamRouting()).toMatchObject({
+		expect(config.getRouting().callers["agents-box"]?.allowFallbacks).toBe(
+			true,
+		);
+		config.setProviderPool("claude-code", { enabled: false });
+		expect(new Config(path).getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
 			callerWeeklyMaxUsage: { alice: 0.7 },
-			callerProviderFallback: { "agents-box": "ordered" },
 		});
-		config.setTeamRouting({
+		config.setProviderPool("claude-code", {
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { " Other@Example.test ": 0.95 },
 			caller_weekly_max_usage: { bob: 0.8 },
-			caller_provider_fallback: { "agents-box": "ordered" },
 		});
-		expect(new Config(path).getRuntime().teamRouting).toMatchObject({
+		expect(new Config(path).getTeamRouting("claude-code")).toMatchObject({
 			maxUsage: 0.8,
 			weeklyMaxUsage: 0.9,
 			weeklyMaxUsageByEmail: { "other@example.test": 0.95 },
 			callerWeeklyMaxUsage: { bob: 0.8 },
-			callerProviderFallback: { "agents-box": "ordered" },
 		});
-		expect(JSON.parse(readFileSync(path, "utf8")).team_routing).toEqual({
+		expect(
+			JSON.parse(readFileSync(path, "utf8")).providers["claude-code"].pool,
+		).toEqual({
+			enabled: false,
 			max_usage: 0.8,
 			weekly_max_usage: 0.9,
 			weekly_max_usage_by_email: { "other@example.test": 0.95 },
 			caller_weekly_max_usage: { bob: 0.8 },
-			caller_provider_fallback: { "agents-box": "ordered" },
 		});
 	});
 	it.each([
@@ -94,16 +109,14 @@ describe("weekly cap configuration", () => {
 		{ caller_weekly_max_usage: { "alice@example.test": 0.7 } },
 		{ caller_weekly_max_usage: [] },
 		{ caller_weekly_max_usage: null },
-		{ caller_provider_fallback: { alice: "automatic" } },
-		{ caller_provider_fallback: { "alice@example.test": "ordered" } },
-		{ caller_provider_fallback: [] },
-		{ caller_provider_fallback: null },
 	])("rejects invalid weekly policy without replacing the saved policy: %j", (bad) => {
 		const { config, path } = configFrom({ enabled: true, max_usage: 0.8 });
-		const before = config.getTeamRouting();
+		const before = config.getTeamRouting("claude-code");
 		const saved = readFileSync(path, "utf8");
-		expect(() => config.setTeamRouting({ enabled: false, ...bad })).toThrow();
-		expect(config.getTeamRouting()).toEqual(before);
+		expect(() =>
+			config.setProviderPool("claude-code", { enabled: false, ...bad }),
+		).toThrow();
+		expect(config.getTeamRouting("claude-code")).toEqual(before);
 		expect(readFileSync(path, "utf8")).toBe(saved);
 	});
 });

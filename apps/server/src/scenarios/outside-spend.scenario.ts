@@ -9,7 +9,35 @@ const body = (opening: string) =>
 export default defineScenario({
 	name: "status reports a served weekly rise as not measurable rather than outside spend",
 	config: {
-		team_routing: { enabled: true, allowlisted_account_uuids: ["acct-a"] },
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
+		},
 	},
 	fleet: [{ name: "a", accountUuid: "acct-a" }],
 	upstream: [

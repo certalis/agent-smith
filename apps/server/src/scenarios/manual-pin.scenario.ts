@@ -3,9 +3,34 @@ import { defineScenario } from "./harness/scenario";
 export default defineScenario({
 	name: "a manual Claude account pin selects one eligible pooled seat",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

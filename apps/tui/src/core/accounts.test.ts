@@ -37,13 +37,13 @@ describe("Local pool accounts", () => {
 		});
 
 		setAccountPoolMembership(account.id, true, db, config);
-		expect(config.getTeamRouting()).toMatchObject({
+		expect(config.getTeamRouting("claude-code")).toMatchObject({
 			enabled: true,
 			allowlistedAccountUuids: ["authorized-seat-id"],
 		});
 
 		setAccountPoolMembership(account.id, false, db, config);
-		expect(config.getTeamRouting()).toMatchObject({
+		expect(config.getTeamRouting("claude-code")).toMatchObject({
 			enabled: false,
 			allowlistedAccountUuids: [],
 		});

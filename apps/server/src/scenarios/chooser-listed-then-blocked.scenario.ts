@@ -8,15 +8,72 @@ export default defineScenario({
 	name: "a listed provider can block after the chooser selects it and releases admission",
 	config: {
 		providers: {
-			"qwen-claude": { enabled: true, strategy: "model-studio-anthropic-api" },
-			"kimi-claude": { enabled: true, strategy: "model-studio-anthropic-api" },
+			"qwen-claude": {
+				enabled: true,
+				strategy: "model-studio-anthropic-api",
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			"kimi-claude": {
+				enabled: true,
+				strategy: "model-studio-anthropic-api",
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			"claude-code": {
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: [],
+					admission: {
+						cap: 1,
+						queue_limit: 0,
+					},
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["qwen-claude", "kimi-claude"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: [],
-			admission_cap: 1,
-			admission_queue_limit: 0,
+		routing: {
+			routes: {
+				"anthropic-messages": ["qwen-claude", "kimi-claude"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

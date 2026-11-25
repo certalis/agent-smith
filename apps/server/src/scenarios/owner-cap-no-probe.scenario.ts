@@ -15,11 +15,42 @@ const quota = {
 export default defineScenario({
 	name: "the pooled ninety-percent cap also blocks all-spent revalidation",
 	config: {
-		block_when_all_full: false,
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			max_usage: 0.9,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					block_when_all_full: false,
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					block_when_all_full: false,
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					block_when_all_full: false,
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					max_usage: 0.9,
+					block_when_all_full: false,
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

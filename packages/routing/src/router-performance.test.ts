@@ -37,7 +37,7 @@ it("does not query full capacity for an ordinary successful route", async () => 
 		providers: [provider],
 		headers: new Headers(),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(await response.text()).toBe("ok");
@@ -86,7 +86,7 @@ it("reads missing capacity facts only when the route is exhausted", async () => 
 		providers: [provider],
 		headers: new Headers(),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		onRouteFull: (at) => {
 			reported = at;
 		},
@@ -145,7 +145,7 @@ it("does not scan an exhausted provider when the next provider serves", async ()
 		providers: [first, second],
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("empty", { status: 503 }),
 	});
 	expect(await response.text()).toBe("ok");

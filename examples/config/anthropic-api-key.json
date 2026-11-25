@@ -1,5 +1,13 @@
 {
-	"provider_pools": {
-		"anthropic-messages": ["anthropic"]
-	}
+  "providers": {},
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "anthropic"
+      ]
+    },
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
+  }
 }

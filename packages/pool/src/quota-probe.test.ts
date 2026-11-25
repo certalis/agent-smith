@@ -14,13 +14,12 @@ const config = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 1,
 	admissionQueueLimit: 1,
 	admissionWaitMs: 1,
-	holdSeconds: 0,
 	quotaProbeSeconds: 1,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
 
 type ProviderLookup = Pick<ProviderRegistry, "getProvider">;

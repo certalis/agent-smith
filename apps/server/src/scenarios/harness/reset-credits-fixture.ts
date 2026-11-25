@@ -1,3 +1,4 @@
+import { rewriteLegacyConfig } from "@agent-smith/config";
 import type { RequestStep, UpstreamRule } from "./scenario";
 import { wireAdminKey, wireProxyKey } from "./wire-fixture";
 
@@ -11,10 +12,10 @@ export const resetEnvironment = {
 	AGENT_SMITH_ADMIN_KEY: wireAdminKey,
 	AGENT_SMITH_PROXY_KEY: wireProxyKey,
 };
-export const resetConfig = {
+export const resetConfig = rewriteLegacyConfig({
 	payload_storage_enabled: false,
 	team_routing: { enabled: false, quota_probe_seconds: 0 },
-};
+});
 export const resetFleet = [
 	{
 		name: "codex",

@@ -5,12 +5,54 @@ const body = '{"model":"claude-retired","messages":[]}';
 export default defineScenario({
 	name: "repeated fallback arrivals do not restart a pooled sibling admission ramp",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			admission_cap: 3,
-			admission_queue_limit: 3,
-			admission_wait_ms: 1_000,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 3,
+						queue_limit: 3,
+						wait_ms: 1000,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 3,
+						queue_limit: 3,
+						wait_ms: 1000,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 3,
+						queue_limit: 3,
+						wait_ms: 1000,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 3,
+						queue_limit: 3,
+						wait_ms: 1000,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

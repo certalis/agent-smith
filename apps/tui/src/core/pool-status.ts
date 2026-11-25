@@ -44,6 +44,7 @@ type Membership = {
 	id: string;
 	account_uuid: string | null;
 	auth_method: string;
+	provider: string;
 };
 
 export type PoolStatusSources = {
@@ -68,30 +69,32 @@ export function summarizePool({
 		maxUsagePercent: routing.maxUsage * 100,
 		enrollmentUrl: `${origin}/pool-enroll`,
 		emails,
-		accounts: accounts.map((account) => {
-			const identity = byId.get(account.id);
-			const windows = account.quotaWindows ?? {};
-			return {
-				name: account.name,
-				paused: account.paused,
-				blocked: Boolean(account.blockedReason),
-				poolAllowed:
-					routing.enabled &&
-					identity?.auth_method === "oauth" &&
-					allowed.has(identity.account_uuid ?? ""),
-				tokenStatus: account.tokenStatus,
-				usage: {
-					fiveHour: windows.unified5h ?? null,
-					sevenDay: windows.unified7d ?? null,
-					weeklyByModel: Object.fromEntries(
-						MODEL_WINDOWS.flatMap((model) => {
-							const window = windows[`unified7d${model}`];
-							return window ? [[model, window]] : [];
-						}),
-					),
-				},
-			};
-		}),
+		accounts: accounts
+			.filter((account) => byId.get(account.id)?.provider === "claude-code")
+			.map((account) => {
+				const identity = byId.get(account.id);
+				const windows = account.quotaWindows ?? {};
+				return {
+					name: account.name,
+					paused: account.paused,
+					blocked: Boolean(account.blockedReason),
+					poolAllowed:
+						routing.enabled &&
+						identity?.auth_method === "oauth" &&
+						allowed.has(identity.account_uuid ?? ""),
+					tokenStatus: account.tokenStatus,
+					usage: {
+						fiveHour: windows.unified5h ?? null,
+						sevenDay: windows.unified7d ?? null,
+						weeklyByModel: Object.fromEntries(
+							MODEL_WINDOWS.flatMap((model) => {
+								const window = windows[`unified7d${model}`];
+								return window ? [[model, window]] : [];
+							}),
+						),
+					},
+				};
+			}),
 	};
 }
 
@@ -100,7 +103,7 @@ function readMemberships(dbPath: string): Membership[] {
 	try {
 		return database
 			.query<Membership, []>(
-				"SELECT id, account_uuid, auth_method FROM accounts",
+				"SELECT id, account_uuid, auth_method, provider FROM accounts",
 			)
 			.all();
 	} finally {
@@ -131,7 +134,7 @@ export async function readPoolStatus(
 	};
 	const [{ accounts }, routing, { emails }] = await Promise.all([
 		admin<{ accounts: FleetAccount[] }>("status"),
-		admin<TeamRouting>("config/team-routing"),
+		admin<TeamRouting>("config/providers/claude-code/pool"),
 		admin<{ emails: string[] }>("enrollment-emails", {}),
 	]);
 	if (

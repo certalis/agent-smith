@@ -13,14 +13,61 @@ export default defineScenario({
 	...poolWire,
 	name: "admission 503 responses advertise bounded escalating retries before any provider call",
 	config: {
-		...poolWire.config,
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a"],
-			admission_cap: 1,
-			admission_queue_limit: 1,
-			admission_wait_ms: 1_000,
-			quota_probe_seconds: 0,
+		payload_storage_enabled: false,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a"],
+					quota_probe_seconds: 0,
+					admission: {
+						cap: 1,
+						queue_limit: 1,
+						wait_ms: 1000,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [{ name: "a", provider: "claude-code", accountUuid: "acct-a" }],

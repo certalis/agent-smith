@@ -1,13 +1,13 @@
 import { expect, test } from "bun:test";
 import {
-	type TeamRoutingConfig,
+	type ProviderPoolSettings,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 import { TeamRouter, type TeamRoutingRequest } from "@agent-smith/pool";
 import type { Provider } from "@agent-smith/providers";
 import { getConversationProviderKey } from "@agent-smith/routing";
 
-const config: TeamRoutingConfig = {
+const config: ProviderPoolSettings = {
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
@@ -15,13 +15,12 @@ const config: TeamRoutingConfig = {
 	distributionEnabled: true,
 	preferExpiringQuota: false,
 	enabled: true,
-	holdSeconds: 0,
 	maxUsage: 0.9,
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	quotaProbeSeconds: 0,
+	blockWhenAllFull: true,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
 };
 

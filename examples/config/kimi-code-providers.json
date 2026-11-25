@@ -1,13 +1,22 @@
 {
-	"providers": {
-		"kimi-code-claude": {
-			"enabled": true,
-			"strategy": "kimi-code-anthropic-api",
-			"base_url": "https://api.kimi.ai/coding",
-			"models": { "claude-*": "k3.1-pro" }
-		}
-	},
-	"provider_pools": {
-		"anthropic-messages": ["kimi-code-claude"]
-	}
+  "providers": {
+    "kimi-code-claude": {
+      "enabled": true,
+      "strategy": "kimi-code-anthropic-api",
+      "base_url": "https://api.kimi.ai/coding",
+      "models": {
+        "claude-*": "k3.1-pro"
+      }
+    }
+  },
+  "routing": {
+    "routes": {
+      "anthropic-messages": [
+        "kimi-code-claude"
+      ]
+    },
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
+  }
 }

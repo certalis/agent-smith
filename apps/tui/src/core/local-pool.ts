@@ -1,6 +1,6 @@
 import {
-	type TeamRoutingConfig,
-	type TeamRoutingFileConfig,
+	type ProviderPoolFileConfig,
+	type ProviderPoolSettings,
 	windowWarmupFileConfig,
 } from "@agent-smith/config";
 import type { Account, AccountQuotaState } from "@agent-smith/types";
@@ -17,7 +17,7 @@ export function isPoolEligible(account: Account): boolean {
 
 export function localPoolState(
 	account: Account,
-	routing: TeamRoutingConfig,
+	routing: ProviderPoolSettings,
 ): LocalPoolState {
 	if (!isPoolEligible(account)) return "unavailable";
 
@@ -27,11 +27,11 @@ export function localPoolState(
 		: "protected";
 }
 
-export function nextTeamRoutingConfig(
-	routing: TeamRoutingConfig,
+export function nextProviderPoolSettings(
+	routing: ProviderPoolSettings,
 	account: Account,
 	pooled: boolean,
-): TeamRoutingConfig {
+): ProviderPoolSettings {
 	if (!isPoolEligible(account)) {
 		throw new Error(
 			"Only an OAuth seat with a verified account identity can join the local pool.",
@@ -53,23 +53,24 @@ export function nextTeamRoutingConfig(
 	};
 }
 
-export function teamRoutingFileConfig(
-	routing: TeamRoutingConfig,
-): TeamRoutingFileConfig {
+export function providerPoolFileConfig(
+	routing: ProviderPoolSettings,
+): ProviderPoolFileConfig {
 	return {
 		enabled: routing.enabled,
 		distribution_enabled: routing.distributionEnabled,
 		prefer_expiring_quota: routing.preferExpiringQuota,
-		allowlisted_account_uuids: routing.allowlistedAccountUuids,
+		members: routing.allowlistedAccountUuids,
 		max_usage: routing.maxUsage,
 		weekly_max_usage: routing.weeklyMaxUsage,
 		weekly_max_usage_by_email: routing.weeklyMaxUsageByEmail,
 		caller_weekly_max_usage: routing.callerWeeklyMaxUsage,
-		caller_provider_fallback: routing.callerProviderFallback,
-		admission_cap: routing.admissionCap,
-		admission_queue_limit: routing.admissionQueueLimit,
-		admission_wait_ms: routing.admissionWaitMs,
-		hold_seconds: routing.holdSeconds,
+		admission: {
+			cap: routing.admissionCap,
+			queue_limit: routing.admissionQueueLimit,
+			wait_ms: routing.admissionWaitMs,
+		},
+		block_when_all_full: routing.blockWhenAllFull,
 		quota_probe_seconds: routing.quotaProbeSeconds,
 		window_warmup: windowWarmupFileConfig(routing.windowWarmup),
 	};

@@ -7,15 +7,24 @@ export default defineScenario({
 	name: "a caller without fallback policy stays on an exhausted provider",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
+			"claude-code": {
+				enabled: true,
+			},
 			acme: {
 				enabled: true,
 				strategy: "anthropic-api",
-				models: { "claude-sonnet-*": "acme-sonnet" },
+				models: {
+					"claude-sonnet-*": "acme-sonnet",
+				},
 			},
 		},
-		provider_pools: {
-			"anthropic-messages": ["claude-code", "acme"],
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "acme"],
+			},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

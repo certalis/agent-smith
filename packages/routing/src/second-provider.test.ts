@@ -71,6 +71,7 @@ function provider(name: string, backend: FakeBackend): RoutedProvider {
 			threadRequest: false,
 		}),
 		status: async () => ({
+			poolEnabled: true,
 			servableSeats: backend.capacity(),
 			retryAt: null,
 			admissionWaitMs: 0,
@@ -117,7 +118,7 @@ test("the same provider interface serves a pool first and a key after pool exhau
 		providers,
 		headers: new Headers(),
 		orderedFallback: true,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("unavailable", { status: 503 }),
 	};
 	const first = await router.route({ ...input, route: request() });
@@ -139,7 +140,7 @@ test("a chooser can select the key provider while the pool is available", async 
 			"x-agent-smith-provider-choice": "key",
 		}),
 		orderedFallback: false,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: "chooser_or_fallback" as const,
 		noEligible: () => new Response("unavailable", { status: 503 }),
 	});
 	expect(await response.text()).toBe("key response");
@@ -152,9 +153,8 @@ test("caller status sums only the reachable fake providers' status", async () =>
 	const input = {
 		route: request(),
 		providers,
-		teamRoutingEnabled: true,
+		apiKeyAccounts: true,
 		holdSeconds: 0,
-		admissionWaitMs: 0,
 	};
 	expect(
 		(await getCallerPoolStatus({ ...input, orderedFallback: false }))

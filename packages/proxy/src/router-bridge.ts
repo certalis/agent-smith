@@ -78,15 +78,12 @@ export async function routePoolRequest(
 			getProviderSupply(ctx, provider),
 		),
 		headers: req.headers,
-		orderedFallback: hasOrderedProviderFallback(
-			ctx.runtime.teamRouting,
-			callerId,
-		),
-		teamRoutingEnabled: ctx.runtime.teamRouting.enabled,
+		orderedFallback: hasOrderedProviderFallback(ctx.runtime.routing, callerId),
+		apiKeyAccounts: ctx.runtime.routing.apiKeyAccounts,
 		conversationKey: ctx.conversationPinsEnabled
 			? getConversationProviderKey(teamRequest)
 			: undefined,
-		holdSeconds: ctx.runtime.teamRouting.holdSeconds,
+		holdSeconds: ctx.runtime.routing.holdSeconds,
 		waitUntil: quotaHold
 			? (at, signal) => quotaHold.waitUntil(at, signal)
 			: undefined,
@@ -142,8 +139,8 @@ export async function routeDirectRequest(
 		},
 	);
 	const holdSeconds =
-		resolved.runtime.teamRouting.enabled && ctx.quotaHold
-			? resolved.runtime.teamRouting.holdSeconds
+		resolved.runtime.pool.enabled && ctx.quotaHold
+			? resolved.runtime.routing.holdSeconds
 			: 0;
 	const quotaHold = ctx.quotaHold;
 	return ctx.router.route({
@@ -151,7 +148,7 @@ export async function routeDirectRequest(
 		providers: [getProviderSupply(ctx, resolved.provider)],
 		headers: req.headers,
 		orderedFallback: false,
-		teamRoutingEnabled: resolved.runtime.teamRouting.enabled,
+		apiKeyAccounts: ctx.runtime.routing.apiKeyAccounts,
 		holdSeconds,
 		waitUntil: quotaHold
 			? (at, signal) => quotaHold.waitUntil(at, signal)

@@ -1541,13 +1541,12 @@ describe("APIRouter", () => {
 
 	it("returns a client error for a Codex OAuth workspace outside the allowlist", async () => {
 		const { router, dbOps } = createRouterContext({
-			team_routing: {
-				enabled: true,
-				allowlisted_account_uuids: ["allowlisted-codex-workspace"],
-			},
 			providers: {
 				"claude-code": { enabled: true },
-				codex: { enabled: true },
+				codex: {
+					enabled: true,
+					pool: { members: ["allowlisted-codex-workspace"] },
+				},
 			},
 		});
 
@@ -1754,4 +1753,61 @@ describe("APIRouter", () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get("content-type")).toContain("text/event-stream");
 	});
+});
+
+it("updates separate provider pool and routing endpoints without exposing private maps", async () => {
+	const { router, config } = createRouterContext({
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat"],
+					weekly_max_usage_by_email: { "owner@example.test": 0.8 },
+					caller_weekly_max_usage: { box: 0.7 },
+				},
+			},
+		},
+		routing: {
+			routes: { "anthropic-messages": ["claude-code"] },
+			callers: { box: { allow_fallbacks: true } },
+			hold_seconds: 10,
+		},
+	});
+	const pool = await apiRequest(
+		router,
+		"GET",
+		"/api/config/providers/claude-code/pool",
+	);
+	expect(pool.status).toBe(200);
+	const poolText = await pool.text();
+	expect(poolText).not.toContain("owner@example.test");
+	expect(poolText).not.toContain("box");
+	const poolUpdate = await apiRequest(
+		router,
+		"POST",
+		"/api/config/providers/claude-code/pool",
+		{ members: ["seat"], max_usage: 0.8 },
+	);
+	expect(poolUpdate.status).toBe(200);
+	expect(config.getTeamRouting("claude-code")).toMatchObject({
+		weeklyMaxUsageByEmail: { "owner@example.test": 0.8 },
+		callerWeeklyMaxUsage: { box: 0.7 },
+	});
+	const routing = await apiRequest(router, "GET", "/api/config/routing");
+	expect(routing.status).toBe(200);
+	expect(await routing.text()).not.toContain("box");
+	const routingUpdate = await apiRequest(
+		router,
+		"POST",
+		"/api/config/routing",
+		{ routes: { "anthropic-messages": ["claude-code"] }, hold_seconds: 20 },
+	);
+	expect(routingUpdate.status).toBe(200);
+	expect(config.getRouting()).toMatchObject({
+		callers: { box: { allowFallbacks: true } },
+		holdSeconds: 20,
+	});
+	expect(
+		(await apiRequest(router, "GET", "/api/config/team-routing")).status,
+	).toBe(404);
 });

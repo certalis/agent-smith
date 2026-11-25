@@ -1,6 +1,6 @@
 import { defineScenario } from "./harness/scenario";
 
-const routing = "/api/config/team-routing";
+const routing = "/api/config/providers/claude-code/pool";
 const proxy = { "x-api-key": "scenario-proxy-key" };
 const admin = { "x-api-key": "scenario-admin-key" };
 const body = '{"model":"claude-opus-4-5","messages":[]}';
@@ -13,10 +13,46 @@ export default defineScenario({
 		AGENT_SMITH_ADMIN_KEY: "scenario-admin-key",
 	},
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["tech"],
-			weekly_max_usage_by_email: { "tech@example.test": 0.3 },
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["tech"],
+					weekly_max_usage_by_email: {
+						"tech@example.test": 0.3,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage_by_email: {
+						"tech@example.test": 0.3,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage_by_email: {
+						"tech@example.test": 0.3,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["tech"],
+					weekly_max_usage_by_email: {
+						"tech@example.test": 0.3,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [
@@ -67,7 +103,7 @@ export default defineScenario({
 			method: "POST",
 			path: routing,
 			headers: admin,
-			body: '{"enabled":true,"allowlisted_account_uuids":["tech"]}',
+			body: '{"enabled":true,"members":["tech"]}',
 		},
 		{ type: "request", headers: proxy, body },
 		{
@@ -75,7 +111,7 @@ export default defineScenario({
 			method: "POST",
 			path: routing,
 			headers: admin,
-			body: '{"enabled":true,"allowlisted_account_uuids":["tech"],"weekly_max_usage_by_email":{}}',
+			body: '{"enabled":true,"members":["tech"],"weekly_max_usage_by_email":{}}',
 		},
 		{ type: "request", headers: proxy, body },
 	],

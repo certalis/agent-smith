@@ -1,17 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import {
-	type TeamRoutingConfig,
+	type ProviderPoolSettings,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 import type { Account } from "@agent-smith/types";
 import {
 	formatPoolLimits,
 	isPoolEligible,
-	nextTeamRoutingConfig,
-	teamRoutingFileConfig,
+	nextProviderPoolSettings,
+	providerPoolFileConfig,
 } from "./local-pool";
 
-const routing: TeamRoutingConfig = {
+const routing: ProviderPoolSettings = {
 	enabled: true,
 	distributionEnabled: true,
 	preferExpiringQuota: false,
@@ -20,13 +20,12 @@ const routing: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.9,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
-	holdSeconds: 0,
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
 
 function oauthSeat(overrides: Partial<Account> = {}): Account {
@@ -65,24 +64,23 @@ describe("local pool policy", () => {
 			weeklyMaxUsageByEmail: { "tech@example.test": 0.3 },
 			callerWeeklyMaxUsage: { alice: 0.7 },
 		};
-		const next = nextTeamRoutingConfig(policy, oauthSeat(), true);
+		const next = nextProviderPoolSettings(policy, oauthSeat(), true);
 
 		expect(next).toEqual({
 			...policy,
 			enabled: true,
 			allowlistedAccountUuids: ["existing-seat", "new-seat"],
 		});
-		expect(teamRoutingFileConfig(next)).toMatchObject({
-			allowlisted_account_uuids: ["existing-seat", "new-seat"],
+		expect(providerPoolFileConfig(next)).toMatchObject({
+			members: ["existing-seat", "new-seat"],
 			weekly_max_usage: 0.95,
 			weekly_max_usage_by_email: { "tech@example.test": 0.3 },
 			caller_weekly_max_usage: { alice: 0.7 },
-			caller_provider_fallback: {},
 		});
 	});
 
 	it("turns routing off when its final pooled seat is protected", () => {
-		const next = nextTeamRoutingConfig(
+		const next = nextProviderPoolSettings(
 			{ ...routing, allowlistedAccountUuids: ["new-seat"] },
 			oauthSeat(),
 			false,
@@ -95,7 +93,7 @@ describe("local pool policy", () => {
 		});
 	});
 
-	it("writes the window warm-up schedule back, since a seat toggle replaces the whole policy", () => {
+	it("writes the window warm-up schedule back, when a seat membership changes", () => {
 		const windowWarmup = {
 			enabled: true,
 			times: ["07:30"],
@@ -105,7 +103,7 @@ describe("local pool policy", () => {
 		};
 
 		expect(
-			teamRoutingFileConfig({ ...routing, windowWarmup }).window_warmup,
+			providerPoolFileConfig({ ...routing, windowWarmup }).window_warmup,
 		).toEqual({
 			enabled: true,
 			times: ["07:30"],
@@ -120,7 +118,11 @@ describe("local pool policy", () => {
 		expect(isPoolEligible(oauthSeat({ auth_method: "api_key" }))).toBe(false);
 		expect(isPoolEligible(oauthSeat({ account_uuid: null }))).toBe(false);
 		expect(() =>
-			nextTeamRoutingConfig(routing, oauthSeat({ account_uuid: null }), true),
+			nextProviderPoolSettings(
+				routing,
+				oauthSeat({ account_uuid: null }),
+				true,
+			),
 		).toThrow("OAuth seat with a verified account identity");
 	});
 

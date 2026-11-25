@@ -15,9 +15,33 @@ export default defineScenario({
 	name: "a held thread continuation waits for its own seat, not a sooner sibling",
 	config: {
 		session_duration_ms: 1,
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
 			hold_seconds: 30,
 		},
 	},

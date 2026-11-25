@@ -11,14 +11,46 @@ export default defineScenario({
 	name: "a second-provider seat pin without a chooser preference survives restart",
 	config: {
 		providers: {
-			"claude-code": { enabled: true },
-			"second-claude": { enabled: true, strategy: "claude-code" },
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			"second-claude": {
+				enabled: true,
+				strategy: "claude-code",
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			openai: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
+			codex: {
+				pool: {
+					members: ["seat-a", "seat-b"],
+				},
+			},
 		},
-		provider_pools: { "anthropic-messages": ["claude-code", "second-claude"] },
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b"],
-			caller_provider_fallback: { "synthetic-device": "ordered" },
+		routing: {
+			routes: {
+				"anthropic-messages": ["claude-code", "second-claude"],
+			},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {
+				"synthetic-device": {
+					allow_fallbacks: true,
+				},
+			},
+			hold_seconds: 0,
 		},
 	},
 	fleet: [

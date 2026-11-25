@@ -9,7 +9,19 @@ export default defineScenario({
 		AGENT_SMITH_TRUST_LOOPBACK: "false",
 		AGENT_SMITH_ENROLLMENT_ORIGIN: "https://pool.example.test",
 	},
-	config: { team_routing: { enabled: false } },
+	config: {
+		providers: {
+			"claude-code": {
+				enabled: true,
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
+		},
+	},
 	fleet: [],
 	upstream: [
 		{

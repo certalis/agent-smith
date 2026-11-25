@@ -1,4 +1,4 @@
-import type { TeamRoutingConfig } from "@agent-smith/config";
+import type { ProviderPoolSettings } from "@agent-smith/config";
 import type { Provider, ProviderRegistry } from "@agent-smith/providers";
 import type { Account, AccountQuotaState } from "@agent-smith/types";
 import type { OutsideSpendTracker } from "./outside-spend";
@@ -34,7 +34,7 @@ export class QuotaProbe {
 	private timer: ReturnType<typeof setInterval> | undefined;
 
 	constructor(
-		private readonly config: () => TeamRoutingConfig,
+		private readonly config: () => ProviderPoolSettings,
 		private readonly store: QuotaStore,
 		private readonly outsideSpend: OutsideSpendTracker,
 		private readonly providers: Pick<ProviderRegistry, "getProvider">,
@@ -83,7 +83,7 @@ export class QuotaProbe {
 		this.intervalMs = 0;
 	}
 
-	private probeable(account: Account, config: TeamRoutingConfig): boolean {
+	private probeable(account: Account, config: ProviderPoolSettings): boolean {
 		const provider = this.providers.getProvider(account.provider);
 		return (
 			provider?.supportsQuotaProbe(account) === true &&

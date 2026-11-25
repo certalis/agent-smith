@@ -132,7 +132,7 @@ it("a settings reload keeps an in-flight token refresh deduplicated", async () =
 		});
 	};
 	const first = getValidAccessToken(selected, ctx);
-	ctx.runtime.teamRouting = { ...ctx.runtime.teamRouting, enabled: true };
+	ctx.runtime.pool = { ...ctx.runtime.pool, enabled: true };
 	const second = getValidAccessToken(selected, ctx);
 	expect(calls).toBe(1);
 	if (!finish) throw new Error("refresh did not start");

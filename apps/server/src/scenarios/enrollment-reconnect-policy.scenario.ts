@@ -1,6 +1,5 @@
 import {
 	confirm,
-	enrollmentConfig,
 	enrollmentEnvironment,
 	profileReply,
 	readAccounts,
@@ -47,11 +46,81 @@ export default defineScenario({
 	name: "enrollment reconnect refreshes one saved account while preserving operator policy and quota",
 	environment: enrollmentEnvironment,
 	config: {
-		...enrollmentConfig,
-		enrollment_emails: names.map((name) => `${name}@example.test`),
-		team_routing: {
-			...enrollmentConfig.team_routing,
-			allowlisted_account_uuids: allowlist,
+		enrollment_emails: [
+			"owner@example.test",
+			"missing@example.test",
+			"manual@example.test",
+			"unknown@example.test",
+			"excluded@example.test",
+		],
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					enabled: false,
+					members: [
+						"seat-owner",
+						"seat-missing",
+						"seat-manual",
+						"seat-unknown",
+					],
+					max_usage: 0.85,
+					admission: {
+						cap: 3,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					enabled: false,
+					members: [
+						"seat-owner",
+						"seat-missing",
+						"seat-manual",
+						"seat-unknown",
+					],
+					max_usage: 0.85,
+					admission: {
+						cap: 3,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					enabled: false,
+					members: [
+						"seat-owner",
+						"seat-missing",
+						"seat-manual",
+						"seat-unknown",
+					],
+					max_usage: 0.85,
+					admission: {
+						cap: 3,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					enabled: false,
+					members: [
+						"seat-owner",
+						"seat-missing",
+						"seat-manual",
+						"seat-unknown",
+					],
+					max_usage: 0.85,
+					admission: {
+						cap: 3,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "everyone",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	claudeOAuth: true,

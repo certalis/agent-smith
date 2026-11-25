@@ -28,7 +28,9 @@ import {
 	type ProviderWire,
 	type StrategyName,
 } from "@agent-smith/types";
+import { BUILTIN_PROVIDER_CONFIGS } from "./builtin-providers";
 import { resolveConfigPath } from "./paths";
+import { hasLegacyConfig, rewriteConfigFile } from "./rewrite-file";
 import {
 	sanitizeWindowWarmup,
 	WINDOW_WARMUP_DEFAULTS,
@@ -40,7 +42,6 @@ import {
 const log = new Logger("Config");
 
 export interface RuntimeConfig {
-	blockWhenAllFull: boolean;
 	clientId: string;
 	maxBodyBytes: number;
 	quotaThreshold: number;
@@ -49,10 +50,11 @@ export interface RuntimeConfig {
 	sessionDurationMs: number;
 	port: number;
 	storeRequestPayloads: boolean;
-	teamRouting: TeamRoutingConfig;
+	routing: RoutingConfig;
+	providerPools: Record<string, ProviderPoolSettings>;
 }
 
-export interface TeamRoutingConfig {
+export interface ProviderPoolSettings {
 	enabled: boolean;
 	distributionEnabled: boolean;
 	preferExpiringQuota: boolean;
@@ -61,13 +63,12 @@ export interface TeamRoutingConfig {
 	weeklyMaxUsage: number;
 	weeklyMaxUsageByEmail: Record<string, number>;
 	callerWeeklyMaxUsage: Record<string, number>;
-	callerProviderFallback: Record<string, "ordered">;
 	admissionCap: number;
 	admissionQueueLimit: number;
 	admissionWaitMs: number;
-	holdSeconds: number;
 	quotaProbeSeconds: number;
 	windowWarmup: WindowWarmupConfig;
+	blockWhenAllFull: boolean;
 }
 
 export type TeamRoutingFileConfig = {
@@ -124,6 +125,36 @@ export type ProviderFileConfig = {
 	strategy?: ProviderStrategy;
 	base_url?: string;
 	models?: Record<string, string>;
+	pool?: ProviderPoolFileConfig;
+};
+
+export type ProviderPoolFileConfig = {
+	enabled?: boolean;
+	members?: string[];
+	distribution_enabled?: boolean;
+	prefer_expiring_quota?: boolean;
+	max_usage?: number;
+	weekly_max_usage?: number;
+	weekly_max_usage_by_email?: Record<string, number>;
+	caller_weekly_max_usage?: Record<string, number>;
+	admission?: { cap?: number; queue_limit?: number; wait_ms?: number };
+	quota_probe_seconds?: number;
+	window_warmup?: WindowWarmupFileConfig;
+	block_when_all_full?: boolean;
+};
+
+export type RoutingFileConfig = {
+	routes?: ProviderPoolsFileConfig;
+	api_key_accounts?: "everyone" | "chooser_or_fallback";
+	callers?: Record<string, { allow_fallbacks: boolean }>;
+	hold_seconds?: number;
+};
+
+export type RoutingConfig = {
+	routes: ProviderPoolsFileConfig;
+	apiKeyAccounts: "everyone" | "chooser_or_fallback";
+	callers: Record<string, { allowFallbacks: boolean }>;
+	holdSeconds: number;
 };
 
 export type ProviderConfig = {
@@ -132,6 +163,7 @@ export type ProviderConfig = {
 	strategy: ProviderStrategy;
 	baseUrl?: string;
 	models?: Record<string, string>;
+	pool?: ProviderPoolFileConfig;
 };
 
 export type ProviderPoolsFileConfig = Partial<Record<ProviderWire, string[]>>;
@@ -153,14 +185,7 @@ export type ClientRoutingConfig = {
 	poolSshHost?: string;
 };
 
-const BUILTIN_PROVIDER_CONFIGS: readonly ProviderConfig[] = [
-	{ name: "anthropic", enabled: true, strategy: "anthropic-api" },
-	{ name: "openai", enabled: true, strategy: "openai-api" },
-	{ name: "claude-code", enabled: false, strategy: "claude-code" },
-	{ name: "codex", enabled: false, strategy: "codex" },
-] as const;
-
-const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map(
+const BUILTIN_PROVIDER_CONFIG_BY_NAME = new Map<string, ProviderConfig>(
 	BUILTIN_PROVIDER_CONFIGS.map((provider) => [provider.name, provider]),
 );
 const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -168,7 +193,7 @@ const POOL_SSH_HOST_PATTERN = /^\w[\w.-]{0,127}(@\w[\w.-]{0,127})?$/;
 const CALLER_ID_PATTERN = /^[-a-zA-Z0-9_]{1,64}$/;
 const MAX_CALLERS = 128;
 
-const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
+export const POOL_DEFAULTS: ProviderPoolSettings = {
 	enabled: false,
 	distributionEnabled: true,
 	preferExpiringQuota: false,
@@ -177,14 +202,28 @@ const TEAM_ROUTING_DEFAULTS: TeamRoutingConfig = {
 	weeklyMaxUsage: 0.95,
 	weeklyMaxUsageByEmail: {},
 	callerWeeklyMaxUsage: {},
-	callerProviderFallback: {},
 	admissionCap: 5,
 	admissionQueueLimit: 25,
 	admissionWaitMs: 30_000,
-	holdSeconds: 0,
 	quotaProbeSeconds: 0,
 	windowWarmup: WINDOW_WARMUP_DEFAULTS,
+	blockWhenAllFull: true,
 };
+
+/** Provider-specific view for Pool execution; routing policy stays global. */
+export type ResolvedRuntimeConfig = RuntimeConfig & {
+	pool: ProviderPoolSettings;
+};
+
+export function runtimeForProvider(
+	runtime: RuntimeConfig,
+	provider: string,
+): ResolvedRuntimeConfig {
+	return {
+		...runtime,
+		pool: runtime.providerPools[provider] ?? { ...POOL_DEFAULTS },
+	};
+}
 
 export interface ConfigData {
 	lb_strategy?: StrategyName;
@@ -202,6 +241,7 @@ export interface ConfigData {
 	team_routing?: TeamRoutingFileConfig;
 	providers?: Record<string, ProviderFileConfig>;
 	provider_pools?: ProviderPoolsFileConfig;
+	routing?: RoutingFileConfig;
 	client?: ClientRoutingFileConfig;
 	enrollment_emails?: string[];
 	alerts?: AlertsFileConfig;
@@ -214,6 +254,7 @@ export interface ConfigData {
 		| TeamRoutingFileConfig
 		| Record<string, ProviderFileConfig>
 		| ProviderPoolsFileConfig
+		| RoutingFileConfig
 		| ClientRoutingFileConfig
 		| AlertsFileConfig
 		| undefined;
@@ -282,6 +323,11 @@ function sanitizeConfigData(value: unknown): ConfigData {
 		if (key === "provider_pools") {
 			const providerPools = sanitizeProviderPools(entry);
 			if (providerPools) sanitized.provider_pools = providerPools;
+			continue;
+		}
+		if (key === "routing") {
+			const routing = sanitizeRouting(entry);
+			if (routing) sanitized.routing = routing;
 			continue;
 		}
 		if (key === "client") {
@@ -485,6 +531,8 @@ function sanitizeProviderConfigs(
 		if (baseUrl) provider.base_url = baseUrl;
 		const models = sanitizeProviderModels(entry.models);
 		if (models) provider.models = models;
+		const pool = sanitizeProviderPool(entry.pool);
+		if (pool) provider.pool = pool;
 		providers[name] = provider;
 	}
 
@@ -629,6 +677,120 @@ function sanitizeTeamRouting(
 	return result;
 }
 
+function sanitizeProviderPool(
+	value: unknown,
+): ProviderPoolFileConfig | undefined {
+	if (!isRecord(value)) return undefined;
+	const legacy: Record<string, unknown> = {
+		...value,
+		allowlisted_account_uuids: value.members,
+	};
+	if (isRecord(value.admission)) {
+		legacy.admission_cap = value.admission.cap;
+		legacy.admission_queue_limit = value.admission.queue_limit;
+		legacy.admission_wait_ms = value.admission.wait_ms;
+	}
+	const sanitized = sanitizeTeamRouting(legacy);
+	if (!sanitized) return undefined;
+	const pool: ProviderPoolFileConfig = {};
+	if (typeof value.enabled === "boolean") pool.enabled = value.enabled;
+	if (sanitized.allowlisted_account_uuids)
+		pool.members = sanitized.allowlisted_account_uuids;
+	for (const field of [
+		"distribution_enabled",
+		"prefer_expiring_quota",
+		"max_usage",
+		"weekly_max_usage",
+		"weekly_max_usage_by_email",
+		"caller_weekly_max_usage",
+		"quota_probe_seconds",
+		"window_warmup",
+	] as const) {
+		if (sanitized[field] !== undefined)
+			Object.assign(pool, { [field]: sanitized[field] });
+	}
+	if (isRecord(value.admission)) {
+		pool.admission = {
+			...(sanitized.admission_cap !== undefined && {
+				cap: sanitized.admission_cap,
+			}),
+			...(sanitized.admission_queue_limit !== undefined && {
+				queue_limit: sanitized.admission_queue_limit,
+			}),
+			...(sanitized.admission_wait_ms !== undefined && {
+				wait_ms: sanitized.admission_wait_ms,
+			}),
+		};
+	}
+	if (typeof value.block_when_all_full === "boolean")
+		pool.block_when_all_full = value.block_when_all_full;
+	return pool;
+}
+
+function sanitizeRouting(value: unknown): RoutingFileConfig | undefined {
+	if (!isRecord(value)) return undefined;
+	const routing: RoutingFileConfig = {};
+	const routes = sanitizeProviderPools(value.routes);
+	if (routes) routing.routes = routes;
+	if (
+		value.api_key_accounts === "everyone" ||
+		value.api_key_accounts === "chooser_or_fallback"
+	)
+		routing.api_key_accounts = value.api_key_accounts;
+	if (isNonNegativeFiniteNumber(value.hold_seconds))
+		routing.hold_seconds = Math.floor(value.hold_seconds);
+	if (isRecord(value.callers)) {
+		const entries = Object.entries(value.callers);
+		if (
+			entries.length <= MAX_CALLERS &&
+			entries.every(
+				([caller, policy]) =>
+					CALLER_ID_PATTERN.test(caller) &&
+					isRecord(policy) &&
+					typeof policy.allow_fallbacks === "boolean",
+			)
+		) {
+			routing.callers = Object.fromEntries(
+				entries.map(([caller, policy]) => [
+					caller,
+					{
+						allow_fallbacks: (policy as { allow_fallbacks: boolean })
+							.allow_fallbacks,
+					},
+				]),
+			);
+		}
+	}
+	return routing;
+}
+
+function migrateLegacyConfig(path: string, parsed: unknown): unknown {
+	let current = parsed;
+	for (let attempt = 0; attempt < 3 && hasLegacyConfig(current); attempt++) {
+		try {
+			const result = rewriteConfigFile(path);
+			if (result.changed)
+				log.info(`Rewrote config ${path}; backup: ${result.backup}`);
+			current = JSON.parse(readFileSync(path, "utf8")) as unknown;
+		} catch (error) {
+			const reason =
+				error instanceof SyntaxError
+					? "invalid JSON"
+					: error instanceof Error
+						? error.message
+						: String(error);
+			throw new Error(
+				`Could not rewrite legacy config ${path}: ${reason}. Run: agent-smith config rewrite`,
+			);
+		}
+	}
+	if (hasLegacyConfig(current))
+		throw new Error(
+			`Config ${path} kept changing while rewriting. Run: agent-smith config rewrite`,
+		);
+	return current;
+}
+
 export function readClientRouting(
 	configPath = resolveConfigPath(),
 ): ClientRoutingConfig {
@@ -638,6 +800,7 @@ export function readClientRouting(
 	} catch {
 		throw new Error("Agent Smith client config could not be read");
 	}
+	data = migrateLegacyConfig(configPath, data);
 	if (
 		!isRecord(data) ||
 		(data.client !== undefined && !isRecord(data.client)) ||
@@ -674,14 +837,17 @@ export class Config extends EventEmitter {
 
 	private loadConfig(): void {
 		if (existsSync(this.configPath)) {
+			let parsed: unknown;
 			try {
 				const content = readFileSync(this.configPath, "utf8");
-				this.data = sanitizeConfigData(JSON.parse(content));
+				parsed = JSON.parse(content);
 			} catch (error) {
 				log.error(`Failed to parse config file: ${error}`);
 				this.data = {};
 				return;
 			}
+			parsed = migrateLegacyConfig(this.configPath, parsed);
+			this.data = sanitizeConfigData(parsed);
 
 			try {
 				chmodSync(this.configPath, 0o600);
@@ -849,35 +1015,43 @@ export class Config extends EventEmitter {
 		};
 	}
 
-	getTeamRouting(): TeamRoutingConfig {
-		const file = this.data.team_routing;
+	getRouting(): RoutingConfig {
+		const routing = this.data.routing;
 		return {
-			enabled: file?.enabled ?? TEAM_ROUTING_DEFAULTS.enabled,
+			routes: structuredClone(routing?.routes ?? {}),
+			apiKeyAccounts: routing?.api_key_accounts ?? "everyone",
+			callers: Object.fromEntries(
+				Object.entries(routing?.callers ?? {}).map(([name, policy]) => [
+					name,
+					{ allowFallbacks: policy.allow_fallbacks },
+				]),
+			),
+			holdSeconds: routing?.hold_seconds ?? 0,
+		};
+	}
+
+	getTeamRouting(providerName: string): ProviderPoolSettings {
+		const pool = this.data.providers?.[providerName]?.pool;
+		return {
+			enabled: pool !== undefined && pool.enabled !== false,
 			distributionEnabled:
-				file?.distribution_enabled ?? TEAM_ROUTING_DEFAULTS.distributionEnabled,
+				pool?.distribution_enabled ?? POOL_DEFAULTS.distributionEnabled,
 			preferExpiringQuota:
-				file?.prefer_expiring_quota ??
-				TEAM_ROUTING_DEFAULTS.preferExpiringQuota,
-			allowlistedAccountUuids: [
-				...(file?.allowlisted_account_uuids ??
-					TEAM_ROUTING_DEFAULTS.allowlistedAccountUuids),
-			],
-			maxUsage: file?.max_usage ?? TEAM_ROUTING_DEFAULTS.maxUsage,
-			weeklyMaxUsage:
-				file?.weekly_max_usage ?? TEAM_ROUTING_DEFAULTS.weeklyMaxUsage,
-			weeklyMaxUsageByEmail: { ...file?.weekly_max_usage_by_email },
-			callerWeeklyMaxUsage: { ...file?.caller_weekly_max_usage },
-			callerProviderFallback: { ...file?.caller_provider_fallback },
-			admissionCap: file?.admission_cap ?? TEAM_ROUTING_DEFAULTS.admissionCap,
+				pool?.prefer_expiring_quota ?? POOL_DEFAULTS.preferExpiringQuota,
+			allowlistedAccountUuids: [...(pool?.members ?? [])],
+			maxUsage: pool?.max_usage ?? POOL_DEFAULTS.maxUsage,
+			weeklyMaxUsage: pool?.weekly_max_usage ?? POOL_DEFAULTS.weeklyMaxUsage,
+			weeklyMaxUsageByEmail: { ...pool?.weekly_max_usage_by_email },
+			callerWeeklyMaxUsage: { ...pool?.caller_weekly_max_usage },
+			admissionCap: pool?.admission?.cap ?? POOL_DEFAULTS.admissionCap,
 			admissionQueueLimit:
-				file?.admission_queue_limit ??
-				TEAM_ROUTING_DEFAULTS.admissionQueueLimit,
+				pool?.admission?.queue_limit ?? POOL_DEFAULTS.admissionQueueLimit,
 			admissionWaitMs:
-				file?.admission_wait_ms ?? TEAM_ROUTING_DEFAULTS.admissionWaitMs,
-			holdSeconds: file?.hold_seconds ?? TEAM_ROUTING_DEFAULTS.holdSeconds,
+				pool?.admission?.wait_ms ?? POOL_DEFAULTS.admissionWaitMs,
 			quotaProbeSeconds:
-				file?.quota_probe_seconds ?? TEAM_ROUTING_DEFAULTS.quotaProbeSeconds,
-			windowWarmup: windowWarmupConfig(file?.window_warmup),
+				pool?.quota_probe_seconds ?? POOL_DEFAULTS.quotaProbeSeconds,
+			windowWarmup: windowWarmupConfig(pool?.window_warmup),
+			blockWhenAllFull: pool?.block_when_all_full !== false,
 		};
 	}
 
@@ -901,11 +1075,6 @@ export class Config extends EventEmitter {
 		this.persistStrictly("client", { ...this.data.client, enabled });
 	}
 
-	/** On unless the file says `false`: a full fleet refuses requests rather than spend extra usage. */
-	getBlockWhenAllFull(): boolean {
-		return this.data.block_when_all_full !== false;
-	}
-
 	getProviderConfig(name: string): ProviderConfig | undefined {
 		const builtin = BUILTIN_PROVIDER_CONFIG_BY_NAME.get(name);
 		const configured = this.data.providers?.[name];
@@ -917,11 +1086,12 @@ export class Config extends EventEmitter {
 			strategy: configured?.strategy ?? builtin?.strategy ?? "anthropic-api",
 			...(configured?.base_url && { baseUrl: configured.base_url }),
 			...(configured?.models && { models: { ...configured.models } }),
+			...(configured?.pool && { pool: structuredClone(configured.pool) }),
 		};
 	}
 
 	getProviderPool(wire: ProviderWire): string[] {
-		return (this.data.provider_pools?.[wire] ?? []).filter((name) => {
+		return (this.data.routing?.routes?.[wire] ?? []).filter((name) => {
 			const provider = this.getProviderConfig(name);
 			return (
 				provider?.enabled === true &&
@@ -939,7 +1109,9 @@ export class Config extends EventEmitter {
 	}
 
 	getProviderConfigs(): ProviderConfig[] {
-		const names = new Set(BUILTIN_PROVIDER_CONFIGS.map(({ name }) => name));
+		const names = new Set<string>(
+			BUILTIN_PROVIDER_CONFIGS.map(({ name }) => name),
+		);
 		for (const name of Object.keys(this.data.providers ?? {})) {
 			names.add(name);
 		}
@@ -948,94 +1120,126 @@ export class Config extends EventEmitter {
 			.filter((provider): provider is ProviderConfig => provider !== undefined);
 	}
 
-	/**
-	 * Replaces the team-routing policy as one validated unit. This deliberately
-	 * does not accept unknown fields: an operator should never believe an
-	 * admission or quota guard is enabled when its setting was ignored.
-	 */
-	setTeamRouting(value: unknown): void {
-		if (!isRecord(value)) {
-			throw new Error("team routing configuration must be an object");
-		}
+	getProviderPoolSettings(): Record<string, ProviderPoolSettings> {
+		return Object.fromEntries(
+			this.getProviderConfigs().map((provider) => [
+				provider.name,
+				this.getTeamRouting(provider.name),
+			]),
+		);
+	}
+
+	getProviderPoolConfig(name: string): ProviderPoolFileConfig | undefined {
+		const pool = this.data.providers?.[name]?.pool;
+		return pool ? structuredClone(pool) : undefined;
+	}
+
+	setProviderPool(name: string, value: unknown): void {
+		if (!this.getProviderConfig(name)) throw new Error("Unknown provider");
+		if (!isRecord(value))
+			throw new Error("Provider pool configuration must be an object");
 		const allowed = new Set([
 			"enabled",
+			"members",
 			"distribution_enabled",
 			"prefer_expiring_quota",
-			"allowlisted_account_uuids",
 			"max_usage",
 			"weekly_max_usage",
 			"weekly_max_usage_by_email",
 			"caller_weekly_max_usage",
-			"caller_provider_fallback",
-			"admission_cap",
-			"admission_queue_limit",
-			"admission_wait_ms",
-			"hold_seconds",
+			"admission",
 			"quota_probe_seconds",
 			"window_warmup",
+			"block_when_all_full",
 		]);
-		if (Object.keys(value).some((key) => !allowed.has(key))) {
-			throw new Error("team routing configuration contains an unknown field");
-		}
-		const sanitized = sanitizeTeamRouting(value);
-		if (!sanitized) {
-			throw new Error("team routing configuration must be an object");
-		}
-		for (const key of Object.keys(value)) {
-			if (!(key in sanitized)) {
-				throw new Error(`Invalid team routing field: ${key}`);
-			}
-		}
-		const oldValue = this.data.team_routing;
-		// The public GET omits this private map; routine edits must not erase it.
+		if (Object.keys(value).some((key) => !allowed.has(key)))
+			throw new Error("Provider pool contains an unknown field");
+		const sanitized = sanitizeProviderPool(value);
+		if (!sanitized) throw new Error("Invalid provider pool");
+		for (const key of Object.keys(value))
+			if (!(key in sanitized))
+				throw new Error(`Invalid provider pool field: ${key}`);
 		if (
-			!("weekly_max_usage_by_email" in value) &&
-			oldValue?.weekly_max_usage_by_email
-		) {
-			sanitized.weekly_max_usage_by_email = {
-				...oldValue.weekly_max_usage_by_email,
-			};
-		}
+			isRecord(value.admission) &&
+			Object.keys(value.admission).some(
+				(key) =>
+					!["cap", "queue_limit", "wait_ms"].includes(key) ||
+					!(key in (sanitized.admission ?? {})),
+			)
+		)
+			throw new Error("Invalid admission field");
+		const old = this.getProviderPoolConfig(name) ?? { enabled: false };
+		this.persistStrictly("providers", {
+			...this.data.providers,
+			[name]: {
+				...this.data.providers?.[name],
+				pool: { ...old, ...sanitized },
+			},
+		});
+	}
+
+	removeProviderPool(name: string): void {
+		const provider = this.data.providers?.[name];
+		if (!provider?.pool) return;
+		const { pool: _pool, ...rest } = provider;
+		this.persistStrictly("providers", { ...this.data.providers, [name]: rest });
+	}
+
+	setRouting(value: unknown): void {
+		if (!isRecord(value))
+			throw new Error("Routing configuration must be an object");
+		const allowed = new Set([
+			"routes",
+			"api_key_accounts",
+			"callers",
+			"hold_seconds",
+		]);
+		if (Object.keys(value).some((key) => !allowed.has(key)))
+			throw new Error("Routing contains an unknown field");
+		const sanitized = sanitizeRouting(value);
+		if (!sanitized) throw new Error("Invalid routing configuration");
+		for (const key of Object.keys(value))
+			if (!(key in sanitized)) throw new Error(`Invalid routing field: ${key}`);
 		if (
-			!("caller_weekly_max_usage" in value) &&
-			oldValue?.caller_weekly_max_usage
-		) {
-			sanitized.caller_weekly_max_usage = {
-				...oldValue.caller_weekly_max_usage,
-			};
-		}
-		if (
-			!("caller_provider_fallback" in value) &&
-			oldValue?.caller_provider_fallback
-		) {
-			sanitized.caller_provider_fallback = {
-				...oldValue.caller_provider_fallback,
-			};
-		}
-		this.persistStrictly("team_routing", sanitized);
+			"routes" in value &&
+			(!isRecord(value.routes) ||
+				Object.entries(value.routes).some(
+					([wire, providers]) =>
+						!isProviderWire(wire) ||
+						!Array.isArray(providers) ||
+						providers.some(
+							(provider) =>
+								typeof provider !== "string" ||
+								!PROVIDER_NAME_PATTERN.test(provider),
+						),
+				))
+		)
+			throw new Error("Invalid routing field: routes");
+		this.persistStrictly("routing", { ...this.data.routing, ...sanitized });
 	}
 
 	/** Persist a consented seat without changing routing enablement or limits. */
-	allowAccountUuid(accountUuid: string): void {
-		const current = this.getTeamRouting().allowlistedAccountUuids;
+	allowAccountUuid(provider: string, accountUuid: string): void {
+		const current = this.getTeamRouting(provider).allowlistedAccountUuids;
 		if (current.includes(accountUuid)) return;
-		this.persistAccountAllowlist([...current, accountUuid]);
+		this.persistAccountAllowlist(provider, [...current, accountUuid]);
 	}
 
 	/** Remove only this membership, with the same strict persistence as enrollment. */
-	removeAccountUuid(accountUuid: string): void {
-		const current = this.getTeamRouting().allowlistedAccountUuids;
+	removeAccountUuid(provider: string, accountUuid: string): void {
+		const current = this.getTeamRouting(provider).allowlistedAccountUuids;
 		if (!current.includes(accountUuid)) return;
 		this.persistAccountAllowlist(
+			provider,
 			current.filter((uuid) => uuid !== accountUuid),
 		);
 	}
 
-	private persistAccountAllowlist(accountUuids: string[]): void {
-		this.persistStrictly("team_routing", {
-			...this.data.team_routing,
-			allowlisted_account_uuids: accountUuids,
-		});
+	private persistAccountAllowlist(
+		provider: string,
+		accountUuids: string[],
+	): void {
+		this.setProviderPool(provider, { members: accountUuids });
 	}
 
 	getEnrollmentEmails(): string[] {
@@ -1073,7 +1277,7 @@ export class Config extends EventEmitter {
 
 	/** Atomic write that throws, unlike saveConfig, so a caller can roll back. */
 	private persistStrictly<
-		K extends "team_routing" | "enrollment_emails" | "client",
+		K extends "enrollment_emails" | "client" | "providers" | "routing",
 	>(key: K, value: NonNullable<ConfigData[K]>): void {
 		const next: ConfigData = { ...this.data, [key]: value };
 		this.writePrivately(next);
@@ -1085,7 +1289,6 @@ export class Config extends EventEmitter {
 	getRuntime(): RuntimeConfig {
 		// Default values
 		const defaults: RuntimeConfig = {
-			blockWhenAllFull: this.getBlockWhenAllFull(),
 			clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
 			maxBodyBytes: 64 * 1024 * 1024,
 			quotaThreshold: 0.98,
@@ -1098,7 +1301,8 @@ export class Config extends EventEmitter {
 			sessionDurationMs: TIME_CONSTANTS.SESSION_DURATION_DEFAULT,
 			port: NETWORK.DEFAULT_PORT,
 			storeRequestPayloads: this.storesRequestPayloads(),
-			teamRouting: this.getTeamRouting(),
+			routing: this.getRouting(),
+			providerPools: this.getProviderPoolSettings(),
 		};
 
 		// Override with environment variables if present
@@ -1186,6 +1390,8 @@ export class Config extends EventEmitter {
 
 export { resolveConfigPath } from "./paths";
 export { getPlatformConfigDir } from "./paths-common";
+export { rewriteLegacyConfig } from "./rewrite-config";
+export { rewriteConfigFile } from "./rewrite-file";
 export {
 	nextWindowWarmupAt,
 	WINDOW_WARMUP_DEFAULTS,

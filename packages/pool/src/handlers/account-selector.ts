@@ -5,7 +5,6 @@ import {
 	type AccountProvider,
 	isCurrentQuotaWindow,
 	isOpenQuotaWindow,
-	type PoolStatus,
 	quotaThresholdFor,
 	type RequestMeta,
 } from "@agent-smith/types";
@@ -14,13 +13,13 @@ import { isAllowlisted, type TeamRoutingRequest } from "../seat-router";
 import { soonestWeeklyReset } from "../seat-usage";
 import { refreshBackoffUntil } from "./token-manager";
 
-type EligibilityContext = Pick<PoolContext, "runtime" | "dbOps">;
+type EligibilityContext = Pick<ResolvedPoolContext, "runtime" | "dbOps">;
 type SeatPolicyContext = {
-	runtime: Pick<PoolContext["runtime"], "quotaThreshold" | "teamRouting">;
+	runtime: Pick<ResolvedPoolContext["runtime"], "quotaThreshold" | "pool">;
 	dbOps: Pick<PoolContext["dbOps"], "getEnrollmentContact">;
 };
 type PoolStatusContext = Pick<
-	PoolContext,
+	ResolvedPoolContext,
 	"runtime" | "dbOps" | "providerRegistry"
 >;
 
@@ -74,7 +73,7 @@ function pooledMaxUsage(
 	ctx: SeatPolicyContext,
 	callerId?: string,
 ): PoolUsageCap | undefined {
-	const teamRouting = ctx.runtime.teamRouting;
+	const teamRouting = ctx.runtime.pool;
 	if (teamRouting?.enabled !== true || !isAllowlisted(account, teamRouting))
 		return undefined;
 	if (!provider.isWeeklyBucket(bucket)) {
@@ -146,7 +145,7 @@ function fleetAccounts(
 }
 
 function isFleetSeat(account: Account, ctx: SeatPolicyContext): boolean {
-	const teamRouting = ctx.runtime.teamRouting;
+	const teamRouting = ctx.runtime.pool;
 	return (
 		!account.paused &&
 		(teamRouting?.enabled !== true || isAllowlisted(account, teamRouting))
@@ -379,21 +378,19 @@ export function getPoolStatus(
 	provider: AccountProvider,
 	model: string | undefined,
 	ctx: PoolStatusContext,
-): PoolStatus {
+): import("@agent-smith/capacity").ProviderStatus {
 	const providerStrategy = ctx.providerRegistry.getProvider(provider);
 	if (!providerStrategy) throw new Error(`Unknown provider '${provider}'`);
-	const config = ctx.runtime.teamRouting;
+	const config = ctx.runtime.pool;
 	const now = Date.now();
 	const accounts = config?.enabled ? fleetAccounts(provider, ctx) : [];
 	const eligibleAccounts = accounts.filter((account) =>
 		isServableSeat(providerStrategy, account, model, ctx, now),
 	).length;
 	return {
-		version: 1,
-		provider,
-		routingEnabled: config?.enabled === true,
-		eligibleAccounts,
-		retryAtMs:
+		poolEnabled: config.enabled,
+		servableSeats: eligibleAccounts,
+		retryAt:
 			eligibleAccounts === 0
 				? soonestServableAt(
 						providerStrategy,
@@ -404,7 +401,6 @@ export function getPoolStatus(
 						now,
 					)
 				: null,
-		holdSeconds: config?.holdSeconds ?? 0,
 		admissionWaitMs: config?.admissionWaitMs ?? 0,
 	};
 }
@@ -419,15 +415,22 @@ export function getProviderCallerStatus(
 ): import("@agent-smith/capacity").ProviderStatus {
 	const strategy = ctx.providerRegistry.getProvider(provider);
 	if (!strategy) throw new Error(`Unknown provider '${provider}'`);
-	const config = ctx.runtime.teamRouting;
+	const config = ctx.runtime.pool;
 	const now = Date.now();
 	const accounts = config.enabled
 		? callerPoolAccounts(provider, ctx, apiKeyAccounts)
-		: [];
+		: ctx.dbOps
+				.getAccountsByProvider(provider)
+				.filter(
+					(account) =>
+						!account.paused &&
+						(apiKeyAccounts || account.auth_method !== "api_key"),
+				);
 	const servableSeats = accounts.filter((account) =>
 		isServableNow(strategy, account, model, ctx, now, callerId),
 	).length;
 	return {
+		poolEnabled: config.enabled,
 		servableSeats,
 		retryAt:
 			servableSeats === 0
@@ -511,7 +514,7 @@ function selectRevalidationProbe(
 		.filter((account) => {
 			// A real-client probe remains available for ordinary accounts. It must
 			// never bypass a weekly ceiling that applies to a pooled account.
-			const routing = ctx.runtime.teamRouting;
+			const routing = ctx.runtime.pool;
 			return (
 				routing?.enabled !== true ||
 				!isAllowlisted(account, routing) ||
@@ -568,7 +571,8 @@ export function getOrderedAccounts(
 	const candidates =
 		eligible.length > 0
 			? eligible
-			: options.allowRevalidationProbe === false || ctx.runtime.blockWhenAllFull
+			: options.allowRevalidationProbe === false ||
+					ctx.runtime.pool.blockWhenAllFull
 				? []
 				: selectRevalidationProbe(
 						providerAccounts,
@@ -591,7 +595,7 @@ export function getOrderedAccounts(
 			: ctx.teamRouter?.order(
 					ordered,
 					teamRequest,
-					ctx.runtime.teamRouting,
+					ctx.runtime.pool,
 					ctx.provider,
 					ctx.dbOps,
 				)) ?? ordered

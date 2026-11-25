@@ -1,4 +1,4 @@
-import type { RuntimeConfig } from "@agent-smith/config";
+import type { ResolvedRuntimeConfig, RuntimeConfig } from "@agent-smith/config";
 import type { AsyncDbWriter, DatabaseOperations } from "@agent-smith/database";
 import type { Provider, ProviderRegistry } from "@agent-smith/providers";
 import type {
@@ -28,6 +28,7 @@ export interface PoolContext {
 }
 
 export interface ResolvedPoolContext extends PoolContext {
+	runtime: ResolvedRuntimeConfig;
 	provider: Provider;
 	providerName: AccountProvider;
 	upstreamPath: string;

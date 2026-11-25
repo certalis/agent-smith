@@ -11,7 +11,7 @@ function requestFor(attempts: ProxyAttempt[]): PoolAttemptRequest {
 	return {
 		req: new Request("http://localhost/test"),
 		ctx: {
-			runtime: { teamRouting: { enabled: false } },
+			runtime: { pool: { enabled: false } },
 			provider: {},
 			providerName: "fake",
 		},
@@ -120,7 +120,7 @@ test.each([
 	const request = requestFor([
 		{ kind: "response", response: new Response("body") },
 	]);
-	request.ctx.runtime.teamRouting.enabled = true;
+	request.ctx.runtime.pool.enabled = true;
 	request.ctx.teamAdmission = {
 		acquire: async () => ({
 			release: () => {
@@ -140,7 +140,7 @@ test.each([
 test("an exhausted attempt releases its admission permit", async () => {
 	let released = 0;
 	const request = requestFor([{ kind: "quota-rate-limit", forward }]);
-	request.ctx.runtime.teamRouting.enabled = true;
+	request.ctx.runtime.pool.enabled = true;
 	request.ctx.teamAdmission = {
 		acquire: async () => ({
 			release: () => {
@@ -210,8 +210,8 @@ test("a provider object selects and serves its own available account", async () 
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: { enabled: false },
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: false } },
 		},
 		strategy: { select: (accounts: Account[]) => accounts },
 		dbOps: {
@@ -265,7 +265,10 @@ test("a provider without a team pool reports a usable direct account", async () 
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			teamRouting: { enabled: false, holdSeconds: 0, admissionWaitMs: 0 },
+			routing: { holdSeconds: 0 },
+			providerPools: {
+				[provider.name]: { enabled: false, admissionWaitMs: 0 },
+			},
 		},
 		dbOps: {
 			getAvailableAccountsByProvider: () => [seat],
@@ -304,7 +307,7 @@ test("replacing settings during an open stream preserves and releases its permit
 	const request = requestFor([
 		{ kind: "response", response: new Response("body") },
 	]);
-	request.ctx.runtime.teamRouting.enabled = true;
+	request.ctx.runtime.pool.enabled = true;
 	request.ctx.teamAdmission = {
 		acquire: async () => {
 			active += 1;
@@ -318,8 +321,8 @@ test("replacing settings during an open stream preserves and releases its permit
 	const outcome = await serveSelectedAccounts(request, [account], "direct");
 	if (outcome.kind !== "final") throw new Error("expected final");
 	expect(active).toBe(1);
-	request.ctx.runtime.teamRouting = {
-		...request.ctx.runtime.teamRouting,
+	request.ctx.runtime.pool = {
+		...request.ctx.runtime.pool,
 		enabled: false,
 	};
 	expect(active).toBe(1);
@@ -338,8 +341,8 @@ test("websocket selection has no admission permit or in-flight count", async () 
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: { enabled: true },
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: true } },
 		},
 		strategy: { select: (accounts: Account[]) => accounts },
 		dbOps: {
@@ -404,14 +407,17 @@ test("caller status counts an API-key account when ordered fallback reaches it",
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			teamRouting: {
-				enabled: true,
-				allowlistedAccountUuids: [],
-				maxUsage: 0.9,
-				weeklyMaxUsage: 0.9,
-				weeklyMaxUsageByEmail: {},
-				callerWeeklyMaxUsage: {},
-				admissionWaitMs: 100,
+			routing: { holdSeconds: 0 },
+			providerPools: {
+				[provider.name]: {
+					enabled: true,
+					allowlistedAccountUuids: [],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.9,
+					weeklyMaxUsageByEmail: {},
+					callerWeeklyMaxUsage: {},
+					admissionWaitMs: 100,
+				},
 			},
 		},
 		dbOps: {
@@ -444,6 +450,7 @@ test("caller status counts an API-key account when ordered fallback reaches it",
 		signal: new AbortController().signal,
 	} as const;
 	expect(await supply.status(route)).toEqual({
+		poolEnabled: true,
 		servableSeats: 1,
 		retryAt: null,
 		admissionWaitMs: 100,
@@ -506,7 +513,11 @@ test("availability checks the serving provider's mapped model buckets", async ()
 		},
 	} as unknown as Account;
 	const ctx = {
-		runtime: { quotaThreshold: 0.98, teamRouting: { enabled: false } },
+		runtime: {
+			quotaThreshold: 0.98,
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: false } },
+		},
 		dbOps: {
 			getAvailableAccountsByProvider: () => [blocked],
 			getAccountsByProvider: () => [blocked],
@@ -593,14 +604,16 @@ test.each([
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: {
-				enabled: true,
-				allowlistedAccountUuids: ["wanted-uuid", "other-uuid"],
-				maxUsage: 0.9,
-				weeklyMaxUsage: 0.9,
-				weeklyMaxUsageByEmail: {},
-				callerWeeklyMaxUsage: {},
+			routing: { holdSeconds: 0 },
+			providerPools: {
+				[provider.name]: {
+					enabled: true,
+					allowlistedAccountUuids: ["wanted-uuid", "other-uuid"],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.9,
+					weeklyMaxUsageByEmail: {},
+					callerWeeklyMaxUsage: {},
+				},
 			},
 		},
 		strategy: { select: (seats: Account[]) => seats },
@@ -680,7 +693,7 @@ test("a failed response stream releases its permit", async () => {
 	const request = requestFor([
 		{ kind: "response", response: new Response(body) },
 	]);
-	request.ctx.runtime.teamRouting.enabled = true;
+	request.ctx.runtime.pool.enabled = true;
 	request.ctx.teamAdmission = {
 		acquire: async () => ({
 			release: () => {
@@ -749,8 +762,8 @@ test("preparing and serving a route keeps selected accounts inside the pool and 
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: { enabled: false },
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: false } },
 		},
 		strategy: { select: (accounts: Account[]) => accounts },
 		dbOps: {
@@ -823,14 +836,17 @@ test("caller status maps the requested model exactly once", async () => {
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			teamRouting: {
-				enabled: true,
-				allowlistedAccountUuids: [],
-				maxUsage: 0.9,
-				weeklyMaxUsage: 0.9,
-				weeklyMaxUsageByEmail: {},
-				callerWeeklyMaxUsage: {},
-				admissionWaitMs: 100,
+			routing: { holdSeconds: 0 },
+			providerPools: {
+				[provider.name]: {
+					enabled: true,
+					allowlistedAccountUuids: [],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.9,
+					weeklyMaxUsageByEmail: {},
+					callerWeeklyMaxUsage: {},
+					admissionWaitMs: 100,
+				},
 			},
 		},
 		dbOps: {
@@ -864,6 +880,7 @@ test("caller status maps the requested model exactly once", async () => {
 		signal: new AbortController().signal,
 	} as const;
 	expect(await supply.status(route)).toEqual({
+		poolEnabled: true,
 		servableSeats: 0,
 		retryAt: now + 60_000,
 		admissionWaitMs: 100,
@@ -906,8 +923,8 @@ test("a pooled thread uses the serving provider session parser while pins use th
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: { enabled: false },
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: false } },
 		},
 		strategy: { select: (accounts: Account[]) => accounts },
 		dbOps: {
@@ -995,15 +1012,17 @@ test("pool status without a caller maps its requested model", async () => {
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			teamRouting: {
-				enabled: true,
-				allowlistedAccountUuids: ["seat"],
-				maxUsage: 0.9,
-				weeklyMaxUsage: 0.9,
-				weeklyMaxUsageByEmail: {},
-				callerWeeklyMaxUsage: {},
-				holdSeconds: 0,
-				admissionWaitMs: 100,
+			routing: { holdSeconds: 0 },
+			providerPools: {
+				[provider.name]: {
+					enabled: true,
+					allowlistedAccountUuids: ["seat"],
+					maxUsage: 0.9,
+					weeklyMaxUsage: 0.9,
+					weeklyMaxUsageByEmail: {},
+					callerWeeklyMaxUsage: {},
+					admissionWaitMs: 100,
+				},
 			},
 		},
 		dbOps: {
@@ -1036,6 +1055,7 @@ test("pool status without a caller maps its requested model", async () => {
 		signal: new AbortController().signal,
 	} as const;
 	expect(await supply.status(route)).toEqual({
+		poolEnabled: true,
 		servableSeats: 0,
 		retryAt: now + 60_000,
 		admissionWaitMs: 100,
@@ -1054,8 +1074,8 @@ test("closing a websocket session during a failed refresh prevents trying the ne
 	const ctx = {
 		runtime: {
 			quotaThreshold: 0.98,
-			blockWhenAllFull: true,
-			teamRouting: { enabled: false },
+			routing: { holdSeconds: 0 },
+			providerPools: { [provider.name]: { enabled: false } },
 		},
 		strategy: { select: (accounts: Account[]) => accounts },
 		dbOps: {

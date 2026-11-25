@@ -1,5 +1,5 @@
 import {
-	type TeamRoutingConfig,
+	type ProviderPoolSettings,
 	WINDOW_WARMUP_DEFAULTS,
 } from "@agent-smith/config";
 
@@ -19,7 +19,7 @@ export type AdmissionPermit = {
 
 type QueuedRequest = {
 	abort?: () => void;
-	config: TeamRoutingConfig;
+	config: ProviderPoolSettings;
 	deadline: number;
 	reject: (reason: Error) => void;
 	resolve: (permit: AdmissionPermit) => void;
@@ -28,7 +28,7 @@ type QueuedRequest = {
 
 type AccountAdmission = {
 	active: number;
-	config: TeamRoutingConfig;
+	config: ProviderPoolSettings;
 	queue: QueuedRequest[];
 	rampTimer: ReturnType<typeof setTimeout> | undefined;
 	switchedAt: number | undefined;
@@ -45,7 +45,7 @@ export class TeamAdmission {
 
 	acquire(
 		accountId: string,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 		signal?: AbortSignal,
 	): Promise<AdmissionPermit> {
 		if (!config.enabled || config.admissionCap < 1) {
@@ -106,13 +106,12 @@ export class TeamAdmission {
 			weeklyMaxUsage: 0.95,
 			weeklyMaxUsageByEmail: {},
 			callerWeeklyMaxUsage: {},
-			callerProviderFallback: {},
 			admissionCap: 1,
 			admissionQueueLimit: 0,
 			admissionWaitMs: 0,
-			holdSeconds: 0,
 			quotaProbeSeconds: 0,
 			windowWarmup: WINDOW_WARMUP_DEFAULTS,
+			blockWhenAllFull: true,
 		});
 		// Already-serving siblings are warm; a new arrival must not shrink their cap.
 		if (account.active > 0 || account.queue.length > 0) return;
@@ -135,7 +134,7 @@ export class TeamAdmission {
 
 	private account(
 		accountId: string,
-		config: TeamRoutingConfig,
+		config: ProviderPoolSettings,
 	): AccountAdmission {
 		const existing = this.accounts.get(accountId);
 		if (existing) return existing;

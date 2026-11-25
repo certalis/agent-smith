@@ -9,10 +9,46 @@ const body = (opening: string) =>
 export default defineScenario({
 	name: "disabling distribution drains existing conversation pins and changes only new conversations",
 	config: {
-		team_routing: {
-			enabled: true,
-			allowlisted_account_uuids: ["acct-a", "acct-b"],
-			admission_cap: 5,
+		providers: {
+			"claude-code": {
+				enabled: true,
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			anthropic: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			openai: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+			codex: {
+				pool: {
+					members: ["acct-a", "acct-b"],
+					admission: {
+						cap: 5,
+					},
+				},
+			},
+		},
+		routing: {
+			routes: {},
+			api_key_accounts: "chooser_or_fallback",
+			callers: {},
+			hold_seconds: 0,
 		},
 	},
 	environment: { AGENT_SMITH_ADMIN_KEY: "scenario-admin-key" },
@@ -29,13 +65,13 @@ export default defineScenario({
 		{ type: "request", body: body("second"), sessionId: "second-session" },
 		{
 			type: "request",
-			path: "/api/config/team-routing",
+			path: "/api/config/providers/claude-code/pool",
 			headers: { "x-api-key": "scenario-admin-key" },
 			body: JSON.stringify({
 				enabled: true,
 				distribution_enabled: false,
-				allowlisted_account_uuids: ["acct-a", "acct-b"],
-				admission_cap: 5,
+				members: ["acct-a", "acct-b"],
+				admission: { cap: 5 },
 			}),
 		},
 		{ type: "request", body: body("second"), sessionId: "second-session" },

@@ -1,5 +1,13 @@
 {
-	"provider_pools": {
-		"openai-responses": ["openai"]
-	}
+  "providers": {},
+  "routing": {
+    "routes": {
+      "openai-responses": [
+        "openai"
+      ]
+    },
+    "api_key_accounts": "everyone",
+    "callers": {},
+    "hold_seconds": 0
+  }
 }

@@ -15,8 +15,8 @@ import {
 	formatPoolLimits,
 	type LocalPoolState,
 	localPoolState,
-	nextTeamRoutingConfig,
-	teamRoutingFileConfig,
+	nextProviderPoolSettings,
+	providerPoolFileConfig,
 } from "./local-pool";
 
 export interface AddAccountProviderOption {
@@ -177,14 +177,13 @@ export async function addAccount(options: AddAccountOptions): Promise<void> {
 export async function getAccounts(): Promise<LocalPoolAccount[]> {
 	const dbOps = DatabaseFactory.getInstance();
 	const config = new Config();
-	const routing = config.getTeamRouting();
 	const providerRegistry = createConfiguredProviderRegistry(
 		config.getProviderConfigs(),
 	);
 	const now = Date.now();
 	return dbOps.getAllAccounts().map((account) => ({
 		...toAccountDisplay(account, now),
-		poolState: localPoolState(account, routing),
+		poolState: localPoolState(account, config.getTeamRouting(account.provider)),
 		poolLimits: formatPoolLimits(account.quota_state ?? null),
 		providerDisabled: !providerRegistry.getProvider(account.provider),
 	}));
@@ -201,12 +200,12 @@ export function setAccountPoolMembership(
 		throw new Error("Account not found");
 	}
 
-	const nextRouting = nextTeamRoutingConfig(
-		config.getTeamRouting(),
+	const nextRouting = nextProviderPoolSettings(
+		config.getTeamRouting(account.provider),
 		account,
 		pooled,
 	);
-	config.setTeamRouting(teamRoutingFileConfig(nextRouting));
+	config.setProviderPool(account.provider, providerPoolFileConfig(nextRouting));
 }
 
 export async function removeAccount(name: string): Promise<void> {

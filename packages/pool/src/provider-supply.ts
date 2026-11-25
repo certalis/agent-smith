@@ -6,6 +6,7 @@ import type {
 	ServeOutcome,
 	SessionOutcome,
 } from "@agent-smith/capacity";
+import { runtimeForProvider } from "@agent-smith/config";
 import { Logger } from "@agent-smith/logger";
 import type { Provider } from "@agent-smith/providers";
 import type { Account, ProviderWire } from "@agent-smith/types";
@@ -61,7 +62,7 @@ export async function serveSelectedAccounts(
 				request.ctx.teamRouter?.rebind(
 					request.teamRequest,
 					account.id,
-					request.ctx.runtime.teamRouting,
+					request.ctx.runtime.pool,
 					request.ctx.provider,
 					request.ctx.dbOps,
 				);
@@ -210,6 +211,7 @@ export class ProviderSupply implements RoutedProvider {
 					);
 		return {
 			...this.context,
+			runtime: runtimeForProvider(this.context.runtime, this.name),
 			provider: this.provider,
 			providerName: this.name,
 			upstreamPath: resolved?.upstreamPath ?? "/",
@@ -287,7 +289,7 @@ export class ProviderSupply implements RoutedProvider {
 				ctx.teamRouter?.eligibleAccounts(
 					fleet,
 					teamRequest,
-					ctx.runtime.teamRouting,
+					ctx.runtime.pool,
 				) ?? fleet;
 			const id = getThreadAccount();
 			return id ? eligible.filter((account) => account.id === id) : eligible;
@@ -348,7 +350,7 @@ export class ProviderSupply implements RoutedProvider {
 				ctx.teamRouter?.eligibleAccounts(
 					accounts,
 					teamRequest,
-					ctx.runtime.teamRouting,
+					ctx.runtime.pool,
 				) ?? accounts;
 			accounts = route.apiKeyAccounts
 				? accounts.filter(
@@ -358,7 +360,7 @@ export class ProviderSupply implements RoutedProvider {
 				: pooled;
 			const pinnedId = ctx.teamRouter?.getPinnedAccountId(
 				teamRequest,
-				ctx.runtime.teamRouting,
+				ctx.runtime.pool,
 				ctx.provider,
 				ctx.dbOps,
 			);
@@ -378,16 +380,19 @@ export class ProviderSupply implements RoutedProvider {
 	async conversationAffinity(
 		route: RouteRequest,
 	): Promise<{ holdsConversation: boolean; hasConversationPin: boolean }> {
+		const view = this.requestView(route);
+		if (!view.ctx.runtime.pool.enabled)
+			return { holdsConversation: false, hasConversationPin: false };
 		let pins = conversationPins.get(this.context);
 		if (!pins) {
 			pins = new WeakMap();
 			conversationPins.set(this.context, pins);
 		}
 		if (!pins.has(route)) {
-			const { ctx, teamRequest } = this.requestView(route);
+			const { ctx, teamRequest } = view;
 			const pinnedId = ctx.teamRouter?.getPinnedAccountId(
 				teamRequest,
-				ctx.runtime.teamRouting,
+				ctx.runtime.pool,
 				ctx.provider,
 				ctx.dbOps,
 			);
@@ -420,11 +425,11 @@ export class ProviderSupply implements RoutedProvider {
 			.getAvailableAccountsByProvider(this.name)
 			.some((account) => {
 				if (threadAccount && account.id !== threadAccount) return false;
-				const teamEnabled = ctx.runtime.teamRouting.enabled;
+				const teamEnabled = ctx.runtime.pool.enabled;
 				const pooled =
 					account.auth_method !== "api_key" &&
 					(!teamEnabled ||
-						(isAllowlisted(account, ctx.runtime.teamRouting) &&
+						(isAllowlisted(account, ctx.runtime.pool) &&
 							(!route.seatHint || account.name === route.seatHint)));
 				const keyReached =
 					route.apiKeyAccounts && account.auth_method === "api_key";
@@ -462,31 +467,31 @@ export class ProviderSupply implements RoutedProvider {
 	}
 
 	async status(route: RouteRequest): Promise<ProviderStatus> {
+		const context = {
+			...this.context,
+			runtime: runtimeForProvider(this.context.runtime, this.name),
+		};
 		const mapped =
 			route.scope.kind === "pool-route"
 				? this.mapModel(route.model)
 				: route.model;
 		if (mapped === null)
 			return {
+				poolEnabled: context.runtime.pool.enabled,
 				servableSeats: 0,
 				retryAt: null,
-				admissionWaitMs: this.context.runtime.teamRouting.admissionWaitMs,
+				admissionWaitMs: context.runtime.pool.admissionWaitMs,
 			};
 		if (route.scope.kind === "pool-route" && route.callerId) {
 			return getProviderCallerStatus(
 				this.name,
 				mapped,
 				route.callerId,
-				this.context,
+				context,
 				route.apiKeyAccounts,
 			);
 		}
-		const snapshot = getPoolStatus(this.name, mapped, this.context);
-		return {
-			servableSeats: snapshot.eligibleAccounts,
-			retryAt: snapshot.retryAtMs,
-			admissionWaitMs: snapshot.admissionWaitMs,
-		};
+		return getPoolStatus(this.name, mapped, context);
 	}
 
 	async openSession(route: RouteRequest): Promise<SessionOutcome> {

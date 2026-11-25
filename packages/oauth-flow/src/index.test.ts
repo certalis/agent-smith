@@ -225,9 +225,11 @@ describe("OAuthFlow", () => {
 
 	it("refuses a Codex browser OAuth workspace outside the enabled allowlist", async () => {
 		const { config, dbOps } = createTestContext({
-			team_routing: {
-				enabled: true,
-				allowlisted_account_uuids: ["allowlisted-codex-workspace"],
+			providers: {
+				codex: {
+					enabled: true,
+					pool: { members: ["allowlisted-codex-workspace"] },
+				},
 			},
 		});
 		const oauthFlow = await createOAuthFlow(dbOps, config);
@@ -259,9 +261,8 @@ describe("OAuthFlow", () => {
 
 	it("allows an explicitly local pool enrollment to create its verified Codex seat", async () => {
 		const { config, dbOps } = createTestContext({
-			team_routing: {
-				enabled: true,
-				allowlisted_account_uuids: ["existing-seat"],
+			providers: {
+				codex: { enabled: true, pool: { members: ["existing-seat"] } },
 			},
 		});
 		const oauthFlow = await createOAuthFlow(dbOps, config);
@@ -338,9 +339,11 @@ describe("OAuthFlow", () => {
 
 	it("refuses a Claude Code OAuth identity outside the enabled seat allowlist", async () => {
 		const { config, dbOps } = createTestContext({
-			team_routing: {
-				enabled: true,
-				allowlisted_account_uuids: ["allowed-account"],
+			providers: {
+				"claude-code": {
+					enabled: true,
+					pool: { members: ["allowed-account"] },
+				},
 			},
 		});
 		const oauthFlow = await createOAuthFlow(dbOps, config);
