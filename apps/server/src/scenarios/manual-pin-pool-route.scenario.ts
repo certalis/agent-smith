@@ -13,11 +13,13 @@ export default defineScenario({
 		provider_pools: { "anthropic-messages": ["claude-code", "second-claude"] },
 		team_routing: {
 			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b"],
+			allowlisted_account_uuids: ["seat-a", "seat-b", "decoy-a", "decoy-b"],
 		},
 	},
 	fleet: [
+		{ name: "first-decoy", provider: "claude-code", accountUuid: "decoy-a" },
 		{ name: "first-seat", provider: "claude-code", accountUuid: "seat-a" },
+		{ name: "second-decoy", provider: "second-claude", accountUuid: "decoy-b" },
 		{ name: "second-seat", provider: "second-claude", accountUuid: "seat-b" },
 	],
 	upstream: [
@@ -33,6 +35,12 @@ export default defineScenario({
 		},
 		{
 			type: "request",
+			id: "second-without-choice",
+			path: "/tc-acct/second-seat/v1/pool/anthropic-messages/v1/messages",
+			body,
+		},
+		{
+			type: "request",
 			id: "second",
 			path: "/tc-acct/second-seat/v1/pool/anthropic-messages/v1/messages",
 			body,
@@ -44,9 +52,9 @@ export default defineScenario({
 	],
 	assertions: [
 		{
-			id: "both-manual-requests-succeed",
+			id: "manual-pin-without-a-provider-choice-does-not-walk-the-pool",
 			type: "client",
-			statuses: [200, 200],
+			statuses: [200, 503, 200],
 		},
 		{
 			id: "each-request-reaches-the-named-seat",

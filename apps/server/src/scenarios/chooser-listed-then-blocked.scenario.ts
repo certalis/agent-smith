@@ -84,6 +84,19 @@ export default defineScenario({
 			type: "client",
 			request: "chosen-blocks",
 			status: 429,
+			header: { name: "content-type", value: "application/problem+json" },
+		},
+		{
+			id: "capacity-problem-identifies-selected-provider",
+			type: "client",
+			request: "chosen-blocks",
+			jsonPath: { path: "blockedProvider", value: "kimi-claude" },
+		},
+		{
+			id: "capacity-problem-gives-category",
+			type: "client",
+			request: "chosen-blocks",
+			jsonPath: { path: "category", value: "token-allocation" },
 		},
 		{
 			id: "next-request-can-enter-with-zero-queue",

@@ -16,14 +16,29 @@ export default defineScenario({
 		provider_pools: { "anthropic-messages": ["claude-code", "second-claude"] },
 		team_routing: {
 			enabled: true,
-			allowlisted_account_uuids: ["seat-a", "seat-b"],
+			allowlisted_account_uuids: ["seat-a", "seat-b", "seat-preferred"],
 		},
 	},
 	fleet: [
 		{ name: "first", provider: "claude-code", accountUuid: "seat-a" },
-		{ name: "second", provider: "second-claude", accountUuid: "seat-b" },
+		{
+			name: "second-preferred",
+			provider: "second-claude",
+			accountUuid: "seat-preferred",
+			priority: 0,
+			rateLimitedFor: "1m",
+		},
+		{
+			name: "second",
+			provider: "second-claude",
+			accountUuid: "seat-b",
+			priority: 1,
+		},
 	],
-	upstream: [{ account: "second", status: 200, json: { ok: true } }],
+	upstream: [
+		{ account: "second", status: 200, json: { ok: true } },
+		{ account: "second-preferred", status: 200, json: { ok: true } },
+	],
 	steps: [
 		{
 			type: "request",
@@ -36,6 +51,7 @@ export default defineScenario({
 				"x-agent-smith-provider-choice": "second-claude",
 			},
 		},
+		{ type: "advance", by: "2m" },
 		{ type: "restart" },
 		{ type: "request", id: "resume", path, body, sessionId: "restart-choice" },
 		{
@@ -49,9 +65,9 @@ export default defineScenario({
 	assertions: [
 		{ id: "all-turns-succeed", type: "client", statuses: [200, 200, 200] },
 		{
-			id: "same-seat-and-provider-even-with-a-different-opening",
+			id: "seat-pin-and-provider-preference-survive-independently",
 			type: "upstream",
-			accounts: ["second", "second", "second"],
+			accounts: ["second", "second", "second-preferred"],
 		},
 	],
 });

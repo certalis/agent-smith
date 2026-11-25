@@ -481,6 +481,9 @@ describe("WebSocket failover characterization", () => {
 			(state) => state === FakeUpstreamWebSocket.OPEN,
 		);
 		expect(FakeUpstreamWebSocket.captures).toHaveLength(2);
+		expect(FakeUpstreamWebSocket.captures[0]?.headers.authorization).toBe(
+			"Bearer codex-access-token",
+		);
 		expect(second.headers.authorization).toBe("Bearer second-access-token");
 		expect(calls()).toEqual({ admissionCalls: 0, inFlightCalls: 0 });
 		websocketProxyHandler.close?.(
@@ -488,6 +491,31 @@ describe("WebSocket failover characterization", () => {
 			1000,
 			"done",
 		);
+	});
+
+	it("does not retry a failure immediately after opening, before any messages", async () => {
+		globalThis.WebSocket =
+			FakeUpstreamWebSocket as unknown as typeof globalThis.WebSocket;
+		const { downstream, calls } = startWithSeats();
+		const first = await waitFor(
+			() => FakeUpstreamWebSocket.captures[0] ?? null,
+			(value): value is FakeUpstreamCapture => value !== null,
+		);
+		await waitFor(
+			() => first.socket.readyState,
+			(state) => state === FakeUpstreamWebSocket.OPEN,
+		);
+		first.socket.close(1011, "upstream failed before reply");
+		await waitFor(
+			() => downstream.closeCalls.length,
+			(count) => count > 0,
+		);
+		expect(FakeUpstreamWebSocket.captures).toHaveLength(1);
+		expect(first.sent).toHaveLength(0);
+		expect(downstream.closeCalls[0]?.reason).toBe(
+			"upstream failed before reply",
+		);
+		expect(calls()).toEqual({ admissionCalls: 0, inFlightCalls: 0 });
 	});
 
 	it("does not retry a websocket after the upstream has opened", async () => {

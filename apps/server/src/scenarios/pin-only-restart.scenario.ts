@@ -3,6 +3,8 @@ import { standaloneRequest, standaloneWire } from "./harness/wire-fixture";
 
 const body =
 	'{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"persist my seat"}]}' as const;
+const changedOpening =
+	'{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"different opening"}]}' as const;
 
 export default defineScenario({
 	...standaloneWire,
@@ -32,13 +34,19 @@ export default defineScenario({
 		{ ...standaloneRequest, id: "fallback", body, sessionId: "restart-pin" },
 		{ type: "restart" },
 		{ ...standaloneRequest, id: "resume", body, sessionId: "restart-pin" },
+		{
+			...standaloneRequest,
+			id: "new-opening",
+			body: changedOpening,
+			sessionId: "restart-pin",
+		},
 	],
 	assertions: [
-		{ id: "both-turns-succeed", type: "client", statuses: [200, 200] },
+		{ id: "all-turns-succeed", type: "client", statuses: [200, 200, 200] },
 		{
 			id: "after-restart-pin-skips-first",
 			type: "upstream",
-			accounts: ["first", "second", "second"],
+			accounts: ["first", "second", "second", "first"],
 		},
 	],
 });

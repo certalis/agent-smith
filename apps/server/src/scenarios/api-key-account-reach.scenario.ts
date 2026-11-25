@@ -30,7 +30,7 @@ function reachScenario(
 	return defineScenario({
 		...standaloneWire,
 		...(pool ? {} : { standalone: false, edge: {} }),
-		name: `API-key reach: team ${team ? "on" : "off"}, ${mixed ? "mixed" : "keys only"}, ${pool ? "pool" : "direct"}, ${caller}`,
+		name: `API-key reach: team ${team ? "on" : "off"}, ${mixed ? "mixed" : "keys only"}, ${pool ? "pool device" : "direct proxy"}, ${caller}`,
 		config: {
 			providers: {
 				"reach-provider": { enabled: true, strategy: "anthropic-api" },
@@ -51,6 +51,7 @@ function reachScenario(
 							name: "seat",
 							provider: "reach-provider",
 							accountUuid: "seat-uuid",
+							priority: 1,
 						},
 					]
 				: []),
