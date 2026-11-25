@@ -27,6 +27,7 @@ const API_KEY_EXAMPLES = [
 	"openai-api-key.json",
 	"compatible-endpoint-fallback.json",
 	"model-studio-compatible-providers.json",
+	"kimi-code-providers.json",
 ];
 
 function exampleConfig(name: string): Config {
@@ -286,6 +287,19 @@ describe("README example configurations", () => {
 		});
 		expect(config.getProviderConfig("kimi-codex")?.models).toEqual({
 			"gpt-5.6-*": "kimi-k3.1-pro",
+		});
+	});
+
+	it("sends every Claude model of a Kimi Code key to Kimi's coding endpoint", () => {
+		const config = exampleConfig("kimi-code-providers.json");
+
+		expect(config.getProviderPool("anthropic-messages")).toEqual([
+			"kimi-code-claude",
+		]);
+		expect(config.getProviderConfig("kimi-code-claude")).toMatchObject({
+			strategy: "kimi-code-anthropic-api",
+			baseUrl: "https://api.kimi.ai/coding",
+			models: { "claude-*": "k3.1-pro" },
 		});
 	});
 

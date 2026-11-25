@@ -30,7 +30,9 @@ policy. Those responsibilities stay in `routing` and the proxy pool.
 Configured API-key providers may also use `model-studio-anthropic-api`. It is
 an Anthropic Messages-compatible Model Studio adapter: it keeps Messages
 payloads intact and classifies only Model Studio's documented capacity codes.
-It is not a Google or OpenAI protocol translator.
+It is not a Google or OpenAI protocol translator. `kimi-code-anthropic-api` is
+the same Messages pass-through for Kimi Code, which reads every 429 as a full
+provider, so the pool can move on instead of failing the one request.
 
 These are exposed through `/v1/{provider}/...` routes.
 

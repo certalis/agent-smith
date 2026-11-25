@@ -9,7 +9,7 @@ import {
 	deleteClientCredentialHeaders,
 	deleteTransportHeaders,
 } from "../../base";
-import { classifyGoogleGeminiCapacityBlock } from "../../connectors/google-gemini-capacity";
+import { classifyRetryAfterCapacityBlock } from "../../connectors/retry-after-capacity";
 import type {
 	ProviderRequestTransform,
 	ProviderRequestTransformInput,
@@ -25,7 +25,7 @@ export class GoogleGeminiProvider extends BaseProvider {
 	wire = "anthropic-messages" as const;
 
 	async getCapacityBlock(response: Response) {
-		return await classifyGoogleGeminiCapacityBlock(response);
+		return await classifyRetryAfterCapacityBlock(response);
 	}
 
 	prepareHeaders(headers: Headers, account: Account | null): Headers {
