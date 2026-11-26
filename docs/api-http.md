@@ -850,6 +850,8 @@ Get detailed analytics data.
 - `mode` - Display mode: `normal`, `cumulative` (default: `normal`). Cumulative mode shows running totals over time
 - `modelBreakdown` - Include per-model time series data: `true`, `false` (default: `false`)
 
+`callerBreakdown` groups usage by the named device key that sent each request, most expensive first. `caller` is `null` for the forwarding key, the administrator key, local requests and rows recorded before callers were stored.
+
 **Response:**
 ```json
 {
@@ -891,6 +893,20 @@ Get detailed analytics data.
   ],
   "accountPerformance": [
     {"name": "account1", "requests": 2500, "successRate": 99}
+  ],
+  "callerBreakdown": [
+    {
+      "caller": "alice-laptop",
+      "requests": 1200,
+      "tokenBreakdown": {
+        "inputTokens": 3000,
+        "cacheReadInputTokens": 90000000,
+        "cacheCreationInputTokens": 2000000,
+        "outputTokens": 400000
+      },
+      "totalCostUsd": 42.10
+    },
+    {"caller": null, "requests": 300, "tokenBreakdown": {"inputTokens": 0, "cacheReadInputTokens": 0, "cacheCreationInputTokens": 0, "outputTokens": 0}, "totalCostUsd": 0}
   ],
   "costByModel": [
     {"model": "claude-3-opus-20240229", "costUsd": 100.50, "requests": 3000, "totalTokens": 1200000}

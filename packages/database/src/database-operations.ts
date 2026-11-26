@@ -358,6 +358,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 			payload?: unknown;
 			storePayload?: boolean;
 			timings?: RequestData["timings"];
+			callerId?: string;
 		},
 	): void {
 		this.requests.save({
@@ -377,6 +378,7 @@ export class DatabaseOperations implements StrategyStore, Disposable {
 			payload: options?.payload,
 			storePayload: options?.storePayload,
 			timings: options?.timings,
+			caller: options?.callerId ?? null,
 		});
 	}
 

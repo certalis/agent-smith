@@ -24,12 +24,17 @@ function bodyTooLargeError(maxBodyBytes: number): HttpError {
  * @param url - The parsed URL
  * @returns Request metadata object
  */
-export function createRequestMetadata(req: Request, url: URL): RequestMeta {
+export function createRequestMetadata(
+	req: Request,
+	url: URL,
+	callerId?: string,
+): RequestMeta {
 	return {
 		id: crypto.randomUUID(),
 		method: isHttpMethod(req.method) ? req.method : "GET",
 		path: url.pathname,
 		timestamp: Date.now(),
+		...(callerId !== undefined && { callerId }),
 	};
 }
 

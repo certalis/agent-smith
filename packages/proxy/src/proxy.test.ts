@@ -786,6 +786,47 @@ describe("handleProxy routing", () => {
 		]);
 	});
 
+	it("tells the usage worker which named device sent a pooled request", async () => {
+		const kimi = createTestProvider("kimi-claude");
+		const account = {
+			...createTestAccount(),
+			id: "kimi-account",
+			provider: "kimi-claude",
+			auth_method: "api_key",
+			api_key: "kimi-api-key",
+		} as Account;
+		globalThis.fetch = mock(() =>
+			Promise.resolve(new Response("served")),
+		) as unknown as typeof fetch;
+		const context = createProxyContext([kimi], [account], {
+			"anthropic-messages": ["kimi-claude"],
+		});
+		const messages: unknown[] = [];
+		context.usageWorker = {
+			postMessage: (message: unknown) => messages.push(message),
+		} as unknown as Worker;
+		const url = new URL(
+			"http://localhost:8080/v1/pool/anthropic-messages/v1/messages",
+		);
+
+		const response = await handleProxy(
+			new Request(url, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: '{"model":"claude-sonnet-4-5","messages":[]}',
+			}),
+			url,
+			context,
+			"alice-laptop",
+		);
+
+		expect(response.status).toBe(200);
+		expect(messages[0]).toMatchObject({
+			type: "start",
+			callerId: "alice-laptop",
+		});
+	});
+
 	it("keeps an interactive policy caller on a blocked provider until a choice is sent", async () => {
 		const qwen = createTestProvider("qwen-claude", {
 			category: "token-allocation",

@@ -293,6 +293,75 @@ describe("DatabaseOperations", () => {
 		}
 	});
 
+	it("breaks analytics down by the device caller that sent each request", () => {
+		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
+		tempDirs.push(tempDir);
+
+		const dbOps = new DatabaseOperations(join(tempDir, "agent-smith.db"));
+
+		try {
+			const now = Date.now();
+			const save = (id: string, costUsd: number, callerId?: string) =>
+				dbOps.saveRequest(
+					id,
+					"POST",
+					"/v1/claude-code/v1/messages",
+					"claude-code",
+					"/v1/messages",
+					null,
+					200,
+					true,
+					null,
+					100,
+					0,
+					{
+						model: "claude-sonnet",
+						inputTokens: 1,
+						cacheReadInputTokens: 10,
+						cacheCreationInputTokens: 2,
+						outputTokens: 3,
+						costUsd,
+					},
+					{ timestamp: now - 1_000, storePayload: false, callerId },
+				);
+			save("alice-1", 1, "alice-laptop");
+			save("alice-2", 2, "alice-laptop");
+			save("bob-1", 0.5, "bob-laptop");
+			save("forwarding-key", 0.25);
+
+			const analytics = dbOps.getAnalytics({
+				startMs: now - 10_000,
+				bucketMs: 1_000,
+			});
+
+			expect(analytics.callerBreakdown).toEqual([
+				{
+					caller: "alice-laptop",
+					requests: 2,
+					tokenBreakdown: {
+						inputTokens: 2,
+						cacheReadInputTokens: 20,
+						cacheCreationInputTokens: 4,
+						outputTokens: 6,
+					},
+					totalCostUsd: 3,
+				},
+				expect.objectContaining({
+					caller: "bob-laptop",
+					requests: 1,
+					totalCostUsd: 0.5,
+				}),
+				expect.objectContaining({
+					caller: null,
+					requests: 1,
+					totalCostUsd: 0.25,
+				}),
+			]);
+		} finally {
+			dbOps.close();
+		}
+	});
+
 	it("resets statistics consistently through the shared facade helper", () => {
 		const tempDir = mkdtempSync(join(tmpdir(), "agent-smith-db-ops-"));
 		tempDirs.push(tempDir);

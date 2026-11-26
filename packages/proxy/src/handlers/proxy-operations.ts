@@ -166,6 +166,7 @@ function createForwarder(
 				retryAttempt: 0,
 				failoverAttempts: input.failoverAttempts,
 				preExtractedModel: input.mappedModel ?? input.requestMeta.model,
+				callerId: input.requestMeta.callerId,
 			},
 			input.ctx,
 		);

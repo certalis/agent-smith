@@ -39,6 +39,9 @@ export interface StartMessage {
 
 	/** False when payload retention is 0 days: the metadata document is not written. */
 	storePayload: boolean;
+
+	/** The named device key that sent the request, for per-caller usage. */
+	callerId?: string;
 }
 
 export interface ChunkMessage {

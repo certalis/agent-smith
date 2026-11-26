@@ -14,6 +14,8 @@ export interface RequestMeta {
 	model?: string;
 	path: string;
 	timestamp: number;
+	/** The named device key that sent the request; absent for every other key. */
+	callerId?: string;
 }
 
 export interface PoolStatus {

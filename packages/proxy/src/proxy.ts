@@ -137,7 +137,7 @@ export async function handleProxy(
 		if (!upstreamUrl.pathname.startsWith("/v1/pool/")) {
 			return new Response("Not Found", { status: 404 });
 		}
-		const requestMeta = createRequestMetadata(req, upstreamUrl);
+		const requestMeta = createRequestMetadata(req, upstreamUrl, callerId);
 		const { buffer } = await prepareRequestBody(req, ctx.runtime.maxBodyBytes);
 		const body = buffer ?? null;
 		requestMeta.model = readRequestModel(body);
@@ -163,7 +163,7 @@ export async function handleProxy(
 			callerId,
 		);
 	}
-	const requestMeta = createRequestMetadata(req, upstreamUrl);
+	const requestMeta = createRequestMetadata(req, upstreamUrl, callerId);
 	const { buffer } = await prepareRequestBody(
 		req,
 		requestContext.runtime.maxBodyBytes,

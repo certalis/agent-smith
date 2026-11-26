@@ -139,6 +139,13 @@ export interface AnalyticsResponse {
 		totalTokens: number;
 		totalCostUsd: number;
 	}>;
+	/** Usage per named device key; `caller` is null for every other key. */
+	callerBreakdown: Array<{
+		caller: string | null;
+		requests: number;
+		tokenBreakdown: TokenBreakdown;
+		totalCostUsd: number;
+	}>;
 	costByModel: Array<{
 		model: string;
 		costUsd: number;

@@ -81,6 +81,7 @@ export interface RequestData {
 		upstreamTtfbMs?: number | null;
 		streamingDurationMs?: number | null;
 	};
+	caller?: string | null;
 }
 
 interface PersistRequestData extends RequestData {
@@ -190,7 +191,8 @@ export class RequestRepository extends BaseRepository<RequestData> {
 					response_id = ?,
 					previous_response_id = ?,
 					response_chain_id = ?,
-					client_session_id = ?
+					client_session_id = ?,
+					caller = ?
 				WHERE id = ?
 			`,
 				[
@@ -223,6 +225,7 @@ export class RequestRepository extends BaseRepository<RequestData> {
 					linkage.previousResponseId,
 					responseChainId,
 					linkage.clientSessionId,
+					data.caller ?? null,
 					data.id,
 				],
 			);

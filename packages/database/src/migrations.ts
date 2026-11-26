@@ -105,6 +105,7 @@ function ensureRequestLinkageColumns(db: Database): void {
 		["proxy_overhead_ms", "INTEGER"],
 		["upstream_ttfb_ms", "INTEGER"],
 		["streaming_duration_ms", "INTEGER"],
+		["caller", "TEXT"],
 	] as const;
 
 	for (const [columnName, columnType] of requestColumns) {
@@ -622,7 +623,8 @@ export function ensureSchema(db: Database): void {
 			ttft_ms INTEGER,
 			proxy_overhead_ms INTEGER,
 			upstream_ttfb_ms INTEGER,
-			streaming_duration_ms INTEGER
+			streaming_duration_ms INTEGER,
+			caller TEXT
 		)
 	`);
 
