@@ -59,31 +59,42 @@ function fixture(client: Record<string, unknown> = { pool_ssh_host: HOST }) {
 	directories.push(root);
 	const plugins = join(root, "plugins");
 	mkdirSync(plugins);
+	const cliBin = join(root, "cli-bin");
+	mkdirSync(cliBin);
 	const configPath = join(root, "agent-smith.json");
 	writeFileSync(configPath, JSON.stringify({ client }), { mode: 0o600 });
 	const output: string[] = [];
 	const deps: Partial<MenubarDeps> = {
 		configPath,
 		cachePath: join(root, "cache", "menubar-status.json"),
-		runtime: "/opt/bun's/bun",
-		entry: () => "/pkg/dist/bin.js",
+		binDirectories: () => [cliBin],
 		pluginDirectory: () => plugins,
 		now: () => NOW,
 		log: (line) => output.push(line),
 	};
 	const run = (command: string, extra: Partial<MenubarDeps> = {}) =>
 		runMenubarCommand([command], { ...deps, ...extra });
-	return { root, plugin: join(plugins, "agent-smith-pool.5m.sh"), output, run };
+	return {
+		root,
+		cliBin,
+		plugin: join(plugins, "agent-smith-pool.5m.sh"),
+		output,
+		run,
+	};
 }
 
 describe("menubar install", () => {
-	it("writes a SwiftBar plugin that runs this package's render command", async () => {
+	it("writes a SwiftBar plugin that finds the CLI each time it runs, so a reinstall keeps it working", async () => {
 		const f = fixture();
 		await f.run("install");
+		writeFileSync(join(f.cliBin, "agent-smith"), `#!/bin/sh\necho "$@"\n`, {
+			mode: 0o755,
+		});
 
-		expect(readFileSync(f.plugin, "utf8")).toContain(
-			`exec '/opt/bun'"'"'s/bun' '/pkg/dist/bin.js' menubar render\n`,
-		);
+		const plugin = Bun.spawnSync(["/bin/sh", f.plugin], {
+			env: { PATH: "/usr/bin:/bin", SSH_AUTH_SOCK: "/tmp/agent.sock" },
+		});
+		expect(plugin.stdout.toString()).toBe("menubar render\n");
 		expect(statSync(f.plugin).mode & 0o777).toBe(0o755);
 	});
 

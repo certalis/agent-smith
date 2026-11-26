@@ -137,8 +137,11 @@ agent-smith menubar uninstall
 ```
 
 `install` writes `agent-smith-pool.5m.sh` into the SwiftBar plugin folder. The
-plugin calls `agent-smith menubar render` every 5 minutes, so updating the
-package updates the menu without reinstalling it. `render` sends a read-only
+plugin calls `agent-smith menubar render` every 5 minutes and looks the command
+up each time: first in the folders where `install` found `agent-smith` and Bun,
+then in `~/.bun/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. Updating the
+package, or reinstalling it with Bun or npm, keeps the menu working without
+reinstalling the plugin. `render` sends a read-only
 status script to the pool host over SSH (`ssh <pool_ssh_host> bun run -`), so
 it adds no HTTP route. The script reads the administrator key on the host and
 returns only account names, pool membership, 5h and 7d usage with their reset

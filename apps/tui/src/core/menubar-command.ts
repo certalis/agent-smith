@@ -3,7 +3,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
-	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -33,8 +32,7 @@ const SSH_OPTIONS = [
 export type MenubarDeps = {
 	configPath: string;
 	cachePath: string;
-	runtime: string;
-	entry: () => string;
+	binDirectories: () => string[];
 	pluginDirectory: () => string | null;
 	fetchStatus: (host: string) => Promise<PoolStatus>;
 	now: () => number;
@@ -84,6 +82,20 @@ async function fetchPoolStatus(host: string): Promise<PoolStatus> {
 	return JSON.parse(result.stdout.toString()) as PoolStatus;
 }
 
+function cliBinDirectories(): string[] {
+	const found = [Bun.which("agent-smith"), Bun.which("bun")].flatMap((path) =>
+		path ? [dirname(path)] : [],
+	);
+	return [
+		...new Set([
+			...found,
+			join(homedir(), ".bun", "bin"),
+			"/opt/homebrew/bin",
+			"/usr/local/bin",
+		]),
+	];
+}
+
 function defaultDeps(): MenubarDeps {
 	return {
 		configPath: resolveConfigPath(),
@@ -94,8 +106,7 @@ function defaultDeps(): MenubarDeps {
 			"agent-smith",
 			"menubar-status.json",
 		),
-		runtime: Bun.which("bun") ?? process.execPath,
-		entry: () => realpathSync(process.argv[1] ?? ""),
+		binDirectories: cliBinDirectories,
 		pluginDirectory: swiftBarPluginDirectory,
 		fetchStatus: fetchPoolStatus,
 		now: Date.now,
@@ -135,14 +146,15 @@ async function loadSnapshot(deps: MenubarDeps): Promise<MenubarSnapshot> {
 	}
 }
 
-function pluginScript(runtime: string, entry: string): string {
+function pluginScript(binDirectories: string[]): string {
 	return `#!/bin/sh
 # <swiftbar.title>Agent Smith pool</swiftbar.title>
 # <swiftbar.hideAbout>true</swiftbar.hideAbout>
 # <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
 # <swiftbar.hideLastUpdated>true</swiftbar.hideLastUpdated>
 export SSH_AUTH_SOCK="\${SSH_AUTH_SOCK:-$(/bin/launchctl getenv SSH_AUTH_SOCK)}"
-exec ${shellQuote(runtime)} ${shellQuote(entry)} ${PLUGIN_MARKER}
+export PATH=${shellQuote(binDirectories.join(":"))}:"$PATH"
+exec agent-smith ${PLUGIN_MARKER}
 `;
 }
 
@@ -155,7 +167,7 @@ function install(deps: MenubarDeps): void {
 	if (!readClientRouting(deps.configPath).poolSshHost)
 		throw new Error(`Set client.pool_ssh_host in ${deps.configPath} first`);
 	const path = join(directory, PLUGIN_FILE);
-	writeFileSync(path, pluginScript(deps.runtime, deps.entry()));
+	writeFileSync(path, pluginScript(deps.binDirectories()));
 	chmodSync(path, 0o755);
 	deps.log(
 		`Installed ${path}. SwiftBar shows the pool shortly and refreshes it every 5 minutes.`,
