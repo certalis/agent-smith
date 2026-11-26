@@ -856,6 +856,7 @@ async function handleEnd(msg: EndMessage): Promise<void> {
 				payload,
 				storePayload: startMessage.storePayload,
 				timings,
+				callerId: startMessage.callerId,
 			},
 		),
 	);

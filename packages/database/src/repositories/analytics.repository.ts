@@ -164,6 +164,42 @@ export class AnalyticsRepository extends BaseRepository<never> {
 			totalCostUsd: row.total_cost_usd ?? 0,
 		}));
 
+		const callerBreakdown = this.query<{
+			caller: string | null;
+			requests: number;
+			input_tokens: number | null;
+			cache_read_input_tokens: number | null;
+			cache_creation_input_tokens: number | null;
+			output_tokens: number | null;
+			total_cost_usd: number | null;
+		}>(
+			`
+				SELECT
+					r.caller as caller,
+					COUNT(*) as requests,
+					SUM(COALESCE(r.input_tokens, 0)) as input_tokens,
+					SUM(COALESCE(r.cache_read_input_tokens, 0)) as cache_read_input_tokens,
+					SUM(COALESCE(r.cache_creation_input_tokens, 0)) as cache_creation_input_tokens,
+					SUM(COALESCE(r.output_tokens, 0)) as output_tokens,
+					SUM(COALESCE(r.cost_usd, 0)) as total_cost_usd
+				FROM requests r
+				WHERE ${whereClause}
+				GROUP BY r.caller
+				ORDER BY total_cost_usd DESC, requests DESC
+			`,
+			queryParams,
+		).map((row) => ({
+			caller: row.caller,
+			requests: row.requests,
+			tokenBreakdown: {
+				inputTokens: row.input_tokens ?? 0,
+				cacheReadInputTokens: row.cache_read_input_tokens ?? 0,
+				cacheCreationInputTokens: row.cache_creation_input_tokens ?? 0,
+				outputTokens: row.output_tokens ?? 0,
+			} satisfies TokenBreakdown,
+			totalCostUsd: row.total_cost_usd ?? 0,
+		}));
+
 		// Model performance + p95 in one query (eliminates N+1 p95 loop)
 		const modelPerformance: ModelPerformance[] = this.query<{
 			model: string;
@@ -283,6 +319,7 @@ export class AnalyticsRepository extends BaseRepository<never> {
 				successRate: account.success_rate ?? 0,
 			})),
 			providerBreakdown,
+			callerBreakdown,
 			costByModel,
 			modelPerformance,
 		};

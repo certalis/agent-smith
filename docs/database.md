@@ -78,6 +78,7 @@ erDiagram
         TEXT previous_response_id
         TEXT response_chain_id
         TEXT client_session_id
+        TEXT caller
     }
 
     request_payloads {
@@ -143,6 +144,7 @@ Important fields:
 - `ttft_ms`, `proxy_overhead_ms`, `upstream_ttfb_ms`, `streaming_duration_ms`: decompose latency for streaming and proxy troubleshooting
 - `response_id`, `previous_response_id`, `response_chain_id`: track Responses API lineage without overloading session-level concepts
 - `client_session_id`: stores provider/client session correlation such as Claude Code's `x-claude-code-session-id`
+- `caller`: the device name from `clients.json` whose key sent the request; `NULL` for the forwarding key, the administrator key and local requests. Rows written before this column existed stay `NULL`
 
 ### `request_payloads`
 

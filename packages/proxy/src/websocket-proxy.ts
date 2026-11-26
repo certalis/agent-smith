@@ -65,6 +65,7 @@ export interface WebSocketProxySession {
 	connectedAccount: Account | null;
 	pendingRequestBody: string | null;
 	pendingRequestTimestamp: number | null;
+	callerId?: string;
 }
 
 export interface WebSocketProxyData {
@@ -313,6 +314,7 @@ function startActiveTurn(
 		retryAttempt: 0,
 		failoverAttempts: Math.max(0, session.nextAccountIndex - 1),
 		storePayload: session.requestContext.runtime.storeRequestPayloads,
+		callerId: session.callerId,
 	};
 
 	session.activeTurn = {
@@ -703,7 +705,7 @@ export async function handleWebSocketUpgradeRequest(
 		});
 	}
 
-	const requestMeta = createRequestMetadata(req, url);
+	const requestMeta = createRequestMetadata(req, url, callerId);
 	const teamRequest: TeamRoutingRequest = {
 		body: null,
 		contentType: null,
@@ -768,6 +770,7 @@ export async function handleWebSocketUpgradeRequest(
 		connectedAccount: null,
 		pendingRequestBody: null,
 		pendingRequestTimestamp: null,
+		callerId,
 	};
 	websocketSessions.set(sessionId, session);
 	const upgraded = server.upgrade(req, {

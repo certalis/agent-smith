@@ -36,6 +36,7 @@ export interface ResponseHandlerOptions {
 	retryAttempt: number;
 	failoverAttempts: number;
 	preExtractedModel?: string;
+	callerId?: string;
 }
 
 /**
@@ -60,6 +61,7 @@ export async function forwardToClient(
 		retryAttempt, // Always 0 in new flow, but kept for message compatibility
 		failoverAttempts,
 		preExtractedModel,
+		callerId,
 	} = options;
 
 	// The provider sees its native response only after all capacity decisions
@@ -104,6 +106,7 @@ export async function forwardToClient(
 		retryAttempt,
 		failoverAttempts,
 		storePayload: ctx.runtime.storeRequestPayloads,
+		callerId,
 	};
 	ctx.usageWorker.postMessage(startMessage);
 
